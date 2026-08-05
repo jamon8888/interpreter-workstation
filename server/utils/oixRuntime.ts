@@ -30,6 +30,7 @@ const PROFILE_BLOCK_BEGIN = "# >>> Open Interpreter installer >>>";
 const PROFILE_BLOCK_END = "# <<< Open Interpreter installer <<<";
 const VALID_VERSION = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/;
 const VALID_TARGET = /^[0-9A-Za-z_.-]+$/;
+const installTails = new Map<string, Promise<void>>();
 
 type OixPackageMetadata = {
   version: string;
@@ -54,6 +55,29 @@ type ResolveOixRuntimeOptions = {
   probeBinary?: (binaryPath: string) => Promise<boolean>;
   configureTerminalPath?: boolean;
 };
+
+async function withInstallLock<T>(
+  standaloneRoot: string,
+  operation: () => Promise<T>,
+): Promise<T> {
+  const previous = installTails.get(standaloneRoot) ?? Promise.resolve();
+  let release!: () => void;
+  const current = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const tail = previous.then(() => current);
+  installTails.set(standaloneRoot, tail);
+
+  await previous;
+  try {
+    return await operation();
+  } finally {
+    release();
+    if (installTails.get(standaloneRoot) === tail) {
+      installTails.delete(standaloneRoot);
+    }
+  }
+}
 
 function pathApi(
   platform: NodeJS.Platform,
@@ -454,7 +478,7 @@ async function hasValidTerminalOix(
   return false;
 }
 
-async function installBundledPackage(
+async function installBundledPackageUnlocked(
   packageDir: string,
   metadata: OixPackageMetadata,
   probeBinary: (binaryPath: string) => Promise<boolean>,
@@ -569,6 +593,26 @@ async function installBundledPackage(
     source: "installed",
     version: metadata.version,
   };
+}
+
+async function installBundledPackage(
+  packageDir: string,
+  metadata: OixPackageMetadata,
+  probeBinary: (binaryPath: string) => Promise<boolean>,
+  options: Required<
+    Pick<ResolveOixRuntimeOptions, "platform" | "env" | "homeDir">
+  > & {
+    configureTerminalPath: boolean;
+  },
+): Promise<OixRuntimeResolution> {
+  const paths = getOixStandalonePaths(
+    options.platform,
+    options.env,
+    options.homeDir,
+  );
+  return await withInstallLock(paths.standaloneRoot, async () =>
+    installBundledPackageUnlocked(packageDir, metadata, probeBinary, options),
+  );
 }
 
 export async function resolveOrInstallOixRuntime(

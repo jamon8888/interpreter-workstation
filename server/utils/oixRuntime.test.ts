@@ -219,6 +219,35 @@ describe("OIX shared runtime resolution", () => {
     );
   });
 
+  test("serializes concurrent installs into the same managed home", async () => {
+    const homeDir = await tempDir("oix-concurrent-install-home-");
+    const bundleDir = await tempDir("oix-concurrent-install-bundle-");
+    writePackage(bundleDir, "0.0.34");
+    const options = {
+      platform: "darwin" as const,
+      arch: "arm64",
+      env: { HOME: homeDir, PATH: "", SHELL: "/bin/zsh" },
+      homeDir,
+      bundledPackageCandidates: [bundleDir],
+      probeBinary: async () => true,
+      configureTerminalPath: false,
+    };
+
+    const [first, second] = await Promise.all([
+      resolveOrInstallOixRuntime(options),
+      resolveOrInstallOixRuntime(options),
+    ]);
+    const paths = getOixStandalonePaths("darwin", options.env, homeDir);
+
+    expect(first.binaryPath).toBe(second.binaryPath);
+    expect(realpathSync(paths.managedBinary)).toBe(
+      realpathSync(first.binaryPath),
+    );
+    expect(readFileSync(paths.terminalOwnershipFile, "utf8")).toContain(
+      '"version":"0.0.34"',
+    );
+  });
+
   test("advances the terminal with app updates while Workstation still owns it", async () => {
     const homeDir = await tempDir("oix-owned-update-home-");
     const firstBundle = await tempDir("oix-owned-update-first-");
