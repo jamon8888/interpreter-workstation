@@ -26,6 +26,14 @@ overrides:
   ws: 8.21.1
   underscore@<1.13.8: 1.13.8
 
+patchedDependencies:
+  '@oxidezap/baileyrs@0.0.32':
+    hash: ckgxziy6uxvzjkxxap5rdgovlm
+    path: patches/@oxidezap__baileyrs@0.0.32.patch
+  whatsapp-rust-bridge@0.6.0-alpha.42:
+    hash: yh4pqya7t45lhhrwczokoiso5u
+    path: patches/whatsapp-rust-bridge@0.6.0-alpha.42.patch
+
 importers:
 
   .:
@@ -143,7 +151,7 @@ importers:
         version: 1.17.0
       '@whiskeysockets/baileys':
         specifier: npm:@oxidezap/baileyrs@0.0.32
-        version: '@oxidezap/baileyrs@0.0.32(sharp@0.35.3(@types/node@24.9.1))'
+        version: '@oxidezap/baileyrs@0.0.32(patch_hash=ckgxziy6uxvzjkxxap5rdgovlm)(sharp@0.35.3(@types/node@24.9.1))'
       '@xterm/addon-canvas':
         specifier: 0.7.0
         version: 0.7.0(@xterm/xterm@6.0.0)
@@ -359,7 +367,7 @@ importers:
         version: 1.6.0(react@19.2.6)
       whatsapp-rust-bridge:
         specifier: 0.6.0-alpha.42
-        version: 0.6.0-alpha.42
+        version: 0.6.0-alpha.42(patch_hash=yh4pqya7t45lhhrwczokoiso5u)
       ws:
         specifier: 8.21.1
         version: 8.21.1
@@ -2034,19 +2042,16 @@ packages:
   '@nut-tree-fork/libnut-darwin@2.7.5':
     resolution: {integrity: sha512-LbqtPtMPTJUcg4XoPP2jsU1wc8flBcGyKTerKsIfK9cD7nBHROnO0QksbrsbSWEpLym8T8fRtuU7XEY83l6Z2Q==}
     engines: {node: '>=10.15.3'}
-    cpu: [x64, arm64]
     os: [darwin, linux, win32]
 
   '@nut-tree-fork/libnut-linux@2.7.5':
     resolution: {integrity: sha512-uxaXEcRKnFObAljsoR6tLOBUU1dJ2sctloG6gFgCBGN7+k6Jdv6jZfOuNjd/fpdq2C5WPMm0rtn9EE7h5J3Jcg==}
     engines: {node: '>=10.15.3'}
-    cpu: [x64, arm64]
     os: [darwin, linux, win32]
 
   '@nut-tree-fork/libnut-win32@2.7.5':
     resolution: {integrity: sha512-yqC87zvmFcDPwFrRU40DYhN0xmEVM3aSkOuyF0IX+y1x+HWSu/i0PNklATpPBhGid3QVb/TOHuVoaraMrUFCNw==}
     engines: {node: '>=10.15.3'}
-    cpu: [x64, arm64]
     os: [darwin, linux, win32]
 
   '@nut-tree-fork/libnut@4.2.6':
@@ -2060,7 +2065,6 @@ packages:
   '@nut-tree-fork/nut-js@4.2.6':
     resolution: {integrity: sha512-aI/WCX7gE1HFGPH3EZP/UWqpNMM1NMoM/EkXqp7pKMgXFCi8e5+o5p+jd/QOYpmALv9bQg7+s69nI7FONbMqDg==}
     engines: {node: '>=16'}
-    cpu: [x64, arm64]
     os: [linux, darwin, win32]
 
   '@nut-tree-fork/provider-interfaces@4.2.6':
@@ -10625,13 +10629,13 @@ snapshots:
 
   '@oxc-project/types@0.142.0': {}
 
-  '@oxidezap/baileyrs@0.0.32(sharp@0.35.3(@types/node@24.9.1))':
+  '@oxidezap/baileyrs@0.0.32(patch_hash=ckgxziy6uxvzjkxxap5rdgovlm)(sharp@0.35.3(@types/node@24.9.1))':
     dependencies:
       '@hapi/boom': 9.1.4
       long: 5.3.2
       pino: 10.3.1
       protobufjs: 7.6.5
-      whatsapp-rust-bridge: 0.6.0-alpha.42
+      whatsapp-rust-bridge: 0.6.0-alpha.42(patch_hash=yh4pqya7t45lhhrwczokoiso5u)
     optionalDependencies:
       sharp: 0.35.3(@types/node@24.9.1)
 
@@ -18000,7 +18004,7 @@ snapshots:
       - esbuild
       - uglify-js
 
-  whatsapp-rust-bridge@0.6.0-alpha.42: {}
+  whatsapp-rust-bridge@0.6.0-alpha.42(patch_hash=yh4pqya7t45lhhrwczokoiso5u): {}
 
   whatwg-fetch@3.6.20: {}
 

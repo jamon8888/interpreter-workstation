@@ -108,18 +108,19 @@
     "test:win-cua-driver": "tsx scripts/windows-cua-driver-background-smoke.ts",
     "test:win-cua-calculator": "tsx scripts/windows-cua-calculator-smoke.ts",
     "test:e2e": "pnpm run test:e2e:ci",
-    "test:e2e:ci": "pnpm run build:locked && cross-env NODE_ENV=test playwright test --project=smoke --project=deterministic",
-    "test:e2e:permissions:ci": "pnpm run build:locked && cross-env NODE_ENV=test playwright test tests/agent-file-permissions.spec.ts --project=deterministic",
-    "test:e2e:hosted:ci": "pnpm run build:locked && cross-env NODE_ENV=test playwright test --project=external",
-    "test:e2e:media-ai:local": "pnpm run build:locked && cross-env NODE_ENV=test USE_LOCAL_API=true RUN_MEDIA_AI_E2E=true INTERPRETER_SKIP_TEST_ELECTRON_REBUILD=1 playwright test tests/media-ai-gpt-image-2.spec.ts --project=external",
-    "test:e2e:hosted:permissions:ci": "pnpm run build:locked && cross-env NODE_ENV=test playwright test tests/agent-shell-permissions.spec.ts --project=external",
-    "test:e2e:smoke": "pnpm run build:locked && cross-env NODE_ENV=test playwright test --project=smoke",
+    "test:electron:ready": "node scripts/ensure-test-electron.mjs",
+    "test:e2e:ci": "pnpm run build:locked && pnpm run test:electron:ready && cross-env NODE_ENV=test playwright test --project=smoke --project=deterministic",
+    "test:e2e:permissions:ci": "pnpm run build:locked && pnpm run test:electron:ready && cross-env NODE_ENV=test playwright test tests/agent-file-permissions.spec.ts --project=deterministic",
+    "test:e2e:hosted:ci": "pnpm run build:locked && pnpm run test:electron:ready && cross-env NODE_ENV=test playwright test --project=external",
+    "test:e2e:media-ai:local": "pnpm run build:locked && pnpm run test:electron:ready && cross-env NODE_ENV=test USE_LOCAL_API=true RUN_MEDIA_AI_E2E=true INTERPRETER_SKIP_TEST_ELECTRON_REBUILD=1 playwright test tests/media-ai-gpt-image-2.spec.ts --project=external",
+    "test:e2e:hosted:permissions:ci": "pnpm run build:locked && pnpm run test:electron:ready && cross-env NODE_ENV=test playwright test tests/agent-shell-permissions.spec.ts --project=external",
+    "test:e2e:smoke": "pnpm run build:locked && pnpm run test:electron:ready && cross-env NODE_ENV=test playwright test --project=smoke",
     "test:e2e:voice": "pnpm run test:e2e:voice:ci",
-    "test:e2e:voice:ci": "pnpm run build:locked && node scripts/check-voice-test-prereqs.mjs && cross-env NODE_ENV=test playwright test --project=voice-deterministic",
-    "test:e2e:nightly": "pnpm run build:locked && cross-env NODE_ENV=test playwright test --project=smoke --project=deterministic --project=nightly --project=external --project=voice-deterministic --project=voice-live",
-    "test:local": "pnpm run build:locked && cross-env NODE_ENV=test USE_LOCAL_API=true playwright test --project=smoke",
-    "test:local:voice": "pnpm run build:locked && node scripts/check-voice-test-prereqs.mjs && cross-env NODE_ENV=test USE_LOCAL_API=true playwright test --project=voice-deterministic",
-    "test:movie": "bun test server/handlers/movie.test.ts && pnpm run build:locked && cross-env NODE_ENV=test playwright test tests/movie-editor.spec.ts",
+    "test:e2e:voice:ci": "pnpm run build:locked && pnpm run test:electron:ready && node scripts/check-voice-test-prereqs.mjs && cross-env NODE_ENV=test playwright test --project=voice-deterministic",
+    "test:e2e:nightly": "pnpm run build:locked && pnpm run test:electron:ready && cross-env NODE_ENV=test playwright test --project=smoke --project=deterministic --project=nightly --project=external --project=voice-deterministic --project=voice-live",
+    "test:local": "pnpm run build:locked && pnpm run test:electron:ready && cross-env NODE_ENV=test USE_LOCAL_API=true playwright test --project=smoke",
+    "test:local:voice": "pnpm run build:locked && pnpm run test:electron:ready && node scripts/check-voice-test-prereqs.mjs && cross-env NODE_ENV=test USE_LOCAL_API=true playwright test --project=voice-deterministic",
+    "test:movie": "bun test server/handlers/movie.test.ts && pnpm run build:locked && pnpm run test:electron:ready && cross-env NODE_ENV=test playwright test tests/movie-editor.spec.ts",
     "test:agent": "playwright test agent.spec.ts",
     "test:tools": "playwright test tools-",
     "test:interpreter:smoke": "node scripts/check-interpreter-cli-smoke.mjs",
@@ -362,6 +363,10 @@
     "ignoredBuiltDependencies": [
       "@sentry/cli",
       "onnxruntime-node"
-    ]
+    ],
+    "patchedDependencies": {
+      "whatsapp-rust-bridge@0.6.0-alpha.42": "patches/whatsapp-rust-bridge@0.6.0-alpha.42.patch",
+      "@oxidezap/baileyrs@0.0.32": "patches/@oxidezap__baileyrs@0.0.32.patch"
+    }
   }
 }
