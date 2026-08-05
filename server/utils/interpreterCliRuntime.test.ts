@@ -103,15 +103,34 @@ describe('interpreterCliRuntime', () => {
 
   test('uses Interpreter runtime storage for the Windows file bridge directory', async () => {
     const userDataDir = 'C:\\Users\\MykoG\\AppData\\Roaming\\Interpreter';
+    const interpreterHome = 'C:\\Users\\MykoG\\.openinterpreter';
+    process.env.INTERPRETER_HOME = interpreterHome;
     process.env.INTERPRETER_USER_DATA_DIR = userDataDir;
     process.env.TEMP = '%USERP~1\\AppData\\Local\\Temp';
     process.env.TMP = '%USERP~1\\AppData\\Local\\Temp';
 
-    const bridgeDir = path.win32.join(userDataDir, 'runtime', 'interpreter-cli', 'bridge', '5517');
+    const bridgeDir = path.win32.join(interpreterHome, 'runtime', 'interpreter-cli', 'bridge', '5517');
 
     expect(getInterpreterCliBridgeDir(5517, 'win32')).toBe(bridgeDir);
     expect(buildInterpreterCliServerConnection(5517, { platform: 'win32', transport: 'file' })).toBe(
       `file:${bridgeDir}`,
+    );
+  });
+
+  test('uses sandbox-readable Interpreter runtime storage for the Unix file bridge directory', async () => {
+    const interpreterHome = '/Users/example/.openinterpreter';
+    process.env.INTERPRETER_HOME = interpreterHome;
+
+    expect(getInterpreterCliBridgeDir(5517, 'darwin')).toBe(
+      path.posix.join(
+        interpreterHome,
+        'home',
+        '.interpreter',
+        'runtime',
+        'interpreter-cli',
+        'bridge',
+        '5517',
+      ),
     );
   });
 
@@ -196,11 +215,7 @@ describe('interpreterCliRuntime', () => {
       expect(script).toContain('interpreter-app tools <server-id> <tool-name> [--json <json> | --json-file <path> | --stdin-json] [--stdin-arg <key>] [--save-to-disk [path]]');
       expect(script).toContain('interpreter-app mcp <server-id> <tool-name> [--json <json> | --json-file <path> | --stdin-json] [--stdin-arg <key>] [--save-to-disk [path]]');
       expect(script).toContain('interpreter-app tools <server-id>__<tool-name> --help');
-      expect(script).toContain('interpreter-app tools find "read word docx"');
-      expect(script).toContain('interpreter-app tools find "convert docx to pdf"');
-      expect(script).toContain("interpreter-app tools builtin-docx read_word --json '{\"path\":\"Notes.docx\"}'");
-      expect(script).toContain("interpreter-app tools builtin-pdf read_pdf --json '{\"path\":\"packet.pdf\"}'");
-      expect(script).toContain("interpreter-app tools builtin-converter convert_file --json '{\"path\":\"Notes.docx\",\"format\":\"pdf\"}'");
+      expect(script).toContain("interpreter-app tools builtin-interpreter interpreter_refresh_file --json '{\"path\":\"report.pdf\"}'");
       expect(script).toContain("interpreter-app tools builtin-interpreter interpreter_refresh_file --json '{\"path\":\"report.xlsx\"}'");
       expect(script).toContain('Top-level tools list does not list individual tools.');
       expect(script).toContain('Many built-in tools live on shared servers such as builtin-interpreter.');
@@ -265,7 +280,7 @@ describe('interpreterCliRuntime', () => {
       );
 
       let requestId = '';
-      for (let attempt = 0; attempt < 100 && requestId.length === 0; attempt += 1) {
+      for (let attempt = 0; attempt < 1000 && requestId.length === 0; attempt += 1) {
         const requestDirs = readdirSync(requestsDir).filter((entry) => !entry.startsWith('.'));
         requestId = requestDirs[0] ?? '';
         if (!requestId) {
@@ -274,6 +289,12 @@ describe('interpreterCliRuntime', () => {
       }
 
       expect(requestId.length).toBeGreaterThan(0);
+
+      const readyPath = path.join(requestsDir, requestId, '.ready');
+      for (let attempt = 0; attempt < 500 && !existsSync(readyPath); attempt += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+      expect(existsSync(readyPath)).toBe(true);
 
       const responseDir = path.join(responsesDir, requestId);
       const progressPath = path.join(responseDir, 'progress');
@@ -297,7 +318,7 @@ describe('interpreterCliRuntime', () => {
     } finally {
       await rm(tempHome, { recursive: true, force: true });
     }
-  });
+  }, 15_000);
 
   test('streams HTTP tool progress to stderr through the Unix launcher and keeps JSON on stdout', async () => {
     const tempHome = await useTempInterpreterDataDir('interpreter-cli-http-progress-');
@@ -679,12 +700,8 @@ describe('interpreterCliRuntime', () => {
       expect(nodeScript).toContain('interpreter-app tools <server-id> <tool-name> [--json <json> | --json-file <path> | --stdin-json] [--stdin-arg <key>] [--save-to-disk [path]]');
       expect(nodeScript).toContain('interpreter-app mcp <server-id> <tool-name> [--json <json> | --json-file <path> | --stdin-json] [--stdin-arg <key>] [--save-to-disk [path]]');
       expect(nodeScript).toContain('interpreter-app tools <server-id>__<tool-name> --help');
-      expect(nodeScript).toContain('interpreter-app tools find "read word docx"');
-      expect(nodeScript).toContain('interpreter-app tools builtin-docx read_word --json');
-      expect(nodeScript).toContain('Notes.docx');
       expect(nodeScript).toContain('report.xlsx');
-      expect(nodeScript).toContain('interpreter-app tools builtin-pdf read_pdf --json');
-      expect(nodeScript).toContain('packet.pdf');
+      expect(nodeScript).toContain('report.pdf');
       expect(nodeScript).toContain('interpreter-app tools builtin-interpreter interpreter_refresh_file --json');
       expect(nodeScript).toContain('Top-level tools list does not list individual tools.');
       expect(nodeScript).toContain('Many built-in tools live on shared servers such as builtin-interpreter.');
@@ -1222,11 +1239,11 @@ describe('interpreterCliRuntime', () => {
     const tempHome = await useTempInterpreterDataDir('interpreter-cli-env-');
 
     try {
-      const codexHome = path.join(tempHome, 'codex-home');
-      const shellHome = path.join(codexHome, 'home');
+      const interpreterHome = tempHome;
+      const shellHome = path.join(interpreterHome, 'home');
       const policy = buildInterpreterCliShellEnvironmentPolicy(
         'agtok_123',
-        { PATH: '/usr/bin:/bin', CODEX_HOME: codexHome },
+        { PATH: '/usr/bin:/bin', INTERPRETER_HOME: interpreterHome },
         'darwin',
         undefined,
         undefined,
@@ -1247,28 +1264,28 @@ describe('interpreterCliRuntime', () => {
     const tempHome = await useTempInterpreterDataDir('interpreter-cli-readable-root-');
 
     try {
-      const codexHome = path.join(tempHome, 'codex-home');
-      const shellHome = path.join(codexHome, 'home');
+      const interpreterHome = tempHome;
+      const shellHome = path.join(interpreterHome, 'home');
 
-      expect(getInterpreterCliShellSandboxReadableRoots('darwin', { CODEX_HOME: codexHome })).toEqual([
+      expect(getInterpreterCliShellSandboxReadableRoots('darwin', { INTERPRETER_HOME: interpreterHome })).toEqual([
         path.join(shellHome, '.interpreter', 'runtime', 'interpreter-cli'),
       ]);
-      expect(getInterpreterCliShellSandboxReadableRoots('linux', { CODEX_HOME: codexHome })).toEqual([]);
+      expect(getInterpreterCliShellSandboxReadableRoots('linux', { INTERPRETER_HOME: interpreterHome })).toEqual([]);
     } finally {
       await rm(tempHome, { recursive: true, force: true });
     }
   });
 
-  test('builds shell environment policy inside INTERPRETER_USER_DATA_DIR when CODEX_HOME is unset', async () => {
+  test('keeps shell environment policy in INTERPRETER_HOME when app data differs', async () => {
     const tempHome = await useTempInterpreterDataDir('interpreter-cli-user-data-env-');
 
     try {
       const tempUserDataDir = path.join(tempHome, 'interpreter-user-data');
-      const codexHome = path.join(tempUserDataDir, 'codex-home');
-      const shellHome = path.join(codexHome, 'home');
+      const interpreterHome = tempHome;
+      const shellHome = path.join(interpreterHome, 'home');
       const policy = buildInterpreterCliShellEnvironmentPolicy(
         'agtok_user_data',
-        { PATH: '/usr/bin:/bin', INTERPRETER_USER_DATA_DIR: tempUserDataDir },
+        { PATH: '/usr/bin:/bin', INTERPRETER_HOME: interpreterHome, INTERPRETER_USER_DATA_DIR: tempUserDataDir },
         'darwin',
         undefined,
         undefined,
@@ -1288,12 +1305,12 @@ describe('interpreterCliRuntime', () => {
     const tempHome = await useTempInterpreterDataDir('interpreter-cli-pdfcpu-env-');
 
     try {
-      const codexHome = path.join(tempHome, 'codex-home');
-      const shellHome = path.join(codexHome, 'home');
+      const interpreterHome = tempHome;
+      const shellHome = path.join(interpreterHome, 'home');
       const pdfcpuDir = '/Applications/Interpreter.app/Contents/Resources/pdfcpu';
       const policy = buildInterpreterCliShellEnvironmentPolicy(
         'agtok_pdfcpu',
-        { PATH: '/usr/bin:/bin', CODEX_HOME: codexHome },
+        { PATH: '/usr/bin:/bin', INTERPRETER_HOME: interpreterHome },
         'darwin',
         undefined,
         undefined,
@@ -1313,15 +1330,15 @@ describe('interpreterCliRuntime', () => {
     const workspace = await mkdtemp(path.join(tmpdir(), 'interpreter-cli-workspace-'));
 
     try {
-      const codexHome = path.join(tempHome, 'codex-home');
-      const shellHome = path.join(codexHome, 'home');
+      const interpreterHome = tempHome;
+      const shellHome = path.join(interpreterHome, 'home');
       const serverConnection = buildInterpreterCliServerConnection(5177, {
         platform: 'darwin',
         transport: 'http',
       });
       const policy = buildInterpreterCliShellEnvironmentPolicy(
         'agtok_workspace',
-        { PATH: '/usr/bin:/bin', CODEX_HOME: codexHome },
+        { PATH: '/usr/bin:/bin', INTERPRETER_HOME: interpreterHome },
         'darwin',
         workspace,
         serverConnection,
@@ -1351,14 +1368,14 @@ describe('interpreterCliRuntime', () => {
     const tempHome = await useTempInterpreterDataDir('interpreter-cli-machine-env-');
 
     try {
-      const codexHome = path.join(tempHome, 'codex-home');
-      const shellHome = path.join(codexHome, 'home');
+      const interpreterHome = tempHome;
+      const shellHome = path.join(interpreterHome, 'home');
       const policy = buildInterpreterCliShellEnvironmentPolicy(
         'agtok_machine',
         {
           PATH: '/usr/bin:/bin',
           DISPLAY: ':99',
-          CODEX_HOME: codexHome,
+          INTERPRETER_HOME: interpreterHome,
           INTERPRETER_MACHINE_RUN_DIR: '/tmp/machine-run',
           OPENAI_API_KEY: 'sk-test',
         },
@@ -1410,20 +1427,20 @@ describe('interpreterCliRuntime', () => {
     const tempHome = await useTempInterpreterDataDir('interpreter-cli-proc-env-');
 
     try {
-      const codexHome = path.join(tempHome, 'codex-home');
-      const shellHome = path.join(codexHome, 'home');
+      const interpreterHome = tempHome;
+      const shellHome = path.join(interpreterHome, 'home');
       const buildEnv = (platform: NodeJS.Platform): NodeJS.ProcessEnv => {
         if (platform === 'win32') {
           return {
             Path: 'C:\\Windows\\System32;C:\\Windows',
             SystemRoot: 'C:\\Windows',
             ComSpec: 'C:\\Windows\\System32\\cmd.exe',
-            CODEX_HOME: codexHome,
+            INTERPRETER_HOME: interpreterHome,
           };
         }
         return {
           PATH: '/usr/bin:/bin',
-          CODEX_HOME: codexHome,
+          INTERPRETER_HOME: interpreterHome,
         };
       };
 

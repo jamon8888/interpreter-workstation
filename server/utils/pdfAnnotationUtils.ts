@@ -1,4 +1,4 @@
-// PDF Annotation Utilities
+// PDF Annotation Utilities shared by the desktop viewer's direct API.
 // Core functionality for adding/removing annotations without IPC events
 // Tools wrap these and add event emission, UI can use directly
 

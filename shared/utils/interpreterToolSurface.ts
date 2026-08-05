@@ -1,10 +1,5 @@
 import { prefixToolName } from './mcpToolName';
 
-const DEFAULT_HIDDEN_TOOL_NAMES = new Set<string>([
-  prefixToolName('builtin-docx', 'add_docx_relationship'),
-  prefixToolName('builtin-docx', 'add_docx_image'),
-]);
-
 const DEFAULT_HIDDEN_SERVER_IDS = new Set<string>([
   'builtin-browser',
 ]);
@@ -31,5 +26,5 @@ export function isInterpreterCliToolVisible(params: {
     return allowed.has(prefixedToolName);
   }
 
-  return !DEFAULT_HIDDEN_TOOL_NAMES.has(prefixedToolName);
+  return true;
 }

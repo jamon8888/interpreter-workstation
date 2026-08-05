@@ -144,7 +144,7 @@
   "settings.general.versionLabel": "Interpreter v{{version}}",
   "settings.general.resetConfirmMessage": "Это сбросит все настройки и запустит процесс начальной настройки с нуля. Вы уверены?",
   "settings.general.resetRuntimeConfigs": "Сбросить локальные файлы конфигурации среды выполнения",
-  "settings.general.resetRuntimeConfigsConfirmMessage": "Это удалит ~/.interpreter/config.json и codex-home/config.toml, чтобы приложение могло заново создать чистые файлы конфигурации среды выполнения. Продолжить?",
+  "settings.general.resetRuntimeConfigsConfirmMessage": "Это удалит ~/.interpreter/config.json и ~/.openinterpreter/config.toml, чтобы приложение могло заново создать чистые файлы конфигурации среды выполнения. Продолжить?",
   "settings.general.resetRuntimeConfigsSuccess": "Локальные файлы конфигурации среды выполнения сброшены. Перезапустите Interpreter, чтобы применить чистое состояние среды выполнения.",
   "settings.general.resetRuntimeConfigsGenericError": "Не удалось сбросить локальные файлы конфигурации среды выполнения.",
   "settings.tools.integrationsSection": "Инструменты",

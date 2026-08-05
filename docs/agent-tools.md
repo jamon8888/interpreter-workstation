@@ -14,7 +14,7 @@ Builtin tools must respect the global file-access policy. All tools that access 
 
 ### Permission Scopes (Precedence Order)
 
-1. **Sandbox** (highest) - `~/.interpreter/sandbox/` - Always read-only
+1. **Sandbox** (highest) - the desktop app-data `sandbox/` directory - Always read-only
 2. **Custom Paths** - Specific file/directory rules (can blacklist!)
 3. **Workspace** - Access within current workspace directory
 4. **System** (lowest) - Fallback for paths outside workspace

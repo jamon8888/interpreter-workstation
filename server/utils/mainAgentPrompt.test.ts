@@ -22,9 +22,9 @@ describe('mainAgentPrompt', () => {
     expect(baseInstructions).toContain('Do not use shell commands, AppleScript, AppKit, Quartz, `open`, `osascript`, `screencapture`, or ad hoc Python to inspect or control desktop GUI state');
     expect(baseInstructions).toContain('When you create, edit, or export user-facing files, end the final answer with markdown links to the delivered files.');
     expect(baseInstructions).toContain('These links are the delivery mechanism.');
-    expect(baseInstructions).toContain('for spreadsheets, the primary path is cohesive code execution guided by the spreadsheet skill');
+    expect(baseInstructions).toContain('Those skills use OIX code execution and permissively licensed libraries');
     expect(baseInstructions).toContain('Treat refresh/recalc as mandatory post-edit hygiene, not optional polish.');
-    expect(baseInstructions).toContain('reopen the saved file and verify formulas, values, sheet names, ranges, and styles');
+    expect(baseInstructions).toContain('Recalculate with an installed permissive office renderer when the task depends on evaluated values.');
     expect(baseInstructions).toContain('call `interpreter-app tools builtin-interpreter interpreter_refresh_file ...` once after the write completes');
     expect(baseInstructions).not.toContain('Before grouped tool actions or large edits');
     expect(baseInstructions).not.toContain('If the exact builtin or MCP tool is present, call it directly');
@@ -57,8 +57,8 @@ describe('mainAgentPrompt', () => {
     expect(developerPrompt).toContain('Interpreter workstation tools are CLI-only for the model by default.');
     expect(developerPrompt).toContain('Use `interpreter-app` for Interpreter app-tool discovery and execution.');
     expect(developerPrompt).toContain('Skills are workflow instructions, not callable tools.');
-    expect(developerPrompt).toContain('Never emit a tool call named after a skill such as `computer-use`, `doc`, `Excel`, `PowerPoint`, `pdf`, or `settings`');
-    expect(developerPrompt).toContain('do not emit direct tool calls such as `builtin-cua-driver__get_app_state`, `builtin-docx__read_docx`, or `builtin-pdf__read_pdf` unless those exact tools are visibly injected');
+    expect(developerPrompt).toContain('Never emit a tool call named after a skill such as `computer-use`, `doc`, `spreadsheets`, `slides`, `pdf`, or `settings`');
+    expect(developerPrompt).toContain('do not emit direct tool calls such as `builtin-cua-driver__get_app_state` unless that exact tool is visibly injected');
     expect(developerPrompt).toContain('Use the OIX shell tool for `interpreter-app` discovery, exact `--help` checks, Interpreter app-tool execution, and ordinary shell/file work only');
     expect(developerPrompt).toContain('The OIX shell tool is a command surface. It cannot call native runtime tools by name.');
     expect(developerPrompt).toContain('The default OIX harness calls it `exec_command`; another selected harness may rename it');
@@ -69,7 +69,7 @@ describe('mainAgentPrompt', () => {
     expect(developerPrompt).toContain('Do not use layout tools as a browser-control substitute.');
     expect(developerPrompt).toContain('Do not use app-tool discovery for native runtime capabilities such as `apply_patch` or shell execution.');
     expect(developerPrompt).not.toContain('Skills describe preferred workflows, not proof that a tool is callable in the current session.');
-    expect(developerPrompt).toContain('For office files, prefer the matching Interpreter app tool path before generic shell or Python fallback.');
+    expect(developerPrompt).toContain('For document files, follow the matching bundled skill and use OIX code execution with permissively licensed libraries.');
     expect(developerPrompt).toContain('A `commandExecution` item without a completion event is still running.');
     expect(developerPrompt).toContain('`js_repl` needs no discovery: call `interpreter-app tools builtin-js-repl js_repl --json \'{"code":"..."}\'` directly');
     expect(developerPrompt).toContain('Use `interpreter-app config get|set` for persistent settings');
@@ -255,29 +255,29 @@ describe('mainAgentPrompt', () => {
       true,
       '/tmp/headless-cli/interpreter-app',
       {
-        bundledSkillNames: ['Excel', 'pdf'],
+        bundledSkillNames: ['spreadsheets', 'pdf'],
       },
     );
 
-    expect(developerPrompt).toContain('`Excel` for spreadsheets/`.xlsx`/`.xls`/`.csv`/`.tsv`; inspect and author workbooks through cohesive code execution');
-    expect(developerPrompt).toContain('`pdf` for PDFs; prefer matching `interpreter-app tools builtin-pdf ...` reads first. For fillable PDF forms');
+    expect(developerPrompt).toContain('`spreadsheets` for `.xlsx`/`.xlsm`/`.csv`/`.tsv`; use OIX code execution with `openpyxl`');
+    expect(developerPrompt).toContain('`pdf` for PDFs; use OIX code execution with permissive Python libraries');
     expect(developerPrompt).not.toContain('`doc` for Word/`.docx`');
-    expect(developerPrompt).not.toContain('`PowerPoint` for presentations/`.pptx`/`.ppt`');
+    expect(developerPrompt).not.toContain('`slides` for presentations/`.pptx`');
   });
 
-  test('keeps PowerPoint as the shipped skill without extra local summary text', () => {
+  test('describes PowerPoint work through its shipped slides skill', () => {
     const developerPrompt = getMainAgentDeveloperPrompt(
       'gpt-5.4-nano',
       true,
       '/tmp/headless-cli/interpreter-app',
       {
-        bundledSkillNames: ['PowerPoint'],
+        bundledSkillNames: ['slides'],
       },
     );
 
-    expect(developerPrompt).toContain('This app ships bundled global Interpreter skills installed in the runtime: `PowerPoint`.');
+    expect(developerPrompt).toContain('This app ships bundled global Interpreter skills installed in the runtime: `slides` for presentations/`.pptx`');
     expect(developerPrompt).not.toContain('Treat skills as workflow guidance, not as proof that a native tool exists.');
-    expect(developerPrompt).not.toContain('`PowerPoint` for presentations/`.pptx`/`.ppt`');
+    expect(developerPrompt).toContain('`slides` for presentations/`.pptx`; use OIX code execution with `python-pptx`');
   });
 
   test('renders visible runtime skills with paths and usage contract', () => {

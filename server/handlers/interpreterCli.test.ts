@@ -1037,103 +1037,32 @@ describe('interpreterCli handlers', () => {
     });
   });
 
-  test('hides DOCX helper tools on the default CLI surface', async () => {
-    setToolManager({
-      async listAllToolServers() {
-        return [
-          {
-            id: 'builtin-docx',
-            name: 'Word Documents',
-            description: 'DOCX tools',
-            state: {
-              status: 'connected',
-              tools: [
-                { name: 'read_word', description: 'Read a DOCX', inputSchema: { type: 'object' } },
-                { name: 'add_docx_relationship', description: 'Add DOCX relationship', inputSchema: { type: 'object' } },
-                { name: 'add_docx_image', description: 'Add DOCX image', inputSchema: { type: 'object' } },
-              ],
-            },
-          },
-        ];
+  test('does not restore removed DOCX tool servers from stale configuration', async () => {
+    setConfigOverride({
+      agents: {},
+      mcpServers: {},
+      builtinToolsEnabled: {
+        'builtin-docx': true,
       },
     } as any);
+    setToolManager(new ToolManager());
     agentTabManager.bindThread({
-      agentId: 'agent-hidden-docx-helpers',
-      threadId: 'thr_hidden_docx_helpers',
-      callerToken: 'agtok_hidden_docx_helpers',
+      agentId: 'agent-removed-docx',
+      threadId: 'thr_removed_docx',
+      callerToken: 'agtok_removed_docx',
+      allowedToolNames: ['builtin-docx__read_word'],
     });
 
-    await expect(listInterpreterCliTools('agtok_hidden_docx_helpers')).resolves.toEqual({
-      servers: [
-        {
-          id: 'builtin-docx',
-          name: 'Word Documents',
-          description: 'DOCX tools',
-          toolCount: 1,
-        },
-      ],
+    await expect(listInterpreterCliTools('agtok_removed_docx')).resolves.toEqual({
+      servers: [],
     });
+    await expect(callInterpreterCliTool({
+      callerToken: 'agtok_removed_docx',
+      serverId: 'builtin-docx',
+      toolName: 'read_word',
+      args: { path: 'status.docx' },
+    })).rejects.toThrow("Tool server 'builtin-docx' is not available.");
   });
-
-  test('allows CLI DOCX tool calls for builtin office tools', async () => {
-    const tempDir = await mkdtemp(path.join(tmpdir(), 'interpreter-cli-docx-'));
-
-    try {
-      const docxPath = path.join(tempDir, 'status.docx');
-      await createDocx(docxPath, [
-        '<w:p><w:r><w:t>Project status</w:t></w:r></w:p>',
-        '<w:p><w:r><w:t>Release date: TBD</w:t></w:r></w:p>',
-      ]);
-
-      setConfigOverride({
-        agents: {},
-        mcpServers: {},
-        builtinToolsEnabled: {
-          'builtin-docx': true,
-        },
-      } as any);
-      setToolManager(new ToolManager());
-      agentTabManager.bindThread({
-        agentId: 'agent-docx-edit',
-        threadId: 'thr_docx_edit',
-        callerToken: 'agtok_docx_edit',
-        workspacePath: tempDir,
-        allowedToolNames: [
-          'builtin-docx__replace_text_in_docx',
-          'builtin-docx__read_word',
-        ],
-      });
-
-      const visibleTools = await listInterpreterCliTools('agtok_docx_edit');
-      expect(visibleTools.servers).toHaveLength(1);
-      expect(visibleTools.servers[0]).toMatchObject({
-        id: 'builtin-docx',
-        toolCount: 2,
-      });
-
-      await expect(callInterpreterCliTool({
-        callerToken: 'agtok_docx_edit',
-        serverId: 'builtin-docx',
-        toolName: 'replace_text_in_docx',
-        args: {
-          path: 'status.docx',
-          replacements: [
-            {
-              old_text: 'Release date: TBD',
-              new_text: 'Release date: April 30',
-            },
-          ],
-        },
-      })).resolves.toBeDefined();
-
-      const updatedZip = await JSZip.loadAsync(await readFile(docxPath));
-      const updatedDocumentXml = await updatedZip.file('word/document.xml')?.async('string');
-      expect(updatedDocumentXml).toContain('Release date: April 30');
-      expect(updatedDocumentXml).not.toContain('Release date: TBD');
-    } finally {
-      await rm(tempDir, { recursive: true, force: true });
-    }
-  }, 15_000);
 
   test('lists explicitly scoped hidden builtin tools', async () => {
     setToolManager({
@@ -2174,9 +2103,9 @@ describe('interpreterCli handlers', () => {
       async listAllToolServers() {
         return [
           {
-            id: 'builtin-docx',
-            name: 'Word Documents',
-            description: 'DOCX tools',
+            id: 'custom-files',
+            name: 'Custom Files',
+            description: 'Custom file tools',
             state: {
               status: 'connected',
               tools: [
@@ -2574,39 +2503,7 @@ describe('interpreterCli handlers', () => {
   });
 
   test('rejects tools that are not explicitly scoped into the caller binding', async () => {
-    setToolManager({
-      async callTool() {
-        throw new Error('should not be called');
-      },
-      async listAllToolServers() {
-        return [
-          {
-            id: 'builtin-docx',
-            name: 'Word Documents',
-            description: 'DOCX tools',
-            state: {
-              status: 'connected',
-              tools: [
-                { name: 'read_word', description: 'Read a DOCX', inputSchema: { type: 'object', required: ['path'] } },
-              ],
-            },
-          },
-        ];
-      },
-      async getToolServer() {
-        return {
-          id: 'builtin-docx',
-          name: 'Word Documents',
-          description: 'DOCX tools',
-          state: {
-            status: 'connected',
-            tools: [
-              { name: 'read_word', description: 'Read a DOCX', inputSchema: { type: 'object', required: ['path'] } },
-            ],
-          },
-        };
-      },
-    } as any);
+    setToolManager(new ToolManager());
     agentTabManager.bindThread({
       agentId: 'agent-hidden-default',
       threadId: 'thr_hidden_default',
@@ -2616,9 +2513,9 @@ describe('interpreterCli handlers', () => {
 
     await expect(callInterpreterCliTool({
       callerToken: 'agtok_hidden_default',
-      serverId: 'builtin-docx',
-      toolName: 'read_word',
-      args: { path: '/tmp/sample.docx' },
-    })).rejects.toThrow("Tool 'builtin-docx__read_word' is not allowed");
+      serverId: 'builtin-utility',
+      toolName: 'calculate',
+      args: { expression: '2 + 2' },
+    })).rejects.toThrow("Tool 'builtin-utility__calculate' is not allowed");
   });
 });

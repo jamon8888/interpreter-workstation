@@ -144,7 +144,7 @@
   "settings.general.versionLabel": "Interpreter v{{version}}",
   "settings.general.resetConfirmMessage": "Esto restablecerá toda la configuración e iniciará el flujo de introducción desde cero. ¿Estás seguro?",
   "settings.general.resetRuntimeConfigs": "Restablecer archivos de configuración local del runtime",
-  "settings.general.resetRuntimeConfigsConfirmMessage": "Esto elimina ~/.interpreter/config.json y codex-home/config.toml para que la app regenere archivos de configuración de runtime limpios. ¿Continuar?",
+  "settings.general.resetRuntimeConfigsConfirmMessage": "Esto elimina ~/.interpreter/config.json y ~/.openinterpreter/config.toml para que la app regenere archivos de configuración de runtime limpios. ¿Continuar?",
   "settings.general.resetRuntimeConfigsSuccess": "Se restablecieron los archivos de configuración local del runtime. Reinicia Interpreter para aplicar un estado de runtime limpio.",
   "settings.general.resetRuntimeConfigsGenericError": "No se pudieron restablecer los archivos de configuración local del runtime.",
   "settings.tools.integrationsSection": "Herramientas",

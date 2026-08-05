@@ -397,41 +397,6 @@ function ExplorerContent({
     searchInputRef.current?.blur();
   }, [onFileOpen]);
 
-  // Handle system-wide file search using indexed_search tool (commented out for now)
-  // const handleSearchComputer = useCallback(async (query: string): Promise<SystemSearchResult[]> => {
-  //   try {
-  //     // Call the indexed_search tool via the tools API (searches entire computer with path="/")
-  //     // callTool returns the tool result data directly (apiRequest returns response.data)
-  //     const result = await callTool('builtin-docx', 'read_word', {
-  //       path: '/',
-  //       name: query,
-  //       limit: 50,
-  //     });
-  //
-  //     if (result?.isError) {
-  //       console.error('[Explorer] indexed_search failed:', result?.content?.[0]?.text);
-  //       return [];
-  //     }
-  //
-  //     // Parse the output (newline-separated paths)
-  //     const text = result?.content?.[0]?.text || '';
-  //     if (text === 'No results found') {
-  //       return [];
-  //     }
-  //
-  //     const paths = text.split('\n').filter((line: string) => line.length > 0 && !line.startsWith('('));
-  //
-  //     return paths.map((filePath: string) => ({
-  //       path: filePath,
-  //       name: filePath.split(/[\\/]/).pop() || filePath,
-  //       type: 'file' as const,
-  //     }));
-  //   } catch (error) {
-  //     console.error('[Explorer] System search failed:', error);
-  //     return [];
-  //   }
-  // }, []);
-
   // Handle keyboard events in search input
   const handleSearchKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Escape') {

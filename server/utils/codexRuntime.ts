@@ -80,8 +80,8 @@ const ATTACHED_OVERLAY_COMPLETION_RETRY_LIMIT = 3;
 const IDLE_TURN_RECOVERY_RETRY_LIMIT = 3;
 const PROMPT_BUNDLED_SKILL_NAMES = [
   'doc',
-  'Excel',
-  'PowerPoint',
+  'spreadsheets',
+  'slides',
   ...(hasHostedApi() ? ['media-creation'] : []),
   'pdf',
   'transcribe',

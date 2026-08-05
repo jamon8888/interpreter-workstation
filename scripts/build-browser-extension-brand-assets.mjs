@@ -3,7 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import sharp from 'sharp';
+import imageTools from './permissive-image.cjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, '..');
@@ -90,19 +90,29 @@ function makeStatusOverlay({ ring, dot }) {
 
 async function buildStateMaster(variantName) {
   const variant = BRAND[variantName];
-  let pipeline = sharp(APP_ICON_PATH).resize(1024, 1024, { fit: 'contain' });
+  let output = await imageTools.png(APP_ICON_PATH, {
+    width: 1024,
+    height: 1024,
+    fit: 'contain',
+  });
   if (variant?.grayscale) {
-    pipeline = pipeline.grayscale().modulate({
-      brightness: variant.brightness,
-      saturation: variant.saturation,
+    output = await imageTools.transformRgba(output, {}, (data) => {
+      for (let index = 0; index < data.length; index += 4) {
+        const red = data[index];
+        const green = data[index + 1];
+        const blue = data[index + 2];
+        const luminance = red * 0.299 + green * 0.587 + blue * 0.114;
+        data[index] = Math.round((luminance + (red - luminance) * variant.saturation) * variant.brightness);
+        data[index + 1] = Math.round((luminance + (green - luminance) * variant.saturation) * variant.brightness);
+        data[index + 2] = Math.round((luminance + (blue - luminance) * variant.saturation) * variant.brightness);
+      }
     });
   }
 
-  let output = pipeline.png();
   if (variant?.ring && variant?.dot) {
-    output = output.composite([{ input: makeStatusOverlay(variant), blend: 'over' }]);
+    output = await imageTools.compositeSvg(output, makeStatusOverlay(variant));
   }
-  return output.png().toBuffer();
+  return output;
 }
 
 async function writeExtensionIcons() {
@@ -119,8 +129,11 @@ async function writeExtensionIcons() {
     const master = await buildStateMaster(variantName);
     for (const size of SIZES) {
       const target = path.join(EXTENSION_ICON_DIR, `icon-${filePrefix}-${size}.png`);
-      const pngBuffer = await sharp(master).resize(size, size, { fit: 'contain' }).png().toBuffer();
-      await writePngIfPixelsChanged(target, pngBuffer);
+      fs.writeFileSync(target, await imageTools.png(master, {
+        width: size,
+        height: size,
+        fit: 'contain',
+      }));
     }
   }
 
@@ -144,51 +157,46 @@ async function buildStoreScreenshot() {
   const innerWidth = frameWidth - margin * 2;
   const innerHeight = frameHeight - margin * 2;
 
-  const source = sharp(STORE_SCREENSHOT_SOURCE_PATH).flatten({ background: '#000000' });
-  const screenshot = await source
-    .resize(innerWidth, innerHeight, {
-      fit: 'contain',
-      background: '#000000',
-    })
-    .png()
-    .toBuffer();
-
-  return sharp({
-    create: {
-      width: frameWidth,
-      height: frameHeight,
-      channels: 4,
-      background: '#000000',
-    },
-  })
-    .composite([{ input: screenshot, gravity: 'center' }])
-    .png()
-    .toBuffer();
+  const screenshot = await imageTools.png(STORE_SCREENSHOT_SOURCE_PATH, {
+    width: innerWidth,
+    height: innerHeight,
+    fit: 'contain',
+    background: '#000000',
+  });
+  const { canvas, ctx } = await imageTools.render(screenshot, {
+    width: frameWidth,
+    height: frameHeight,
+    background: '#000000',
+    fit: 'contain',
+  });
+  ctx.clearRect(0, 0, frameWidth, frameHeight);
+  ctx.fillStyle = '#000000';
+  ctx.fillRect(0, 0, frameWidth, frameHeight);
+  const image = await imageTools.loadImage(screenshot);
+  ctx.drawImage(image, margin, margin, innerWidth, innerHeight);
+  return await canvas.encode('png');
 }
 
 async function writeWebsiteAssets() {
   ensureDir(WEBSITE_PUBLIC_DIR);
   ensureDir(STORE_ASSETS_DIR);
 
-  const websiteAssets = [
-    ['logo-1024.png', 1024],
-    ['logo-512.png', 512],
-    ['favicon-32.png', 32],
-    ['favicon-16.png', 16],
-  ];
-  for (const [fileName, size] of websiteAssets) {
-    const pngBuffer = await sharp(APP_ICON_PATH).resize(size, size).png().toBuffer();
-    await writePngIfPixelsChanged(path.join(WEBSITE_PUBLIC_DIR, fileName), pngBuffer);
+  for (const size of [1024, 512, 32, 16]) {
+    const filename = size <= 32 ? `favicon-${size}.png` : `logo-${size}.png`;
+    fs.writeFileSync(
+      path.join(WEBSITE_PUBLIC_DIR, filename),
+      await imageTools.png(APP_ICON_PATH, { width: size, height: size }),
+    );
   }
 
   const screenshotBuffer = await buildStoreScreenshot();
 
-  await writePngIfPixelsChanged(path.join(WEBSITE_PUBLIC_DIR, 'screenshot@2x.png'), screenshotBuffer);
-  await writePngIfPixelsChanged(
+  fs.writeFileSync(path.join(WEBSITE_PUBLIC_DIR, 'screenshot@2x.png'), screenshotBuffer);
+  fs.writeFileSync(
     path.join(STORE_ASSETS_DIR, 'chrome-store-screenshot-640x400.png'),
-    await sharp(screenshotBuffer).resize(640, 400).png().toBuffer(),
+    await imageTools.png(screenshotBuffer, { width: 640, height: 400 }),
   );
-  await writePngIfPixelsChanged(
+  fs.writeFileSync(
     path.join(STORE_ASSETS_DIR, 'chrome-store-screenshot-1280x800.png'),
     screenshotBuffer,
   );

@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import { copyFile, mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { readPdfStructure } from '../../../utils/pdfStructure';
+import { readPdfStructure } from './pdfStructure';
 import {
   addAnnotationsToPdf,
   addImageAnnotationsToPdf,

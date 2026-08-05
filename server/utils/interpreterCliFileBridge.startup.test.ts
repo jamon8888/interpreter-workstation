@@ -5,9 +5,9 @@ import { startInterpreterCliFileBridge } from './interpreterCliFileBridge';
 import { getInterpreterCliBridgeDir } from './interpreterCliRuntime';
 
 // Regression coverage for #1434: startup crashed with
-// "EACCES: permission denied, rmdir '/tmp/interpreter-cli-bridge-<port>/requests'".
-// A stale bridge dir left by another uid on a shared /tmp cannot be removed; the
-// best-effort pre-clean must not crash startup when the request/response tree already exists.
+// A stale or unexpectedly owned bridge directory may not be removable. The
+// best-effort pre-clean must not crash startup when the request/response tree
+// already exists.
 const PORT = 54_179;
 
 afterEach(() => {

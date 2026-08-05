@@ -1,7 +1,7 @@
 /**
  * Provider configuration storage
  *
- * Handles CRUD operations for providers stored in codex-home/config.toml
+ * Handles CRUD operations for providers stored in the shared Open Interpreter config.toml
  * Similar pattern to MCP servers in configStore.ts
  */
 

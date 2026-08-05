@@ -101,8 +101,6 @@ import { nylasServerDefinition } from './builtin-tools/nylas/index';
 import { whatsappServerDefinition } from './builtin-tools/whatsapp/index';
 import { isConfigured as isWhatsAppConfigured } from './builtin-tools/whatsapp/credentials';
 import { telegramServerDefinition } from './builtin-tools/telegram/index';
-import { docxServerDefinition } from './builtin-tools/docx/index.js';
-import { pdfServerDefinition } from './builtin-tools/pdf/index';
 import { utilityServerDefinition } from './builtin-tools/utility/index';
 import { mediaAiServerDefinition } from './builtin-tools/media-ai/index';
 import { mcpManagementServerDefinition } from './builtin-tools/mcp-management/index';
@@ -131,15 +129,6 @@ function tryLoadServer<T>(serverId: string, loader: () => T): T | null {
     );
     return null;
   }
-}
-
-// Converter tools require Electron (x2t binary from OfficeExtension editors) - conditionally load
-let converterServerDefinition: BuiltinServerDefinition | null = null;
-if (process.versions.electron) {
-  converterServerDefinition = tryLoadServer(
-    'builtin-converter',
-    () => require('./builtin-tools/converter/index.js').converterServerDefinition as BuiltinServerDefinition,
-  );
 }
 
 // Remotion tools require Electron (webFrameMain for iframe control) and are dev-only
@@ -208,10 +197,6 @@ const ALL_BUILTIN_SERVERS: BuiltinServerDefinition[] = [
   ...(nylasServerDefinition ? [nylasServerDefinition] : []),
   ...(whatsappServerDefinition ? [whatsappServerDefinition] : []),
   ...(telegramServerDefinition ? [telegramServerDefinition] : []),
-  ...(docxServerDefinition ? [docxServerDefinition] : []),
-  ...(pdfServerDefinition ? [pdfServerDefinition] : []),
-  // Converter requires Electron (x2t binary) - only include when available
-  ...(converterServerDefinition ? [converterServerDefinition] : []),
   // Remotion tools require Electron (webFrameMain) - only include when available
   ...(remotionServerDefinition ? [remotionServerDefinition] : []),
   ...(utilityServerDefinition ? [utilityServerDefinition] : []),

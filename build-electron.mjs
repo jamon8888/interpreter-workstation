@@ -468,6 +468,10 @@ await esbuild.build({
     'mammoth',
     'jszip',
     'xml-formatter',
+    // Rust-backed WhatsApp bridge loads its WASM beside the ESM package via
+    // import.meta.url. Keep that package external so the URL survives CJS
+    // bundling and electron-builder can ship the WASM unchanged.
+    'whatsapp-rust-bridge',
     '@resvg/resvg-js',
     // sharp ships platform-specific native addons loaded dynamically.
     'sharp',
@@ -481,8 +485,6 @@ await esbuild.build({
     // In-process macOS NSWindow.orderWindow:relativeTo: addon for the world overlay.
     'interpreter-window-pin',
     '@nut-tree-fork/nut-js',
-    // heic-convert uses WASM (libheif-js) for HEIC decoding - must not be bundled
-    'heic-convert',
     // sherpa-onnx ships a runtime WASM payload loaded via __dirname
     'sherpa-onnx',
     // onnxruntime-node has native .node binaries - must not be bundled

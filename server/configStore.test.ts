@@ -53,6 +53,7 @@ import {
   ONBOARDING_STATE_VERSION,
 } from '../shared/types/onboardingState';
 import { resolveInterpreterConfigFile, resolveLegacyInterpreterConfigFile } from '../shared/interpreterConfigPaths';
+import { resolveInterpreterHome } from '../shared/interpreterHome';
 import { CURRENT_CONFIG_VERSION } from './configMigrations';
 import { DEFAULT_CUA_ACCESS_POLICY } from '../shared/cuaAccessPolicy';
 
@@ -60,7 +61,7 @@ const CONFIG_FILE = resolveInterpreterConfigFile();
 const CONFIG_DIR = dirname(CONFIG_FILE);
 const LEGACY_CONFIG_FILE = resolveLegacyInterpreterConfigFile();
 const LEGACY_CONFIG_DIR = dirname(LEGACY_CONFIG_FILE);
-const CREDENTIALS_FILE = join(CONFIG_DIR, 'codex-home', '.credentials.json');
+const CREDENTIALS_FILE = join(resolveInterpreterHome(), '.credentials.json');
 
 let originalConfig: string | null = null;
 let originalLegacyConfig: string | null = null;

@@ -68,6 +68,23 @@ pnpm run extension:bootstrap
 pnpm run extension:verify
 ```
 
+## OIX runtime and shared home
+
+Workstation installs and launches the exact checksummed OIX release pinned by
+the app. Terminal OIX uses an independently movable `current` selector, so a
+terminal update cannot change the app-server protocol underneath a released
+Workstation build. If no terminal installation exists, Workstation exposes its
+pinned release as both `interpreter` and `i`; later terminal-managed updates can
+take ownership of that selector without changing the app runtime.
+
+The app and terminal share one OIX home: `INTERPRETER_HOME` when set, otherwise
+`~/.openinterpreter`. Configuration, sessions, plugins, and global skills
+therefore work across both surfaces. Workstation installs and updates only the
+skills it ships, preserves user and enterprise skills, and backs up local edits
+before replacing a managed skill. OIX separately owns and updates its embedded
+`.system` skills. See [Skills and the Open Interpreter home](docs/skills.md) and
+[local OIX testing](docs/oix-local-testing.md).
+
 ## Distributions
 
 Product-specific hosted services are configuration, not a separate application.

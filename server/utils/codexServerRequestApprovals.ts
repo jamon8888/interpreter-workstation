@@ -1097,7 +1097,7 @@ function commandMentionsInstalledRuntimeSkillPath(commandPattern: string): boole
   }
 
   return (
-    normalizedPattern.includes('/codex-home/skills/')
+    normalizedPattern.includes('/.openinterpreter/skills/')
     || normalizedPattern.includes('/.codex/skills/')
   );
 }

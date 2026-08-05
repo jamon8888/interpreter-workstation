@@ -2,11 +2,28 @@
 
 These rules are architecture constraints for this repository.
 
+## Canonical checkout guard
+
+This repository is the canonical OSS Workstation application. Before editing
+or testing application code, run `git rev-parse --show-toplevel` and verify that
+the result is this repository's root. Read every applicable ancestor
+`AGENTS.md`; if one marks the checkout as legacy or migration-only, stop. Work
+performed or tested in a copied legacy tree is not current Workstation work and
+must never be reported as verification of this repository.
+
+The product website is a separate repository. Do not add website source,
+website build output, or website release configuration here. Downstream product
+distributions should consume this repository as an immutable source revision
+and apply only configuration, branding, signing, and release overlays; all
+application behavior and tests remain here.
+
 ## Before changing code
 
 - Use `pnpm` for repository commands.
 - Read `README.md` and the relevant document under `docs/` before editing that
   subsystem.
+- Verify the canonical checkout guard above before making the first edit or
+  running acceptance tests.
 - Read `docs/agent-testing.md` before writing or running tests.
 - Preserve user work and unrelated changes. Never publish, push, or create a
   public artifact without explicit authorization.
@@ -67,4 +84,3 @@ the real pinned submodule path in addition to unit coverage.
 
 Never claim an end-to-end path works from typechecking alone. Prove the actual
 boundary and report any platform or credential-dependent step that was not run.
-

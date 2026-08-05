@@ -2,7 +2,7 @@
  * Manages the interpreter sandbox folder for storing large tool outputs
  *
  * This folder is:
- * - Located at ~/.interpreter/sandbox/
+ * - Located under the desktop app-data directory at sandbox/
  * - Always readable/writable by all agents (enforced in permissions.ts)
  * - Cleaned up on server startup and shutdown
  */
@@ -10,14 +10,14 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { randomBytes } from 'crypto';
-import { getInterpreterHomeDir } from '../configStore';
+import { getInterpreterAppDataDir } from '../configStore';
 
 /**
- * The sandbox directory path (~/.interpreter/sandbox/)
+ * The desktop app's transient sandbox directory.
  * This is a consistent, predictable location that ALL agents can read/write
  */
 function resolveSandboxDir(): string {
-  return path.join(getInterpreterHomeDir(), 'sandbox');
+  return path.join(getInterpreterAppDataDir(), 'sandbox');
 }
 
 /**

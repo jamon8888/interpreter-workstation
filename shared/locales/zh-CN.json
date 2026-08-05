@@ -144,7 +144,7 @@
   "settings.general.versionLabel": "Interpreter v{{version}}",
   "settings.general.resetConfirmMessage": "这将重置所有设置并从头开始引导流程。确定要继续吗？",
   "settings.general.resetRuntimeConfigs": "重置本地运行时配置文件",
-  "settings.general.resetRuntimeConfigsConfirmMessage": "这将删除 ~/.interpreter/config.json 和 codex-home/config.toml，让应用重新生成干净的运行时配置文件。要继续吗？",
+  "settings.general.resetRuntimeConfigsConfirmMessage": "这将删除 ~/.interpreter/config.json 和 ~/.openinterpreter/config.toml，让应用重新生成干净的运行时配置文件。要继续吗？",
   "settings.general.resetRuntimeConfigsSuccess": "本地运行时配置文件已重置。请重启 Interpreter 以应用干净的运行时状态。",
   "settings.general.resetRuntimeConfigsGenericError": "重置本地运行时配置文件失败。",
   "settings.tools.integrationsSection": "工具",

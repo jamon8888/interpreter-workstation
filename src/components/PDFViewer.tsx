@@ -7,7 +7,6 @@ import { PDF_VIEWER_ID, PDF_ADD_ANNOTATION_BUTTON_ID, PDF_SAVE_BUTTON_ID } from 
 import { AnnotationToolbar } from './AnnotationToolbar';
 import { Button } from './ui/button';
 import { getFileUrl, getApiUrl, pdf, pathBasename, isAbsolutePath, openExternal } from '@/ipc';
-import { callTool } from '@/api';
 import { openFeedbackPopover } from '../utils/feedback';
 import { useFileRefresh } from '../hooks/useFileRefresh';
 import { tokenizeForTyping, valuesEqual } from '../utils/pdfFormFieldAnimation';
@@ -86,6 +85,19 @@ const FORM_TYPING_MIN_DELAY_MS = 30;
 const FORM_TYPING_MAX_DELAY_MS = 100;
 // How long all red-deleted values are shown before clearing.
 const FORM_TYPING_DELETION_DISPLAY_MS = 400;
+
+async function removePdfAnnotations(filePath: string, annotationIds: string[]): Promise<void> {
+  const removeUrl = await getApiUrl('/api/pdf/annotations/remove');
+  const response = await fetch(removeUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path: filePath, annotationIds }),
+  });
+  if (!response.ok) {
+    const message = await response.text();
+    throw new Error(message || `PDF annotation removal failed (${response.status})`);
+  }
+}
 
 
 /**
@@ -1482,10 +1494,7 @@ export function PDFViewer({ filePath, initialPage }: PDFViewerProps) {
     // If it has an originalId (was saved), remove from PDF
     if (annotation.originalId && !annotation.id.startsWith('local-')) {
       try {
-        await callTool('builtin-pdf', 'remove_pdf_annotations', {
-          path: filePath,
-          annotationIds: [annotation.originalId]
-        });
+        await removePdfAnnotations(filePath, [annotation.originalId]);
       } catch (err) {
         console.error('[PDFViewer] Error deleting annotation:', err);
       }
@@ -3214,10 +3223,7 @@ export function PDFViewer({ filePath, initialPage }: PDFViewerProps) {
 
     if (originalIds.length > 0) {
       try {
-        await callTool('builtin-pdf', 'remove_pdf_annotations', {
-          path: filePath,
-          annotationIds: originalIds
-        });
+        await removePdfAnnotations(filePath, originalIds);
       } catch (err) {
         console.error('[PDFViewer] Error deleting annotations:', err);
       }

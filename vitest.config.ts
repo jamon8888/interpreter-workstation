@@ -26,6 +26,11 @@ export default defineConfig({
     clearMocks: true,
     restoreMocks: true,
     mockReset: true,
+    // Unbounded worker fan-out made interaction-heavy UI tests miss their
+    // five-second deadlines on otherwise healthy code and multiplied the
+    // child-process load from server tests.
+    maxWorkers: 4,
+    minWorkers: 1,
     passWithNoTests: false,
   },
 });

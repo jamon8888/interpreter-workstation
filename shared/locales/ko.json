@@ -144,7 +144,7 @@
   "settings.general.versionLabel": "Interpreter v{{version}}",
   "settings.general.resetConfirmMessage": "모든 설정이 초기화되고 온보딩 과정이 처음부터 시작됩니다. 계속하시겠습니까?",
   "settings.general.resetRuntimeConfigs": "로컬 런타임 설정 파일 재설정",
-  "settings.general.resetRuntimeConfigsConfirmMessage": "~/.interpreter/config.json 및 codex-home/config.toml을 삭제해 앱이 깨끗한 런타임 설정 파일을 다시 생성하도록 합니다. 계속하시겠습니까?",
+  "settings.general.resetRuntimeConfigsConfirmMessage": "~/.interpreter/config.json 및 ~/.openinterpreter/config.toml을 삭제해 앱이 깨끗한 런타임 설정 파일을 다시 생성하도록 합니다. 계속하시겠습니까?",
   "settings.general.resetRuntimeConfigsSuccess": "로컬 런타임 설정 파일을 재설정했습니다. 깨끗한 런타임 상태를 적용하려면 Interpreter를 다시 시작하세요.",
   "settings.general.resetRuntimeConfigsGenericError": "로컬 런타임 설정 파일을 재설정하지 못했습니다.",
   "settings.tools.integrationsSection": "도구",

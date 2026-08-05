@@ -6,8 +6,8 @@
  * - Electron: Uses native APIs for OS file icons
  * - Sidecar: Uses generic icons based on file extension
  *
- * Image processing uses 'sharp' (works everywhere).
- * HTTP requests use native 'fetch' (works everywhere).
+ * Image processing uses Electron's nativeImage and operating-system thumbnail
+ * APIs. HTTP requests use native `fetch`.
  */
 
 import * as fs from 'fs';
@@ -35,14 +35,6 @@ if (isElectron) {
   } catch {
     // silently ignore - Electron APIs not available
   }
-}
-
-// Lazy-load sharp (may not be installed in all environments)
-let sharp: any = null;
-try {
-  sharp = require('sharp');
-} catch {
-  // sharp not available
 }
 
 interface ThumbnailCacheEntry {
@@ -476,28 +468,6 @@ class ThumbnailService {
   }
 
   /**
-   * Load and resize image using sharp (works in sidecar mode)
-   */
-  private async loadImageWithSharp(filePath: string, size: number): Promise<ThumbnailResult | null> {
-    if (!sharp) return null;
-
-    try {
-      const image = sharp(filePath);
-      const metadata = await image.metadata();
-      const buffer = await image.resize(size).png().toBuffer();
-      const dataUrl = `data:image/png;base64,${buffer.toString('base64')}`;
-      return {
-        dataUrl,
-        width: metadata.width || size,
-        height: metadata.height || size,
-        kind: 'preview',
-      };
-    } catch {
-      return null;
-    }
-  }
-
-  /**
    * Load and resize image using Electron nativeImage
    */
   private async loadImageWithElectron(filePath: string, size: number): Promise<ThumbnailResult | null> {
@@ -532,11 +502,16 @@ class ThumbnailService {
 
       const buffer = Buffer.from(await response.arrayBuffer());
 
-      // Try to resize with sharp if available
-      if (sharp) {
+      // Resize with Electron's bundled image APIs when available.
+      if (electronNativeImage) {
         try {
-          const resizedBuffer = await sharp(buffer).resize(32).png().toBuffer();
-          const dataUrl = `data:image/png;base64,${resizedBuffer.toString('base64')}`;
+          const resized = electronNativeImage.createFromBuffer(buffer).resize({
+            width: 32,
+            height: 32,
+            quality: 'good',
+          });
+          if (resized.isEmpty()) return null;
+          const dataUrl = resized.toDataURL();
           return { dataUrl, width: 32, height: 32, kind: 'preview' };
         } catch {
           // Fall through to raw buffer
@@ -658,16 +633,6 @@ class ThumbnailService {
 
       // For images, load and resize directly
       if (this.isDirectImage(filePath)) {
-        // Try sharp first (works in sidecar mode)
-        const sharpResult = await this.loadImageWithSharp(filePath, size);
-        if (sharpResult) {
-          const entry = { ...sharpResult, mtime: currentMtime };
-          this.cache.set(cacheKey, entry);
-          this.writeDiskCache(filePath, size, entry);
-          return sharpResult;
-        }
-
-        // Fall back to Electron nativeImage
         const electronResult = await this.loadImageWithElectron(filePath, size);
         if (electronResult) {
           const entry = { ...electronResult, mtime: currentMtime };

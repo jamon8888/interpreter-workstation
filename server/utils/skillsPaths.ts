@@ -1,5 +1,6 @@
 import path from 'node:path';
-import { resolveDefaultCodexHome } from '../../src/lib/codex/app-server-client';
+import { resolveInterpreterDataDir } from '../../shared/interpreterConfigPaths';
+import { resolveInterpreterHome } from '../../shared/interpreterHome';
 
 const SKILLS_SUBDIR = 'skills';
 const AGENTS_DIR = '.agents';
@@ -10,11 +11,11 @@ export function getInterpreterUserDataDir(): string {
     return path.resolve(userDataDir);
   }
 
-  return path.dirname(resolveDefaultCodexHome());
+  return resolveInterpreterDataDir();
 }
 
 export function getGlobalSkillsRoot(): string {
-  return path.join(getInterpreterUserDataDir(), 'codex-home', SKILLS_SUBDIR);
+  return path.join(resolveInterpreterHome(), SKILLS_SUBDIR);
 }
 
 export function getProjectSkillsRoot(workspacePath: string | null): string | null {

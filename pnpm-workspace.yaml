@@ -7,5 +7,4 @@ onlyBuiltDependencies:
   - electron
   - esbuild
   - msw
-  - sharp
   - '@parcel/watcher'

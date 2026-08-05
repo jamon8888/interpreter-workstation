@@ -15,8 +15,7 @@ asarUnpack:
   - "node_modules/@openinterpreter/**"
   - "node_modules/@resvg/**"
   - "node_modules/@napi-rs/**"
-  - "node_modules/@img/**"
-  - "node_modules/sharp/**"
+  - "node_modules/whatsapp-rust-bridge/**"
   - "node_modules/sherpa-onnx/**"
   - "node_modules/onnxruntime-node/**"
   - "**/*.node"
@@ -84,6 +83,8 @@ files:
   - build/**
   - package.json
   - product.json
+  - "!node_modules/shadcn/**"
+  - "!node_modules/caniuse-lite/**"
   - "!src/**"
   - "!test/**"
   - "!tests/**"

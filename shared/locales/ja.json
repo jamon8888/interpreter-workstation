@@ -144,7 +144,7 @@
   "settings.general.versionLabel": "Interpreter v{{version}}",
   "settings.general.resetConfirmMessage": "すべての設定がリセットされ、オンボーディングが最初からやり直しになります。よろしいですか？",
   "settings.general.resetRuntimeConfigs": "ローカルのランタイム設定ファイルをリセット",
-  "settings.general.resetRuntimeConfigsConfirmMessage": "これは ~/.interpreter/config.json と codex-home/config.toml を削除し、アプリがクリーンなランタイム設定ファイルを再生成できるようにします。続行しますか？",
+  "settings.general.resetRuntimeConfigsConfirmMessage": "これは ~/.interpreter/config.json と ~/.openinterpreter/config.toml を削除し、アプリがクリーンなランタイム設定ファイルを再生成できるようにします。続行しますか？",
   "settings.general.resetRuntimeConfigsSuccess": "ローカルのランタイム設定ファイルをリセットしました。クリーンな状態を適用するには Interpreter を再起動してください。",
   "settings.general.resetRuntimeConfigsGenericError": "ローカルのランタイム設定ファイルをリセットできませんでした。",
   "settings.tools.integrationsSection": "ツール",

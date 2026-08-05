@@ -328,9 +328,11 @@ async function readSelectedText(): Promise<SelectionSnapshot['text']> {
   if (process.platform === 'win32') {
     const { keyboard } = await import('@nut-tree-fork/nut-js');
     const { createRequire } = await import('node:module');
-    const require = createRequire(
-      typeof __filename !== 'undefined' ? __filename : import.meta.url,
-    );
+    const requireTarget =
+      typeof __filename === 'string' && __filename.length > 0
+        ? __filename
+        : import.meta.url;
+    const require = createRequire(requireTarget);
     const { clipboard } = require('electron') as typeof import('electron');
     const previousText = clipboard.readText();
     clipboard.writeText('');

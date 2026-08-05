@@ -17,7 +17,7 @@ import {
   getHeadlessTaskCliWorkspaceError as getCliWorkspaceError,
   normalizeHeadlessTaskWorkspace,
 } from "./utils/headlessTaskWorkspace";
-import { resolveDefaultCodexHome } from "../src/lib/codex/app-server-client";
+import { resolveInterpreterHome } from "../shared/interpreterHome";
 import type { StreamSkillReference } from "../src/lib/codex/api-types";
 import { formatTurnErrorDescriptor } from "../src/lib/codex/errors";
 
@@ -71,7 +71,7 @@ function resolveHeadlessSkillReferences(rawSkills: string[] | undefined): Stream
     return [];
   }
 
-  const codexHome = process.env.CODEX_HOME?.trim() || resolveDefaultCodexHome();
+  const interpreterHome = resolveInterpreterHome();
   return rawSkills.map((rawSkill) => {
     const trimmed = rawSkill.trim();
     if (!trimmed) {
@@ -81,7 +81,7 @@ function resolveHeadlessSkillReferences(rawSkills: string[] | undefined): Stream
     const looksLikePath = trimmed.includes('/') || trimmed.includes('\\') || trimmed.toLowerCase().endsWith('.md');
     const skillPath = looksLikePath
       ? path.resolve(trimmed)
-      : path.join(codexHome, 'skills', trimmed, 'SKILL.md');
+      : path.join(interpreterHome, 'skills', trimmed, 'SKILL.md');
     const name = looksLikePath
       ? path.basename(path.dirname(skillPath))
       : trimmed;

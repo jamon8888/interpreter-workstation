@@ -22,6 +22,7 @@ import { constants as fsConstants } from 'node:fs';
 import { access, rm } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join as pathJoin } from 'node:path';
+import { resolveInterpreterHome } from '../../shared/interpreterHome';
 
 import { supportedLanguages, type SupportedLanguage } from '../../shared/locales';
 
@@ -170,32 +171,6 @@ export async function setZoomFactor(zoomFactor: number): Promise<{ success: bool
   return { success: true };
 }
 
-function resolveInterpreterDataDir(): string {
-  const explicitUserDataDir = process.env.INTERPRETER_USER_DATA_DIR?.trim();
-  if (explicitUserDataDir) {
-    return explicitUserDataDir;
-  }
-
-  if (process.versions.electron) {
-    const { app } = require('electron') as typeof import('electron');
-    return app.getPath('userData');
-  }
-
-  if (process.platform === 'win32') {
-    const appData = process.env.APPDATA;
-    if (!appData) {
-      throw new Error('APPDATA is required to resolve Interpreter data directory');
-    }
-    return pathJoin(appData, 'interpreter');
-  }
-
-  if (process.platform === 'darwin') {
-    return pathJoin(homedir(), 'Library', 'Application Support', 'interpreter');
-  }
-
-  return pathJoin(process.env.XDG_CONFIG_HOME ?? pathJoin(homedir(), '.config'), 'interpreter');
-}
-
 async function resetRuntimeConfigFile(
   id: RuntimeConfigFileId,
   filePath: string,
@@ -226,7 +201,7 @@ export async function resetRuntimeConfigFiles(
   const interpreterConfigPath = options.interpreterConfigPath
     ?? pathJoin(homedir(), '.interpreter', 'config.json');
   const runtimeConfigTomlPath = options.runtimeConfigTomlPath
-    ?? pathJoin(resolveInterpreterDataDir(), 'codex-home', 'config.toml');
+    ?? pathJoin(resolveInterpreterHome(), 'config.toml');
 
   const files = await Promise.all([
     resetRuntimeConfigFile('interpreterConfigJson', interpreterConfigPath),

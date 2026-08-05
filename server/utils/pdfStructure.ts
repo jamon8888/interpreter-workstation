@@ -1,7 +1,7 @@
 // PDF Structure Reader
 // Shared utility that extracts structured data from PDFs.
-// Used by both the read_pdf tool (for text formatting) and
-// the PDFViewer (for diff-based refresh of form fields/annotations).
+// Used by the PDFViewer for diff-based refresh of form fields/annotations and
+// by internal preview/checkpoint code. It is not an agent tool surface.
 
 import { readFile } from 'fs/promises';
 import { PDFDocument, PDFName, PDFDict, PDFArray, PDFNumber, PDFString, PDFHexString } from 'pdf-lib';

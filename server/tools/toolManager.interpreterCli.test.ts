@@ -50,10 +50,7 @@ async function waitForApprovalCount(expectedCount: number) {
 const WORKSPACE = process.platform === 'win32'
   ? 'C:\\Users\\test\\project'
   : '/Users/test/project';
-const OUTSIDE_WORKSPACE_DOCX_PATH = process.platform === 'win32'
-  ? 'C:\\Users\\test\\outside-window-b.docx'
-  : '/Users/test/outside-window-b.docx';
-const WORKSPACE_OUTPUT_DOCX_PATH = join(WORKSPACE, 'window-b-output.docx');
+const WORKSPACE_OUTPUT_AUDIO_PATH = join(WORKSPACE, 'window-b-output.wav');
 
 describe('ToolManager interpreter CLI approval ownership', () => {
   beforeEach(() => {
@@ -187,11 +184,12 @@ describe('ToolManager interpreter CLI approval ownership', () => {
       const approvalPromise = runWithWindowSessionOverride('window-b', async () => {
         return await runWithWorkspaceOverride(WORKSPACE, async () => {
           return await toolManager.callTool(
-            'builtin-docx',
-            'create_docx',
+            'builtin-utility',
+            'speak_text',
             {
-              path: WORKSPACE_OUTPUT_DOCX_PATH,
-              content: '<p>Window B</p>',
+              text: 'Window B',
+              outputPath: WORKSPACE_OUTPUT_AUDIO_PATH,
+              play: false,
             },
             false,
             'agent-window-b',
@@ -233,7 +231,7 @@ describe('ToolManager interpreter CLI approval ownership', () => {
           const visibleApprovals = approvalManager.getApprovals();
           expect(visibleApprovals).toHaveLength(1);
           expect(visibleApprovals[0]?.agentId).toBe('agent-window-b');
-          expect(visibleApprovals[0]?.context?.paths).toEqual([WORKSPACE_OUTPUT_DOCX_PATH]);
+          expect(visibleApprovals[0]?.context?.paths).toEqual([WORKSPACE_OUTPUT_AUDIO_PATH]);
         });
       });
 
@@ -265,7 +263,7 @@ describe('ToolManager interpreter CLI approval ownership', () => {
         isError: boolean;
       };
       expect(approvalResult.isError).toBe(false);
-      expect(approvalResult.content[0]?.text).toBe(`Operation denied by user: write: ${WORKSPACE_OUTPUT_DOCX_PATH}`);
+      expect(approvalResult.content[0]?.text).toBe(`Operation denied by user: write: ${WORKSPACE_OUTPUT_AUDIO_PATH}`);
     } finally {
       unregisterWindowSession(101);
       unregisterWindowSession(102);

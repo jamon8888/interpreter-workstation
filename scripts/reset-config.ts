@@ -20,11 +20,13 @@ import {
   resolveLegacyInterpreterConfigDir,
   resolveLegacyInterpreterConfigFile,
 } from '../shared/interpreterConfigPaths';
+import { resolveInterpreterHome } from '../shared/interpreterHome';
 
 const LEGACY_CONFIG_DIR = resolveLegacyInterpreterConfigDir();
 const USER_DATA_DIR = resolveInterpreterDataDir();
 const CONFIG_FILE = resolveInterpreterConfigFile();
 const LEGACY_CONFIG_FILE = resolveLegacyInterpreterConfigFile();
+const INTERPRETER_HOME = resolveInterpreterHome();
 const DOCUMENTS_DIR = join(homedir(), 'Documents');
 const DEFAULT_WORKSPACE_BASE = 'My Workspace';
 
@@ -447,7 +449,7 @@ async function mainHard() {
   console.log('║     MCPs, OAuth, skills, config, extensions — all gone         ║');
   console.log('╚════════════════════════════════════════════════════════════════╝\n');
 
-  for (const directory of new Set([LEGACY_CONFIG_DIR, USER_DATA_DIR])) {
+  for (const directory of new Set([LEGACY_CONFIG_DIR, USER_DATA_DIR, INTERPRETER_HOME])) {
     console.log(`Will delete: ${directory}`);
   }
 
@@ -468,7 +470,7 @@ async function mainHard() {
   await stopRunningInterpreterProcesses([
     LEGACY_CONFIG_DIR,
     USER_DATA_DIR,
-    join(USER_DATA_DIR, 'codex-home'),
+    INTERPRETER_HOME,
   ]);
 
   // Delete workspace folders
@@ -479,7 +481,7 @@ async function mainHard() {
   }
 
   // Delete entire config directory
-  for (const directory of new Set([LEGACY_CONFIG_DIR, USER_DATA_DIR])) {
+  for (const directory of new Set([LEGACY_CONFIG_DIR, USER_DATA_DIR, INTERPRETER_HOME])) {
     console.log(`Deleting: ${directory}`);
     await deletePathWithRetries(directory);
   }

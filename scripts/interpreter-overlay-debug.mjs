@@ -4,7 +4,7 @@ import path from 'node:path';
 import process from 'node:process';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import sharp from 'sharp';
+import imageTools from './permissive-image.cjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, '..');
@@ -285,7 +285,7 @@ async function visualizeSnapshot(args) {
   fs.writeFileSync(elementsPath, `${JSON.stringify(snapshot.elements, null, 2)}\n`);
   fs.writeFileSync(snapshotPath, `${JSON.stringify(snapshot, null, 2)}\n`);
 
-  const metadata = await sharp(screenshotBuffer).metadata();
+  const metadata = await imageTools.metadata(screenshotBuffer);
   if (!metadata.width || !metadata.height) {
     fail('Could not determine screenshot dimensions');
   }
@@ -296,14 +296,14 @@ async function visualizeSnapshot(args) {
   const fullOverlaySvg = buildOverlaySvg(snapshot, metadata.width, metadata.height, {
     interactiveOnly: false,
   });
-  await sharp(screenshotBuffer)
-    .composite([{ input: Buffer.from(interactiveOverlaySvg), blend: 'over' }])
-    .png()
-    .toFile(annotatedPath);
-  await sharp(screenshotBuffer)
-    .composite([{ input: Buffer.from(fullOverlaySvg), blend: 'over' }])
-    .png()
-    .toFile(annotatedAllPath);
+  fs.writeFileSync(
+    annotatedPath,
+    await imageTools.compositeSvg(screenshotBuffer, interactiveOverlaySvg),
+  );
+  fs.writeFileSync(
+    annotatedAllPath,
+    await imageTools.compositeSvg(screenshotBuffer, fullOverlaySvg),
+  );
 
   console.log(`debug_port: ${args.debugPort}`);
   console.log(`output_dir: ${outputDir}`);

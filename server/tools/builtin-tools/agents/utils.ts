@@ -545,17 +545,15 @@ export async function captureFileContent(
         return { content, raw: content };
       }
       case 'word': {
-        // Use dynamic import to avoid circular deps
-        const { convertDocxToPlaintext } = require('../docx/utils');
+        const { readDocxText } = require('../../../utils/documentText');
         const buffer = await fs.readFile(filePath);
-        const plaintext = await convertDocxToPlaintext(buffer);
+        const plaintext = await readDocxText(buffer);
         return { content: plaintext, raw: buffer.toString('base64') };
       }
       case 'excel': {
-        // Convert Excel to plaintext for diffing, and capture raw bytes
         try {
-          const { excelToPlaintext } = require('../cells/excelDiff');
-          const plaintext = excelToPlaintext(filePath);
+          const { readSpreadsheetTextPreview } = require('../../../utils/spreadsheetText');
+          const plaintext = await readSpreadsheetTextPreview(filePath);
           const buffer = await fs.readFile(filePath);
           return { content: plaintext, raw: buffer.toString('base64') };
         } catch (excelError) {
@@ -564,17 +562,17 @@ export async function captureFileContent(
         }
       }
       case 'pdf': {
-        // Use the read_pdf tool to get structured content, and capture raw bytes
         try {
-          const { readPdfTool } = require('../pdf/readPdfTool');
-          const result = await readPdfTool.handler({ path: filePath });
-          if (result.isError) {
-            return { content: '[PDF file - could not read for diff]' };
-          }
-          // Extract the text content (before the JSON section)
-          const text = result.content[0]?.text || '';
-          const jsonIdx = text.indexOf('## JSON');
-          const plaintext = jsonIdx > 0 ? text.substring(0, jsonIdx).trim() : text;
+          const { readPdfStructure } = require('../../../utils/pdfStructure');
+          const structure = await readPdfStructure(filePath);
+          const plaintext = structure.elements
+            .map((element: any) => (
+              element.text
+              || element.contents
+              || (element.fieldName ? `${element.fieldName}: ${element.fieldValue ?? ''}` : '')
+            ))
+            .filter(Boolean)
+            .join('\n');
           const buffer = await fs.readFile(filePath);
           return { content: plaintext, raw: buffer.toString('base64') };
         } catch (pdfError) {

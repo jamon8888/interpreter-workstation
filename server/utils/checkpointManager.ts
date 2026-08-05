@@ -5,7 +5,7 @@
  * Stores before/after snapshots of files indexed by messageId.
  *
  * Storage structure:
- * ~/.interpreter/checkpoints/
+ * <desktop app data>/checkpoints/
  * ├── {messageIdHash}/
  * │   ├── before/
  * │   │   └── {filename}
@@ -21,10 +21,10 @@ import { emitEvent } from './ipcBridge';
 import { IPC_CHANNELS } from '../../electron/ipc/registry';
 import { approvalManager } from '../approvalManager';
 import { getCurrentWorkspace } from './workspace';
-import { getInterpreterHomeDir } from '../configStore';
+import { getInterpreterAppDataDir } from '../configStore';
 
 function getWorkstationDir(): string {
-  return getInterpreterHomeDir();
+  return getInterpreterAppDataDir();
 }
 
 function getCheckpointsDir(): string {
@@ -423,7 +423,7 @@ class CheckpointManager {
 
         // Request approval
         const approved = await approvalManager.createApproval(
-          'replace_text_in_docx',
+          'large_file_edit',
           'checkpoint-manager',
           {
             message: 'Large file edit requires approval',

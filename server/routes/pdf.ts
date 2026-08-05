@@ -3,7 +3,7 @@
 // Use these from the UI to avoid triggering unnecessary refresh cycles
 
 import { Router, type Request, type Response } from 'express';
-import { addAnnotationsToPdf, removeAnnotationsFromPdf, addImageAnnotationsToPdf, type AnnotationInput, type ImageAnnotationInput } from '../tools/builtin-tools/pdf/pdfAnnotationUtils';
+import { addAnnotationsToPdf, removeAnnotationsFromPdf, addImageAnnotationsToPdf, type AnnotationInput, type ImageAnnotationInput } from '../utils/pdfAnnotationUtils';
 import { readFile, writeFile } from 'fs/promises';
 import { existsSync } from 'fs';
 import { PDFDocument, PDFDict, PDFName } from 'pdf-lib';

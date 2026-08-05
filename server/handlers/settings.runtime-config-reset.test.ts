@@ -23,16 +23,16 @@ describe('resetRuntimeConfigFiles', () => {
   beforeEach(async () => {
     testHome = await mkdtemp(join(tmpdir(), 'runtime-config-reset-'));
     interpreterConfigPath = join(testHome, '.interpreter', 'config.json');
-    runtimeConfigPath = join(testHome, 'codex-home', 'config.toml');
+    runtimeConfigPath = join(testHome, '.openinterpreter', 'config.toml');
   });
 
   afterEach(async () => {
     await rm(testHome, { recursive: true, force: true });
   });
 
-  test('removes ~/.interpreter/config.json and codex-home/config.toml when present', async () => {
+  test('removes ~/.interpreter/config.json and ~/.openinterpreter/config.toml when present', async () => {
     await mkdir(join(testHome, '.interpreter'), { recursive: true });
-    await mkdir(join(testHome, 'codex-home'), { recursive: true });
+    await mkdir(join(testHome, '.openinterpreter'), { recursive: true });
     await writeFile(interpreterConfigPath, '{"foo":"bar"}', 'utf8');
     await writeFile(runtimeConfigPath, 'model = "gpt-5.2"\n', 'utf8');
 

@@ -811,14 +811,14 @@ describe('codexServerRequestApprovals', () => {
   });
 
   test('declines shell reads of installed runtime skill files', async () => {
-    const userDataDir = path.join(tempRoot, 'user-data');
-    const runtimeSkillDir = path.join(userDataDir, 'codex-home', 'skills', 'slides');
+    const interpreterHome = path.join(tempRoot, 'open-interpreter-home');
+    const runtimeSkillDir = path.join(interpreterHome, 'skills', 'slides');
     const runtimeSkillPath = path.join(runtimeSkillDir, 'SKILL.md');
     await mkdir(runtimeSkillDir, { recursive: true });
     await writeFile(runtimeSkillPath, '# runtime skill', 'utf8');
 
-    const originalUserDataDir = process.env.INTERPRETER_USER_DATA_DIR;
-    process.env.INTERPRETER_USER_DATA_DIR = userDataDir;
+    const originalInterpreterHome = process.env.INTERPRETER_HOME;
+    process.env.INTERPRETER_HOME = interpreterHome;
     setConfigOverride({
       agents: {},
       codexSandboxMode: 'workspace-write',
@@ -858,10 +858,10 @@ describe('codexServerRequestApprovals', () => {
         response = result;
       }, deps);
     } finally {
-      if (originalUserDataDir === undefined) {
-        delete process.env.INTERPRETER_USER_DATA_DIR;
+      if (originalInterpreterHome === undefined) {
+        delete process.env.INTERPRETER_HOME;
       } else {
-        process.env.INTERPRETER_USER_DATA_DIR = originalUserDataDir;
+        process.env.INTERPRETER_HOME = originalInterpreterHome;
       }
     }
 

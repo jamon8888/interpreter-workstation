@@ -51,6 +51,7 @@ const REQUIRED_BUNDLED_SKILL_FILES = {
   doc: [
     'SKILL.md',
     'agents/openai.yaml',
+    'LICENSE.txt',
     'scripts/render_docx.py',
   ],
   'media-creation': [
@@ -65,6 +66,7 @@ const REQUIRED_BUNDLED_SKILL_FILES = {
   pdf: [
     'SKILL.md',
     'agents/openai.yaml',
+    'LICENSE.txt',
   ],
   playwright: [
     'SKILL.md',
@@ -98,16 +100,12 @@ const REQUIRED_BUNDLED_SKILL_FILES = {
   spreadsheets: [
     'SKILL.md',
     'agents/openai.yaml',
-    'style_guidelines.md',
-    'templates/financial_models.md',
+    'LICENSE.txt',
   ],
   slides: [
     'SKILL.md',
     'agents/openai.yaml',
-    'scripts/init_pro_deck_builder_js.js',
-    'scripts/prepare_reference_prompts.js',
-    'scripts/pro_deck_quality_check.js',
-    'templates/build_pro_deck_template.js',
+    'LICENSE.txt',
   ],
   'wiki-maintainer': [
     'SKILL.md',

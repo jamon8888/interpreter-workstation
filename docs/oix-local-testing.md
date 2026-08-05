@@ -1,8 +1,12 @@
 # Test OIX changes locally
 
-Workstation consumes the public unified OIX runtime package. The pinned release
-and archive contract live in `scripts/download-oix.mjs`; normal builds should
-not depend on a neighboring source checkout or the legacy `oix` gitlink.
+Workstation installs and launches the exact OIX release pinned by the app, while
+the terminal selects its release independently through OIX's `current` link.
+Both use OIX's official managed standalone package store and shared
+`$INTERPRETER_HOME`. If OIX is missing from the terminal, Workstation also makes
+its pinned release available as `interpreter` and `i`. The pinned release and
+archive contract live in `scripts/download-oix.mjs`; normal builds do not depend
+on a neighboring source checkout or the legacy `oix` gitlink.
 
 The checked-out OIX source is an upstream product boundary. It is safe to read
 or build it, but do not patch it as part of a Workstation change. If OIX itself
@@ -38,24 +42,24 @@ Adjust the test package or filter for the contract being changed. Provider,
 model, harness, thread, steering, approval, and history changes should be
 covered at the app-server boundary.
 
-## 3. Overlay the locally built executable
+## 3. Select the locally built executable
 
 First download the pinned package so its `codex-path`, `codex-resources`, helper
-binaries, and metadata are present. Then point only the unified executable at
-the local build:
+binaries, and metadata are present. Then use the explicit development override
+to select the local build. The resolver verifies that the executable identifies
+as Interpreter and exposes `app-server --listen`; a random executable named
+`interpreter` is rejected.
 
 ```bash
 cd /absolute/path/to/workstation/app
 pnpm run download:oix -- --current-platform
 
 OIX_CHECKOUT=/absolute/path/to/openinterpreter
-platform="$(node -p 'process.platform + "-" + process.arch')"
-ln -sf "$OIX_CHECKOUT/codex-rs/target/debug/codex" \
-  "resources/oix/$platform/bin/interpreter"
+export INTERPRETER_OIX_PATH="$OIX_CHECKOUT/codex-rs/target/debug/codex"
 ```
 
-On Windows, use `codex.exe` and `interpreter.exe`. The symlink is a local test
-artifact; do not commit `resources/oix`.
+On Windows, point `INTERPRETER_OIX_PATH` at the built `.exe`. This override is
+for development only and must not be persisted in product configuration.
 
 ## 4. Test Workstation against the local build
 
@@ -65,19 +69,19 @@ resources/oix/"$(node -p 'process.platform + "-" + process.arch')"/bin/interpret
 pnpm run test:unit
 ```
 
-For manual desktop testing, keep the local executable overlay and run:
+For manual desktop testing, keep `INTERPRETER_OIX_PATH` exported and run:
 
 ```bash
 pnpm dev
 ```
 
-To return to the pinned public runtime, remove the current platform's runtime
-directory and rerun the downloader:
+To return to normal resolution, unset the development override. Workstation
+will install and launch its pinned OIX release. It will only select that release
+for the terminal when no terminal OIX exists or when the terminal selector is
+still owned by Workstation:
 
 ```bash
-platform="$(node -p 'process.platform + "-" + process.arch')"
-rm -rf "resources/oix/$platform"
-pnpm run download:oix -- --current-platform
+unset INTERPRETER_OIX_PATH
 ```
 
 ## 5. Ship an OIX release bump

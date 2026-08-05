@@ -3,8 +3,8 @@ import { access, mkdir, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { basename, extname, join } from 'node:path';
 import {
-  downloadMediaMessage,
   type WAMessage,
+  type WASocket,
 } from '@whiskeysockets/baileys';
 import {
   connectionEvents,
@@ -349,6 +349,7 @@ async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: str
 }
 
 async function downloadInboundMediaWithRetry(params: {
+  socket: WASocket;
   rawMessage: WAMessage;
   messageId: string;
 }): Promise<Buffer | null> {
@@ -357,7 +358,7 @@ async function downloadInboundMediaWithRetry(params: {
   for (let attempt = 1; attempt <= INBOUND_MEDIA_MAX_ATTEMPTS; attempt++) {
     try {
       const data = await withTimeout(
-        downloadMediaMessage(params.rawMessage, 'buffer', {}),
+        params.socket.downloadMedia(params.rawMessage, 'buffer', {}),
         INBOUND_MEDIA_TIMEOUT_MS,
         'downloadMediaMessage'
       );
@@ -408,6 +409,7 @@ async function saveIncomingMediaAttachment(
 
   try {
     const data = await downloadInboundMediaWithRetry({
+      socket: sock,
       rawMessage,
       messageId: message.id,
     });
