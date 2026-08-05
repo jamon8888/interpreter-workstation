@@ -29,8 +29,9 @@ function writePackage(
   packageDir: string,
   version: string,
   target = "aarch64-apple-darwin",
+  entrypoint = "bin/interpreter",
 ): string {
-  const binaryPath = path.join(packageDir, "bin", "interpreter");
+  const binaryPath = path.join(packageDir, ...entrypoint.split("/"));
   mkdirSync(path.dirname(binaryPath), { recursive: true });
   mkdirSync(path.join(packageDir, "codex-path"), { recursive: true });
   mkdirSync(path.join(packageDir, "codex-resources"), { recursive: true });
@@ -55,7 +56,7 @@ function writePackage(
       version,
       target,
       variant: "open-interpreter",
-      entrypoint: "bin/interpreter",
+      entrypoint,
       resourcesDir: "codex-resources",
       pathDir: "codex-path",
     }),
@@ -246,6 +247,91 @@ describe("OIX shared runtime resolution", () => {
     expect(readFileSync(paths.terminalOwnershipFile, "utf8")).toContain(
       '"version":"0.0.34"',
     );
+  });
+
+  test("serializes installs from separate app processes", async () => {
+    const homeDir = await tempDir("oix-cross-process-install-home-");
+    const bundleDir = await tempDir("oix-cross-process-install-bundle-");
+    const targetArch = process.arch === "arm64" ? "aarch64" : "x86_64";
+    const target =
+      process.platform === "win32"
+        ? `${targetArch}-pc-windows-msvc`
+        : process.platform === "darwin"
+          ? `${targetArch}-apple-darwin`
+          : `${targetArch}-unknown-linux-gnu`;
+    const entrypoint =
+      process.platform === "win32" ? "bin/interpreter.exe" : "bin/interpreter";
+    writePackage(bundleDir, "0.0.34", target, entrypoint);
+    const runtimeModule = new URL("./oixRuntime.ts", import.meta.url).href;
+    const worker = `
+      const { resolveOrInstallOixRuntime } = await import(process.env.OIX_RUNTIME_MODULE);
+      await resolveOrInstallOixRuntime({
+        platform: process.platform,
+        arch: process.arch,
+        env: {
+          ...process.env,
+          HOME: process.env.OIX_TEST_HOME,
+          USERPROFILE: process.env.OIX_TEST_HOME,
+          LOCALAPPDATA: process.env.OIX_TEST_LOCAL_APP_DATA,
+          PATH: "",
+          SHELL: "/bin/zsh",
+        },
+        homeDir: process.env.OIX_TEST_HOME,
+        bundledPackageCandidates: [process.env.OIX_TEST_BUNDLE],
+        probeBinary: async () => {
+          await Bun.sleep(250);
+          return true;
+        },
+        configureTerminalPath: false,
+      });
+    `;
+    const spawnWorker = () =>
+      Bun.spawn([process.execPath, "-e", worker], {
+        env: {
+          ...process.env,
+          OIX_RUNTIME_MODULE: runtimeModule,
+          OIX_TEST_HOME: homeDir,
+          OIX_TEST_BUNDLE: bundleDir,
+          OIX_TEST_LOCAL_APP_DATA: path.join(homeDir, "AppData", "Local"),
+        },
+        stdout: "pipe",
+        stderr: "pipe",
+      });
+
+    const workers = [spawnWorker(), spawnWorker()];
+    const results = await Promise.all(
+      workers.map(async (child) => ({
+        exitCode: await child.exited,
+        stderr: await new Response(child.stderr).text(),
+      })),
+    );
+    expect(results).toEqual([
+      { exitCode: 0, stderr: "" },
+      { exitCode: 0, stderr: "" },
+    ]);
+
+    const paths = getOixStandalonePaths(
+      process.platform,
+      {
+        HOME: homeDir,
+        USERPROFILE: homeDir,
+        LOCALAPPDATA: path.join(homeDir, "AppData", "Local"),
+        PATH: "",
+      },
+      homeDir,
+    );
+    expect(realpathSync(paths.managedBinary)).toBe(
+      realpathSync(
+        path.join(
+          paths.releasesDir,
+          `0.0.34-${target}`,
+          ...entrypoint.split("/"),
+        ),
+      ),
+    );
+    expect(
+      existsSync(path.join(paths.standaloneRoot, ".workstation-install.lock")),
+    ).toBe(false);
   });
 
   test("advances the terminal with app updates while Workstation still owns it", async () => {

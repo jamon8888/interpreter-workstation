@@ -10,6 +10,7 @@ import {
   realpathSync,
   renameSync,
   rmSync,
+  statSync,
   symlinkSync,
   writeFileSync,
 } from "node:fs";
@@ -30,6 +31,11 @@ const PROFILE_BLOCK_BEGIN = "# >>> Open Interpreter installer >>>";
 const PROFILE_BLOCK_END = "# <<< Open Interpreter installer <<<";
 const VALID_VERSION = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/;
 const VALID_TARGET = /^[0-9A-Za-z_.-]+$/;
+const INSTALL_LOCK_DIR = ".workstation-install.lock";
+const INSTALL_LOCK_OWNER_FILE = "owner.json";
+const INSTALL_LOCK_RETRY_MS = 100;
+const INSTALL_LOCK_TIMEOUT_MS = 120_000;
+const INSTALL_LOCK_ORPHAN_MS = 10 * 60_000;
 const installTails = new Map<string, Promise<void>>();
 
 type OixPackageMetadata = {
@@ -56,6 +62,105 @@ type ResolveOixRuntimeOptions = {
   configureTerminalPath?: boolean;
 };
 
+type InstallLockOwner = {
+  pid: number;
+  acquiredAt: string;
+};
+
+function processIsRunning(pid: number): boolean {
+  if (!Number.isSafeInteger(pid) || pid <= 0) {
+    return false;
+  }
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    return code !== "ESRCH";
+  }
+}
+
+function readInstallLockOwner(lockDir: string): InstallLockOwner | null {
+  try {
+    const parsed = JSON.parse(
+      readFileSync(path.join(lockDir, INSTALL_LOCK_OWNER_FILE), "utf8"),
+    ) as Partial<InstallLockOwner>;
+    if (
+      !Number.isSafeInteger(parsed.pid) ||
+      (parsed.pid ?? 0) <= 0 ||
+      typeof parsed.acquiredAt !== "string"
+    ) {
+      return null;
+    }
+    return parsed as InstallLockOwner;
+  } catch {
+    return null;
+  }
+}
+
+function lockDirectoryIsOrphaned(lockDir: string): boolean {
+  const owner = readInstallLockOwner(lockDir);
+  if (owner) {
+    const acquiredAt = Date.parse(owner.acquiredAt);
+    return (
+      !processIsRunning(owner.pid) ||
+      (Number.isFinite(acquiredAt) &&
+        Date.now() - acquiredAt > INSTALL_LOCK_ORPHAN_MS)
+    );
+  }
+  try {
+    return Date.now() - statSync(lockDir).mtimeMs > INSTALL_LOCK_ORPHAN_MS;
+  } catch {
+    return false;
+  }
+}
+
+async function acquireInstallFilesystemLock(
+  standaloneRoot: string,
+): Promise<() => void> {
+  mkdirSync(standaloneRoot, { recursive: true });
+  const lockDir = path.join(standaloneRoot, INSTALL_LOCK_DIR);
+  const deadline = Date.now() + INSTALL_LOCK_TIMEOUT_MS;
+
+  while (true) {
+    try {
+      mkdirSync(lockDir);
+      try {
+        writeFileSync(
+          path.join(lockDir, INSTALL_LOCK_OWNER_FILE),
+          `${JSON.stringify({
+            pid: process.pid,
+            acquiredAt: new Date().toISOString(),
+          } satisfies InstallLockOwner)}\n`,
+        );
+      } catch (error) {
+        rmSync(lockDir, { recursive: true, force: true });
+        throw error;
+      }
+      return () => rmSync(lockDir, { recursive: true, force: true });
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "EEXIST") {
+        throw error;
+      }
+    }
+
+    if (lockDirectoryIsOrphaned(lockDir)) {
+      rmSync(lockDir, { recursive: true, force: true });
+      continue;
+    }
+    if (Date.now() >= deadline) {
+      const owner = readInstallLockOwner(lockDir);
+      throw new Error(
+        `[oix-runtime] Timed out waiting for the managed runtime install lock at ${lockDir}` +
+          (owner
+            ? ` (held by pid ${owner.pid} since ${owner.acquiredAt})`
+            : ""),
+      );
+    }
+    await new Promise((resolve) => setTimeout(resolve, INSTALL_LOCK_RETRY_MS));
+  }
+}
+
 async function withInstallLock<T>(
   standaloneRoot: string,
   operation: () => Promise<T>,
@@ -69,12 +174,18 @@ async function withInstallLock<T>(
   installTails.set(standaloneRoot, tail);
 
   await previous;
+  let releaseFilesystemLock: (() => void) | undefined;
   try {
+    releaseFilesystemLock = await acquireInstallFilesystemLock(standaloneRoot);
     return await operation();
   } finally {
-    release();
-    if (installTails.get(standaloneRoot) === tail) {
-      installTails.delete(standaloneRoot);
+    try {
+      releaseFilesystemLock?.();
+    } finally {
+      release();
+      if (installTails.get(standaloneRoot) === tail) {
+        installTails.delete(standaloneRoot);
+      }
     }
   }
 }
