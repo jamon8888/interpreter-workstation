@@ -21,14 +21,14 @@ integrations keep their own notices and may not appear in the pnpm inventory.
 
 Known items requiring explicit release review:
 
-- The current WhatsApp implementation uses Baileys, whose dependency graph
-  includes `libsignal` under GPL-3.0. Baileys' maintainers explicitly identify
-  this as a licensing issue they intend to remove. A distributor must either
-  satisfy the applicable GPL obligations or decouple/replace this connector
-  before treating an Apache-only binary policy as satisfied. The Electron build
-  currently bundles the Baileys and `libsignal` implementation into its main
-  process, so this is a packaged-binary concern rather than a lockfile-only
-  false positive.
+- The current WhatsApp implementation aliases the Baileys API to
+  `@oxidezap/baileyrs@0.0.32` (MIT), which uses
+  `whatsapp-rust-bridge@0.6.0-alpha.42` (MIT). Its Signal-protocol code comes
+  from the MIT-licensed `oxidezap/whatsapp-rust` implementation; it is not the
+  GPL `@whiskeysockets/libsignal-node` package used by older Baileys releases.
+  Preserve the npm and upstream Rust notices and audit the shipped native/WASM
+  artifacts at every bridge update, because the pnpm inventory does not inspect
+  licenses embedded inside prebuilt binaries.
 - HEIC support and Sharp's native image stack include LGPL components. Preserve
   their notices and verify the packaged linking/replacement obligations.
 - `buffers@0.1.1` omits license metadata in its npm tarball. Upstream history and
@@ -37,7 +37,7 @@ Known items requiring explicit release review:
 - The browser extension and computer-use submodules carry independent MIT
   licenses and preserved upstream histories.
 
-Current production audit notes (2026-08-01):
+Current production audit notes (2026-08-05):
 
 - `pnpm audit --prod` reports zero critical or high-severity findings.
 - A moderate `file-type@16.5.4` advisory remains under nut.js/Jimp. The fixed
@@ -45,6 +45,8 @@ Current production audit notes (2026-08-01):
   this dependency chain safely. Keep untrusted file-type detection away from
   the main process and replace or upgrade this chain before a hardened binary
   release.
+- The lockfile forces Hono 4.12.34 or newer within the current 4.x line to close
+  the CORS preflight ReDoS advisory inherited through the MCP SDK.
 - A low resource-consumption advisory remains in `@ai-sdk/provider-utils`.
   The current compatible 3.x line has no registry-recognized patched release.
   Recheck this at every lockfile update.
