@@ -8,14 +8,18 @@ contents of a packaged desktop binary.
 Before publishing a release:
 
 1. Generate the production dependency inventory from the frozen lockfile.
-2. Include every required license and attribution in the packaged notices.
-3. Review copyleft, model-weight, codec, native-runtime, and optional integration
+2. Run `pnpm run release:licenses:check` against that exact inventory. This
+   fails on an unreviewed unknown, GPL-containing, or LGPL package.
+3. Verify the packaged app contains its `licenses/` resource directory.
+4. Review model-weight, codec, downloaded native-runtime, and optional integration
    obligations for every target platform.
-4. Archive the exact source and lockfile corresponding to the shipped binary.
+5. Archive the exact source and lockfile corresponding to the shipped binary.
 
 The main CI workflow runs `pnpm run release:licenses` from the frozen
 installation and uploads `production-license-inventory.json`. Treat that
-artifact as review input, not as a substitute for the packaged-binary review:
+artifact as review input. CI then checks it against
+`licenses/release-policy.json`. This is not a substitute for reviewing every
+packaged-binary input:
 downloaded runtimes, native libraries, submodules, models, and optional
 integrations keep their own notices and may not appear in the pnpm inventory.
 
@@ -29,11 +33,22 @@ Known items requiring explicit release review:
   Preserve the npm and upstream Rust notices and audit the shipped native/WASM
   artifacts at every bridge update, because the pnpm inventory does not inspect
   licenses embedded inside prebuilt binaries.
-- HEIC support and Sharp's native image stack include LGPL components. Preserve
-  their notices and verify the packaged linking/replacement obligations.
-- `buffers@0.1.1` omits license metadata in its npm tarball. Upstream history and
-  Debian's source record identify it as MIT; preserve that evidence and notice
-  or replace the dependency during release hardening.
+- Platform packages matching `@img/sharp-libvips-*` appear in pnpm's
+  conservative production inventory as optional peer-platform packages. They
+  are accepted only at the reviewed 1.3.2 release under LGPL-3.0-or-later.
+  Every app packages the exact upstream component notices, LGPL/GPL text, and
+  corresponding-source link. Packaging also verifies the target artifact: the
+  current app does not bundle these development-only platform packages, and a
+  future artifact that does include one must keep its shared libraries
+  replaceable outside ASAR. CI fails if another LGPL package or version appears
+  without review.
+- `buffers@0.1.1` omits license metadata in its npm tarball. The release policy
+  resolves it to MIT using Debian's reviewed source record and upstream commit,
+  and the complete MIT notice is packaged. Any additional `Unknown` entry fails
+  CI.
+- JSZip 3.10.1 is used under its MIT option. node-forge 1.4.0 is used under its
+  BSD-3-Clause option. Their complete selected notices are packaged; CI fails if
+  either package or license expression drifts.
 - The browser extension and computer-use submodules carry independent MIT
   licenses and preserved upstream histories.
 

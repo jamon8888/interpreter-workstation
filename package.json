@@ -137,6 +137,7 @@
     "typecheck": "pnpm run ensure:codex-generated-types && tsc --noEmit && tsc -p tsconfig.electron.json --noEmit",
     "precommit": "pnpm run typecheck && pnpm run test:unit && pnpm run test:vitest",
     "release:licenses": "pnpm licenses list --prod --json",
+    "release:licenses:check": "node scripts/check-production-licenses.mjs",
     "fixtures:generate": "node scripts/generate-public-test-fixtures.mjs",
     "lint:selectors": "npx tsx scripts/lint-selectors.ts",
     "lint": "pnpm run typecheck && pnpm run lint:selectors",
@@ -154,6 +155,7 @@
     "verify:openai-key": "node scripts/verify-openai-realtime-key.mjs"
   },
   "devDependencies": {
+    "@electron/asar": "3.4.1",
     "@electron/rebuild": "4.2.0",
     "@moonshine-ai/moonshine-js": "0.1.29",
     "@playwright/test": "1.56.1",

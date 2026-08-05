@@ -10,6 +10,8 @@ directories:
 
 asar: true
 asarUnpack:
+  # Keep LGPL-covered shared libraries replaceable in the installed app.
+  - "node_modules/@img/sharp-libvips-*/**"
   - "node_modules/@parcel/**"
   - "node_modules/@vscode/ripgrep/**"
   - "node_modules/@openinterpreter/**"
@@ -48,6 +50,12 @@ extraResources:
       - "**/*"
   - from: resources/templates
     to: templates
+  - from: NOTICE
+    to: licenses/NOTICE
+  - from: licenses
+    to: licenses
+    filter:
+      - "**/*"
   - from: resources/icons/app.icns
     to: icons/app.icns
   - from: resources/icons/app.ico

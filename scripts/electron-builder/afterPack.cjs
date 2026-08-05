@@ -2,7 +2,12 @@
 
 const path = require('path');
 const fs = require('fs');
+const { listPackage } = require('@electron/asar');
 const { assertBundledCodexSkills } = require('./checkBundledCodexSkills.cjs');
+
+function listAsarEntries(archivePath) {
+  return listPackage(archivePath);
+}
 
 function copyOptionalFile(source, destination) {
   if (!fs.existsSync(source)) return false;
@@ -55,7 +60,13 @@ function assertWindowsDelayLoadDlls(appOutDir) {
 function getRequiredBundledResourcePaths(resourcesRoot, platform, arch) {
   const isWin = platform === 'win32' || platform === 'windows';
   const binarySuffix = isWin ? '.exe' : '';
-  const oixRuntimePaths = [
+  const sharedResourcePaths = [
+    path.join(resourcesRoot, 'licenses', 'NOTICE'),
+    path.join(resourcesRoot, 'licenses', 'THIRD_PARTY_NOTICES.md'),
+    path.join(resourcesRoot, 'licenses', 'sharp-libvips-v1.3.2-THIRD-PARTY-NOTICES.md'),
+    path.join(resourcesRoot, 'licenses', 'LGPL-3.0.txt'),
+    path.join(resourcesRoot, 'licenses', 'GPL-3.0.txt'),
+    path.join(resourcesRoot, 'licenses', 'release-policy.json'),
     path.join(resourcesRoot, 'oix', 'bin', `interpreter${binarySuffix}`),
     path.join(resourcesRoot, 'oix', 'bin', `i${binarySuffix}`),
     path.join(resourcesRoot, 'oix', 'bin', `codex-code-mode-host${binarySuffix}`),
@@ -63,7 +74,7 @@ function getRequiredBundledResourcePaths(resourcesRoot, platform, arch) {
     path.join(resourcesRoot, 'oix', 'codex-path', `rg${binarySuffix}`),
   ];
   if (!isWin) {
-    oixRuntimePaths.push(
+    sharedResourcePaths.push(
       path.join(resourcesRoot, 'oix', 'codex-resources', 'zsh', 'bin', 'zsh'),
     );
   }
@@ -84,7 +95,7 @@ function getRequiredBundledResourcePaths(resourcesRoot, platform, arch) {
 
   if (platform === 'darwin' || platform === 'mac') {
     return [
-      ...oixRuntimePaths,
+      ...sharedResourcePaths,
       path.join(resourcesRoot, 'pdfcpu', 'pdfcpu'),
       ...jsReplRuntimePaths,
       ...relayRuntimePaths,
@@ -106,7 +117,7 @@ function getRequiredBundledResourcePaths(resourcesRoot, platform, arch) {
 
   if (platform === 'linux') {
     return [
-      ...oixRuntimePaths,
+      ...sharedResourcePaths,
       path.join(resourcesRoot, 'pdfcpu', 'pdfcpu'),
       ...jsReplRuntimePaths,
       ...relayRuntimePaths,
@@ -116,7 +127,7 @@ function getRequiredBundledResourcePaths(resourcesRoot, platform, arch) {
 
   if (platform === 'win32' || platform === 'windows') {
     return [
-      ...oixRuntimePaths,
+      ...sharedResourcePaths,
       path.join(resourcesRoot, 'codex-command-runner.exe'),
       path.join(resourcesRoot, 'pdfcpu', 'pdfcpu.exe'),
       path.join(resourcesRoot, 'codex-windows-sandbox-setup.exe'),
@@ -286,6 +297,54 @@ async function afterPack(context) {
 
   const nodeModulesDirs = getNodeModulesDirs();
   console.log('[afterPack] node_modules directories:', nodeModulesDirs);
+
+  if (isMac || isLinux) {
+    const libvipsPlatform = isMac ? 'darwin' : 'linux';
+    const expectedPackage = `@img/sharp-libvips-${libvipsPlatform}-${arch}`;
+    const asarPath = path.join(resourcesRoot, 'app.asar');
+    const packagedPathFragment = `/node_modules/${expectedPackage}/`;
+    const packagedInsideAsar = fs.existsSync(asarPath)
+      && listAsarEntries(asarPath).some((entry) => entry.includes(packagedPathFragment));
+    const packageRoot = nodeModulesDirs
+      .map((nodeModulesDir) => findPackageInNodeModules(nodeModulesDir, expectedPackage))
+      .find(Boolean);
+
+    if (packagedInsideAsar && !packageRoot) {
+      throw new Error(
+        `[afterPack] LGPL shared-library package is trapped inside ASAR: ${expectedPackage}`,
+      );
+    }
+    if (!packagedInsideAsar && !packageRoot) {
+      console.log(
+        `[afterPack] ${expectedPackage} is present in the conservative license inventory but is not bundled in this artifact`,
+      );
+    }
+    if (!packageRoot) {
+      // Nothing in this target artifact links or distributes the optional package.
+      // Notices are still included because the lockfile inventory is deliberately conservative.
+    } else {
+      const libraryFiles = [];
+      const collectLibraries = (directory) => {
+        for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+          const entryPath = path.join(directory, entry.name);
+          if (entry.isDirectory()) collectLibraries(entryPath);
+          else if (
+            entry.isFile()
+            && (entry.name.includes('.dylib') || entry.name.includes('.so.'))
+          ) {
+            libraryFiles.push(entryPath);
+          }
+        }
+      };
+      collectLibraries(packageRoot);
+      if (libraryFiles.length === 0) {
+        throw new Error(`[afterPack] No replaceable shared libraries found in ${packageRoot}`);
+      }
+      console.log(
+        `[afterPack] Verified ${libraryFiles.length} replaceable LGPL/shared libraries in ${expectedPackage}`,
+      );
+    }
+  }
 
   // --- macOS binary signing ---
   if (isMac) {

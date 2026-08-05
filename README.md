@@ -120,5 +120,7 @@ Do not put credentials in product overlays or commit local `.env` files.
 
 Interpreter Workstation is licensed under the [Apache License 2.0](LICENSE).
 Pinned dependencies and submodules retain their own licenses and notices. Read
-[Dependency licensing](docs/dependency-licensing.md) before distributing a
-packaged binary.
+[Dependency licensing](docs/dependency-licensing.md) and the reviewed
+[third-party notices](licenses/THIRD_PARTY_NOTICES.md) before distributing a
+packaged binary. Every packaged app carries these notices under its `licenses/`
+resource directory.
