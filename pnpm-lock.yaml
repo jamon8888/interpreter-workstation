@@ -22,7 +22,7 @@ overrides:
   picomatch@>=4 <5: 4.0.4
   shell-quote: 1.10.0
   tmp@<0.2.7: 0.2.7
-  undici: 7.28.0
+  undici: 7.29.0
   ws: 8.21.1
   underscore@<1.13.8: 1.13.8
 
@@ -8496,8 +8496,8 @@ packages:
   undici-types@7.16.0:
     resolution: {integrity: sha512-Zz+aZWSj8LE6zoxD+xrjh4VfkIG8Ya6LvYkZqtUQGJPZjYl53ypCaUwWqo7eI0x66KBGeRo+mlBEkMSeSZ38Nw==}
 
-  undici@7.28.0:
-    resolution: {integrity: sha512-cRZYrTDwWznlnRiPjggAGxZXanty6M8RV1ff8Wm4LWXBp7/IG8v5DnOm74DtUBp9OONpK75YlPnIjQqX0dBDtA==}
+  undici@7.29.0:
+    resolution: {integrity: sha512-IDxfleLmmbSskfWSUATiN1nfn2rDuvnMOqb5CWR92iIfojA0Ud+ulOAAEQ57LPr9rWmsreUyf5lwyao+7GNNVw==}
     engines: {node: '>=20.18.1'}
 
   unicorn-magic@0.3.0:
@@ -9412,7 +9412,7 @@ snapshots:
       semver: 7.7.3
       sumchecker: 3.0.1
     optionalDependencies:
-      undici: 7.28.0
+      undici: 7.29.0
     transitivePeerDependencies:
       - supports-color
 
@@ -11968,7 +11968,7 @@ snapshots:
     dependencies:
       progress: 2.0.3
       proxy-from-env: 1.1.0
-      undici: 7.28.0
+      undici: 7.29.0
       which: 2.0.2
     optionalDependencies:
       '@sentry/cli-darwin': 3.2.0
@@ -15051,7 +15051,7 @@ snapshots:
       saxes: 6.0.0
       symbol-tree: 3.2.4
       tough-cookie: 6.0.1
-      undici: 7.28.0
+      undici: 7.29.0
       w3c-xmlserializer: 5.0.0
       webidl-conversions: 8.0.1
       whatwg-mimetype: 5.0.0
@@ -16055,7 +16055,7 @@ snapshots:
       semver: 7.7.3
       tar: 7.5.22
       tinyglobby: 0.2.17
-      undici: 7.28.0
+      undici: 7.29.0
       which: 6.0.1
 
   node-int64@0.4.0: {}
@@ -17742,7 +17742,7 @@ snapshots:
 
   undici-types@7.16.0: {}
 
-  undici@7.28.0: {}
+  undici@7.29.0: {}
 
   unicorn-magic@0.3.0: {}
 
