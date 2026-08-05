@@ -377,6 +377,23 @@ function replaceSymlink(
   targetPath: string,
   type?: "dir" | "junction",
 ): void {
+  try {
+    const linkStat = lstatSync(linkPath);
+    if (linkStat.isSymbolicLink()) {
+      const actualTarget = realpathSync(linkPath);
+      const requestedTarget = realpathSync(targetPath);
+      const sameTarget =
+        process.platform === "win32"
+          ? actualTarget.replace(/^\\\\\?\\/, "").toLowerCase() ===
+            requestedTarget.replace(/^\\\\\?\\/, "").toLowerCase()
+          : actualTarget === requestedTarget;
+      if (sameTarget) {
+        return;
+      }
+    }
+  } catch {
+    // Missing and broken links are handled by the replacement path below.
+  }
   const temporaryLink = `${linkPath}.workstation-${process.pid}`;
   rmSync(temporaryLink, { recursive: true, force: true });
   symlinkSync(targetPath, temporaryLink, type);

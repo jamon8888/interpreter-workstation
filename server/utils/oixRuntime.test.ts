@@ -2,6 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import {
   chmodSync,
   existsSync,
+  lstatSync,
   mkdirSync,
   readFileSync,
   realpathSync,
@@ -218,6 +219,20 @@ describe("OIX shared runtime resolution", () => {
     expect(readFileSync(paths.terminalOwnershipFile, "utf8")).toContain(
       '"version":"0.0.34"',
     );
+
+    const currentInode = lstatSync(paths.currentDir).ino;
+    const visibleInode = lstatSync(paths.visibleBinary).ino;
+    await resolveOrInstallOixRuntime({
+      platform: "darwin",
+      arch: "arm64",
+      env: { HOME: homeDir, PATH: "", SHELL: "/bin/zsh" },
+      homeDir,
+      bundledPackageCandidates: [bundleDir],
+      probeBinary: async () => true,
+      configureTerminalPath: true,
+    });
+    expect(lstatSync(paths.currentDir).ino).toBe(currentInode);
+    expect(lstatSync(paths.visibleBinary).ino).toBe(visibleInode);
   });
 
   test("serializes concurrent installs into the same managed home", async () => {
