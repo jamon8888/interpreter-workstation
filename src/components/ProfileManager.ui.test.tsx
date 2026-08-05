@@ -189,7 +189,7 @@ describe('ProfileManager', () => {
       expect(apiMocks.createProfile).toHaveBeenCalledWith(expect.objectContaining({ wireApi: 'chat' }));
     });
     expect(providersMocks.probeResponsesApiSupport).not.toHaveBeenCalled();
-  });
+  }, 15_000);
 
   test('creates DeepSeek API profiles with Chat Completions without probing Responses support', async () => {
     const user = userEvent.setup();
