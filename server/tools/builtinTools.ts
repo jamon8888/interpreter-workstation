@@ -94,6 +94,7 @@ export interface BuiltinServerDefinition {
 
 import { googleServerDefinition } from './builtin-tools/google/index';
 import { testApprovalServerDefinition } from './builtin-tools/test-approval/index';
+import { testFilesystemServerDefinition } from './builtin-tools/test-filesystem/index';
 import { runAgentServerDefinition } from './builtin-tools/run-agent/index';
 import { runAgentUiServerDefinition } from './builtin-tools/run-agent-ui/index';
 import { echoSecretServerDefinition } from './builtin-tools/echo-secret/index';
@@ -154,6 +155,7 @@ const BASE_HIDDEN_SERVER_IDS: string[] = [
   'builtin-run-agent',
   'builtin-run-agent-ui',
   'builtin-test-approval',
+  'builtin-test-filesystem',
   'builtin-echo-secret',
   'builtin-tasks',
   'builtin-agent-windows',
@@ -191,6 +193,7 @@ const includeElectronWorkstationServers =
 const ALL_BUILTIN_SERVERS: BuiltinServerDefinition[] = [
   ...(googleServerDefinition ? [googleServerDefinition] : []),
   ...(testApprovalServerDefinition ? [testApprovalServerDefinition] : []),
+  ...(process.env.NODE_ENV === 'test' ? [testFilesystemServerDefinition] : []),
   ...(runAgentServerDefinition ? [runAgentServerDefinition] : []),
   ...(runAgentUiServerDefinition ? [runAgentUiServerDefinition] : []),
   ...(echoSecretServerDefinition ? [echoSecretServerDefinition] : []),
