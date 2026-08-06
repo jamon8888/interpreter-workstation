@@ -300,9 +300,10 @@ export async function startInterpreterCliFileBridge(
   const bridgeDir = getInterpreterCliBridgeDir(port);
   const requestsDir = getRequestsDir(bridgeDir);
   const responsesDir = getResponsesDir(bridgeDir);
-  // Best-effort pre-clean of a stale bridge dir from a prior run. If a leftover dir is
-  // owned by another uid (shared /tmp), rmSync throws EACCES/EPERM; that must not crash
-  // startup. The recursive mkdirSync below is a no-op when the tree already exists.
+  // Best-effort pre-clean of a stale bridge dir from a prior run. A damaged or
+  // unexpectedly owned runtime tree can make rmSync throw EACCES/EPERM; that
+  // must not crash startup. The recursive mkdirSync below is a no-op when the
+  // tree already exists.
   try {
     rmSync(bridgeDir, { recursive: true, force: true });
   } catch (error) {

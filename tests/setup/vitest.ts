@@ -1,8 +1,17 @@
 import '@testing-library/jest-dom/vitest';
+import { rmSync } from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { cleanup } from '@testing-library/react';
 import { afterAll, afterEach, beforeAll, vi } from 'vitest';
 import { server } from './msw-server';
 import en from '../../shared/locales/en.json';
+
+// Never let tests read or write the developer's real app data or shared OIX
+// home. Each Vitest worker gets a process-scoped disposable root.
+const testRuntimeRoot = path.join(os.tmpdir(), `interpreter-vitest-${process.pid}`);
+process.env.INTERPRETER_USER_DATA_DIR = path.join(testRuntimeRoot, 'app-data');
+process.env.INTERPRETER_HOME = path.join(testRuntimeRoot, '.openinterpreter');
 
 function translate(key: string, options?: Record<string, unknown>): string {
   const template = en[key as keyof typeof en];
@@ -108,4 +117,5 @@ afterEach(() => {
 
 afterAll(() => {
   server.close();
+  rmSync(testRuntimeRoot, { recursive: true, force: true });
 });

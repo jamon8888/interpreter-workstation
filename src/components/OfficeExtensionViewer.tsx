@@ -344,16 +344,16 @@ export function OfficeExtensionViewer({ filePath, refreshKey = 0 }: OfficeExtens
           className="w-full max-w-md rounded-2xl bg-muted/50 px-6 py-7 text-center"
           style={{ border: 'var(--border-width) solid var(--border)' }}
         >
-          <p className="mb-2 text-ui-base text-foreground">Office extension required</p>
+          <p className="mb-2 text-ui-base text-foreground">Compatible document engine required</p>
           <p className="mb-5 text-ui-sm text-muted-foreground">
-            Install Office extensions to open and edit this file here. Once the install finishes, this page reloads automatically.
+            Workstation does not bundle a document editor. You can optionally install oo-editors, a separate AGPL-3.0 compatible engine, to open and edit this file here.
           </p>
           <Button
             onClick={handleInstall}
             variant="default"
             size="sm"
           >
-            Install Office Extensions
+            Install oo-editors
           </Button>
         </div>
       </div>

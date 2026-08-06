@@ -94,6 +94,7 @@ export interface BuiltinServerDefinition {
 
 import { googleServerDefinition } from './builtin-tools/google/index';
 import { testApprovalServerDefinition } from './builtin-tools/test-approval/index';
+import { testFilesystemServerDefinition } from './builtin-tools/test-filesystem/index';
 import { runAgentServerDefinition } from './builtin-tools/run-agent/index';
 import { runAgentUiServerDefinition } from './builtin-tools/run-agent-ui/index';
 import { echoSecretServerDefinition } from './builtin-tools/echo-secret/index';
@@ -101,8 +102,6 @@ import { nylasServerDefinition } from './builtin-tools/nylas/index';
 import { whatsappServerDefinition } from './builtin-tools/whatsapp/index';
 import { isConfigured as isWhatsAppConfigured } from './builtin-tools/whatsapp/credentials';
 import { telegramServerDefinition } from './builtin-tools/telegram/index';
-import { docxServerDefinition } from './builtin-tools/docx/index.js';
-import { pdfServerDefinition } from './builtin-tools/pdf/index';
 import { utilityServerDefinition } from './builtin-tools/utility/index';
 import { mediaAiServerDefinition } from './builtin-tools/media-ai/index';
 import { mcpManagementServerDefinition } from './builtin-tools/mcp-management/index';
@@ -133,15 +132,6 @@ function tryLoadServer<T>(serverId: string, loader: () => T): T | null {
   }
 }
 
-// Converter tools require Electron (x2t binary from OfficeExtension editors) - conditionally load
-let converterServerDefinition: BuiltinServerDefinition | null = null;
-if (process.versions.electron) {
-  converterServerDefinition = tryLoadServer(
-    'builtin-converter',
-    () => require('./builtin-tools/converter/index.js').converterServerDefinition as BuiltinServerDefinition,
-  );
-}
-
 // Remotion tools require Electron (webFrameMain for iframe control) and are dev-only
 // (Remotion's license does not permit redistribution in packaged apps)
 let remotionServerDefinition: BuiltinServerDefinition | null = null;
@@ -165,6 +155,7 @@ const BASE_HIDDEN_SERVER_IDS: string[] = [
   'builtin-run-agent',
   'builtin-run-agent-ui',
   'builtin-test-approval',
+  'builtin-test-filesystem',
   'builtin-echo-secret',
   'builtin-tasks',
   'builtin-agent-windows',
@@ -202,16 +193,13 @@ const includeElectronWorkstationServers =
 const ALL_BUILTIN_SERVERS: BuiltinServerDefinition[] = [
   ...(googleServerDefinition ? [googleServerDefinition] : []),
   ...(testApprovalServerDefinition ? [testApprovalServerDefinition] : []),
+  ...(process.env.NODE_ENV === 'test' ? [testFilesystemServerDefinition] : []),
   ...(runAgentServerDefinition ? [runAgentServerDefinition] : []),
   ...(runAgentUiServerDefinition ? [runAgentUiServerDefinition] : []),
   ...(echoSecretServerDefinition ? [echoSecretServerDefinition] : []),
   ...(nylasServerDefinition ? [nylasServerDefinition] : []),
   ...(whatsappServerDefinition ? [whatsappServerDefinition] : []),
   ...(telegramServerDefinition ? [telegramServerDefinition] : []),
-  ...(docxServerDefinition ? [docxServerDefinition] : []),
-  ...(pdfServerDefinition ? [pdfServerDefinition] : []),
-  // Converter requires Electron (x2t binary) - only include when available
-  ...(converterServerDefinition ? [converterServerDefinition] : []),
   // Remotion tools require Electron (webFrameMain) - only include when available
   ...(remotionServerDefinition ? [remotionServerDefinition] : []),
   ...(utilityServerDefinition ? [utilityServerDefinition] : []),

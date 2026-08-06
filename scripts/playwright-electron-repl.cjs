@@ -41,6 +41,10 @@ function getDefaultInterpreterAppSupportDir() {
   return path.join(require('node:os').homedir(), 'Library', 'Application Support', 'interpreter');
 }
 
+function getDefaultOpenInterpreterHome() {
+  return path.join(require('node:os').homedir(), '.openinterpreter');
+}
+
 function parseRecordVideoSize(sizeValue) {
   if (!sizeValue) {
     return undefined;
@@ -427,7 +431,7 @@ async function launch() {
       ...(vitePort ? { VITE_PORT: vitePort } : {}),
       ...(process.platform === 'darwin'
         ? {
-            INTERPRETER_HOME: process.env.INTERPRETER_HOME?.trim() || getDefaultInterpreterAppSupportDir(),
+            INTERPRETER_HOME: process.env.INTERPRETER_HOME?.trim() || getDefaultOpenInterpreterHome(),
             INTERPRETER_USER_DATA_DIR:
               process.env.INTERPRETER_USER_DATA_DIR?.trim() || getDefaultInterpreterAppSupportDir(),
           }

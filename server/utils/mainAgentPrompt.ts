@@ -4,8 +4,8 @@ import { hasHostedApi } from '../../shared/productConfig';
 
 const DEFAULT_PROMPT_BUNDLED_SKILL_NAMES = [
   'doc',
-  'Excel',
-  'PowerPoint',
+  'spreadsheets',
+  'slides',
   ...(hasHostedApi() ? ['media-creation'] : []),
   'pdf',
   'transcribe',
@@ -20,10 +20,11 @@ const KNOWN_PROMPT_BUNDLED_SKILL_ORDER = [
 ] as const;
 
 const PROMPT_BUNDLED_SKILL_GUIDANCE: Partial<Record<string, string>> = {
-  doc: '`doc` for Word/`.docx`; prefer matching `interpreter-app tools builtin-docx ...` workflows for exact reads, replacements, paragraph inserts, table inserts, and paragraph comments; prefer `interpreter-app tools builtin-converter convert_file ...` for PDF render checks; and use `python-docx` for richer rewrites',
-  Excel: '`Excel` for spreadsheets/`.xlsx`/`.xls`/`.csv`/`.tsv`; inspect and author workbooks through cohesive code execution guided by the bundled skill, normally with `openpyxl` and `pandas`; preserve formulas and styles; and verify both workbook structure and visible output',
+  doc: '`doc` for Word/`.docx`; use OIX code execution with `python-docx` and focused OOXML edits, then reopen and visually verify the saved document',
+  spreadsheets: '`spreadsheets` for `.xlsx`/`.xlsm`/`.csv`/`.tsv`; use OIX code execution with `openpyxl` for workbook authoring and `pandas` only for analysis, then reopen and visually verify the saved workbook',
+  slides: '`slides` for presentations/`.pptx`; use OIX code execution with `python-pptx`, keep content editable, then reopen and visually verify every slide',
   'media-creation': '`media-creation` for image, video, audio, and 3D generation or editing via `interpreter-app tools builtin-media-ai ...`; search models first, estimate cost before running, tell the user the expected cost in Interpreter balance terms before spending it, and use `interpreter-app tools builtin-interpreter interpreter_usage_get ...` when remaining balance matters',
-  pdf: '`pdf` for PDFs; prefer matching `interpreter-app tools builtin-pdf ...` reads first. For fillable PDF forms, run `read_pdf` first, then call `fill_pdf_form` once with `fields` as an array of `{ "id": "fN", "value": ... }` objects from the read output; never pass a field-name map.',
+  pdf: '`pdf` for PDFs; use OIX code execution with permissive Python libraries such as `pypdf`, `pdfplumber`, and `reportlab`, then render and visually verify the saved PDF',
   transcribe: '`transcribe` for local audio transcription through `interpreter-app tools builtin-transcribe ...`; list models first, ask before downloading a model, then use `download_model` and `transcribe_audio`',
   playwright: '`playwright` for Playwright browser workflows',
   settings: '`settings` for Interpreter settings and account usage; prefer `interpreter-app config ...` and `interpreter-app tools builtin-interpreter ...` workflows',
@@ -67,7 +68,7 @@ ${skillLines.join('\n')}
 - When a task matches a skill, read that skill's \`SKILL.md\` from the path above before following its workflow, unless the full skill body is already attached to the current turn.
 - Resolve any relative files mentioned by a skill relative to that skill's directory.
 - Use only the specific supporting files needed for the task; do not bulk-load unrelated skill references.
-- Skill names are workflow names, not callable tool names. Do not emit a tool call named after a skill such as \`computer-use\`, \`doc\`, \`Excel\`, or \`PowerPoint\`; read the skill file and use the native capability or \`${INTERPRETER_CLI_COMMAND}\` command it names.
+- Skill names are workflow names, not callable tool names. Do not emit a tool call named after a skill such as \`computer-use\`, \`doc\`, \`spreadsheets\`, or \`slides\`; read the skill file and use the native capability or \`${INTERPRETER_CLI_COMMAND}\` command it names.
 - If a skill points to a native runtime capability such as \`apply_patch\` or shell execution, use that native capability directly instead of looking for an \`${INTERPRETER_CLI_COMMAND}\` tool server with the same name.
 - If a skill path cannot be read or the skill cannot be applied, say that directly and continue with the best available path.`;
 }
@@ -162,9 +163,9 @@ export function getMainAgentBaseInstructions(): string {
 
 ## Documents
 
-- For document, spreadsheet, or PDF work, use the matching bundled skill. Use app tools where they provide a clear operation; for spreadsheets, the primary path is cohesive code execution guided by the spreadsheet skill.
-- For single-file office edits, do not send a plan or commentary before acting; your first emitted item should usually be the matching office action, often an \`${INTERPRETER_CLI_COMMAND}\` tool call.
-- Do not use \`js_repl\` for document, spreadsheet, presentation, or PDF extraction/editing tasks unless the user explicitly asked for a Node/JS workflow or the office task truly requires browser automation. Prefer the matching office tool path or a shell/Python fallback instead.
+- For document, spreadsheet, presentation, or PDF work, read and follow the matching bundled skill. Those skills use OIX code execution and permissively licensed libraries; do not search for a proprietary document tool server.
+- For single-file office edits, do not send a plan or commentary before acting; read the matching skill and begin the focused code-execution workflow.
+- Do not use \`js_repl\` for document, spreadsheet, presentation, or PDF extraction/editing tasks unless the user explicitly asked for a Node/JS workflow or the task truly requires browser automation. Prefer the matching skill's shell/Python workflow.
 - For local document, spreadsheet, PDF, or data-analysis tasks that are fully answerable from the provided files plus ordinary arithmetic or transformations, stay local. Do not browse unless the user explicitly asks for it or the needed information is genuinely absent from the workspace.
 - Never use web search as a calculator. For arithmetic, percentages, sample-size formulas, tax scenarios, unit conversions, or other worked-example math, use \`builtin-utility__calculate\` when exposed, otherwise local Python.
 - For research-backed documents, spreadsheets, or presentations, do one compact source-gathering pass for the external facts you truly need, then stop browsing and finish the remaining arithmetic, authoring, and verification locally.
@@ -174,33 +175,28 @@ export function getMainAgentBaseInstructions(): string {
 - For spreadsheet audit, reconciliation, variance, sampling, or selection tasks, local calculation tools or Python are appropriate when they help compute flags, quotas, thresholds, row picks, or supporting math from workbook data.
 - For exact office field edits, replace the narrowest labeled phrase that identifies the target; avoid global bare date, name, or number replacements when nearby labels disambiguate it.
 - After an exact office field edit, verify the target changed and nearby similar values did not.
-- If the task is to add lawyer/editor/reviewer comments to existing Word clauses or sections, prefer the matching \`interpreter-app tools builtin-docx add_docx_comments ...\` path before raw OOXML shell edits or generic \`python-docx\` fallbacks.
-- If the task is an exact Word-text replacement, use the matching \`interpreter-app tools builtin-docx read_word\` or \`read_docx\` command to confirm the current text when needed, then the matching \`replace_text_in_docx\` command instead of \`python-docx\`.
-- If the task is to rewrite one visible paragraph or replace an existing drafted block in Word, prefer the matching \`replace_paragraphs_in_docx\` command before \`python-docx\`.
-- If the task is to append a note, insert paragraphs, or add a drafted block, prefer the matching \`insert_paragraphs_in_docx\` command before \`python-docx\`.
-- If the task is to add a simple table, prefer the matching \`insert_table_in_docx\` command before \`python-docx\`.
-- If the task is to fill or revise an existing Word table or template table, prefer the matching \`update_table_cells_in_docx\` command before \`python-docx\`.
-- \`replace_text_in_docx\` expects \`{ path, replacements: [{ old_text, new_text, replace_all? }] }\`. Do not invent arg names like \`input_path\`, \`find_text\`, or \`replace_text\`.
-- For DOCX visual review in Interpreter, use \`${INTERPRETER_CLI_COMMAND} tools builtin-converter convert_file ...\` when a compatible document engine is configured, then inspect the resulting PDF. Otherwise use the document skill's available structural checks and state that rendered layout was not reviewed.
-- If the DOCX task is an append/insert/rewrite that the builtin DOCX commands cannot express, use \`python-docx\` directly.
-- For spreadsheet work, inspect the real workbook with \`openpyxl\` or \`pandas\`, perform the requested change in one cohesive script, save it, then reopen the saved file and verify formulas, values, sheet names, ranges, and styles.
-- When fills, merged cells, hidden sheets, formulas, comments, validations, or charts carry meaning, inspect those structures explicitly instead of flattening the workbook to a data frame.
-- For spreadsheet audit, sampling, reconciliation, or selection tasks, use local workbook reads plus Python calculations. Keep the analysis and artifact local unless external facts are genuinely required.
-- For visual verification, use a configured document engine when available. Otherwise report the structural checks performed and do not claim a rendered layout was reviewed.
-- For net-new multi-sheet, template-style, printer-friendly, dashboard, or visually structured workbooks, create a meaningful populated structure in the first cohesive authoring pass.
+- For narrow Word edits, use \`python-docx\` first and focused OOXML only for features such as comments that the library cannot express. Verify that nearby similar content was not changed.
+- For DOCX visual review, use the bundled document skill's render workflow and inspect every affected page when a permissive renderer is available.
+- Use \`python-docx\` for DOCX authoring and structured edits; use focused OOXML edits only for features it cannot express.
+- Use \`openpyxl\` for spreadsheet authoring and structured edits, and \`pandas\` only for analysis or reshaping.
+- If spreadsheet meaning is encoded by fills, colors, merged layout, or other formatting, inspect those properties with \`openpyxl\` before editing.
+- For spreadsheet audit, sampling, reconciliation, or selection tasks on an existing workbook, load it once with \`openpyxl\` and use \`pandas\` only where tabular analysis materially helps.
+- For spreadsheet visual verification and recalculation, use an installed permissive office renderer when available; otherwise reopen the workbook, inspect formulas and structure, and state the visual or cached-value limitation.
+- For net-new multi-sheet, template-style, printer-friendly, dashboard, or visually structured workbooks, make the first \`openpyxl\` authoring pass a meaningful populated structure rather than a placeholder.
+- If a net-new multi-sheet, template-style, printer-friendly, dashboard, or other richly structured workbook plainly needs the richer authoring path, do not spend a turn seeding a placeholder workbook with a narrow native write first.
 - If your first workbook write only creates a title, instructions, or other placeholder seed, continue immediately with the main authoring pass before any verification read.
-- For existing-workbook changes such as computed columns, helper tabs, freeze panes, filters, formulas, or formatting, load once, make the bounded edit with \`openpyxl\`, and save once.
-- For PDF-to-XLSX or similar extraction tasks, read the source once, build destination rows in memory, and write and format the complete workbook in one cohesive authoring pass.
-- For fillable PDF forms, use \`${INTERPRETER_CLI_COMMAND} tools builtin-pdf read_pdf ...\` first, map each visible field name to its exact \`[fN]\` id, then call \`fill_pdf_form\` once with \`{ "path": "...", "fields": [{ "id": "f0", "value": "..." }] }\`. The \`fields\` value must be an array, not an object keyed by field name.
-- For plain single-sheet outputs, apply readable widths, typed dates and numbers, filters, freeze panes, and a clear header treatment in the same authoring pass.
+- For existing-workbook tasks like adding computed columns, marking rows, helper tabs, freeze panes, or lightweight formatting, use one bounded \`openpyxl\` edit pass.
+- For PDF-to-XLSX or similar row-extraction tasks, do one direct source read, build rows in memory, write them with one \`openpyxl\` pass, then verify the workbook.
+- For fillable PDF forms, inspect field names and types with the bundled PDF skill's permissive Python workflow, update the exact named fields, preserve unrelated fields, then render and visually verify the result.
+- For plain single-sheet spreadsheet outputs that only need a header row, extracted rows, widths, dates, filters, or freeze panes, use one cohesive \`openpyxl\` authoring pass.
 - After a failed local parse, write, or inspection command, retry or inspect in the very next tool call unless the user needs an explanation or a decision.
 - For cross-format office tasks, choose the destination artifact workflow, pair it with one source-reading path, and act.
-- After an office tool path already produced the requested user-visible structure and a focused verification read/export confirms it, trust that result and keep moving.
+- After the matching skill workflow produced the requested user-visible structure and a focused verification confirms it, trust that result and keep moving.
 - If the task names a specific document, spreadsheet, or PDF file, inspect or edit that file directly instead of starting with broad \`pwd\`, \`ls\`, \`find\`, or \`rg --files\` sweeps.
 - Treat \`@mentions\` as concrete file references; use them before any filesystem search.
-- After an office mutation call, wait for that tool or command result before any verification read or refresh. Do not dispatch verification reads in parallel with the write.
+- After an office mutation command, wait for it to complete before any verification read or refresh. Do not dispatch verification reads in parallel with the write.
 - Treat refresh/recalc as mandatory post-edit hygiene, not optional polish.
-- App tool paths may handle refresh for you; do not add a second manual refresh after a successful app tool write unless the tool result tells you to.
+- Spreadsheet libraries do not calculate cached formula results. Recalculate with an installed permissive office renderer when the task depends on evaluated values.
 - If you create or modify a document, spreadsheet, presentation, or PDF on disk via shell, Python, or another non-native path and the file may be open in Interpreter, call \`${INTERPRETER_CLI_COMMAND} tools builtin-interpreter interpreter_refresh_file ...\` once after the write completes. Keep this automatic and boring.
 
 ## Document linking
@@ -255,8 +251,8 @@ export function getMainAgentDeveloperPrompt(
     ? ` (${interpreterCliPath})`
     : '';
   const interpreterToolsCommand = `${INTERPRETER_CLI_COMMAND} tools`;
-  const skillToolContract = `- Skills are workflow instructions, not callable tools. Never emit a tool call named after a skill such as \`computer-use\`, \`doc\`, \`Excel\`, \`PowerPoint\`, \`pdf\`, or \`settings\`; read or follow the skill, then call an actual runtime capability.
-- In normal CLI-only app-tool mode, do not emit direct tool calls such as \`builtin-cua-driver__get_app_state\`, \`builtin-docx__read_docx\`, or \`builtin-pdf__read_pdf\` unless those exact tools are visibly injected in the top-level tool list. Run \`${INTERPRETER_CLI_COMMAND}\` through the shell tool OIX exposes instead. The default OIX harness calls it \`exec_command\`; another selected harness may rename it, so follow the visible tool schema and never invent a \`command_execution\` tool.`;
+  const skillToolContract = `- Skills are workflow instructions, not callable tools. Never emit a tool call named after a skill such as \`computer-use\`, \`doc\`, \`spreadsheets\`, \`slides\`, \`pdf\`, or \`settings\`; read or follow the skill, then call an actual runtime capability.
+- In normal CLI-only app-tool mode, do not emit direct tool calls such as \`builtin-cua-driver__get_app_state\` unless that exact tool is visibly injected in the top-level tool list. Run \`${INTERPRETER_CLI_COMMAND}\` through the shell tool OIX exposes instead. The default OIX harness calls it \`exec_command\`; another selected harness may rename it, so follow the visible tool schema and never invent a \`command_execution\` tool.`;
   const interpreterShellGuidance = isWindows
     ? `- On Windows, the runtime executes shell-tool commands via \`powershell.exe -Command\`. Pass a plain command string, not JSON/array vectors like \`["powershell.exe","-Command","..."]\` or quoted/comma-separated argv text. PowerShell v5 does not support \`&&\`. Never use \`&&\` in any Windows command. Never run bare \`${INTERPRETER_CLI_COMMAND}\` inside PowerShell; for Interpreter CLI discovery and tool calls, always use \`cmd.exe /c "%INTERPRETER_CLI_PATH%" ...\`. For app launching, use \`cmd.exe /c start "" <app>\`.`
     : `- On Unix, prefer the bare \`${INTERPRETER_CLI_COMMAND}\` command on \`PATH\`. It is the supported Unix shell entrypoint for this runtime.`;
@@ -290,7 +286,7 @@ export function getMainAgentDeveloperPrompt(
 - ${skillToolContract.slice(2)}
 - \`js_repl\` runs JavaScript in a persistent Node kernel and lives on the \`builtin-js-repl\` server: \`${interpreterToolsCommand} builtin-js-repl js_repl --json '{"code":"..."}'\` (prefer \`--stdin-arg code\` to pass multi-line code raw on stdin, no JSON escaping; pass \`timeout_ms\` for long-running actions like browser navigation). Clear kernel state with \`${interpreterToolsCommand} builtin-js-repl js_repl_reset --json '{}'\`.
 - The OIX shell tool is a command surface. It cannot call native runtime tools by name. Do not run bare commands named \`js_repl\`, \`apply_patch\`, or other non-command capabilities.
-- For office files, prefer the matching Interpreter app tool path before generic shell or Python fallback.
+- For document files, follow the matching bundled skill and use OIX code execution with permissively licensed libraries.
 - \`$INTERPRETER_CLI_PATH\` is available for environments that need an explicit executable form${interpreterCliPathHint}. Do not derive it from \`$HOME\`.
 - ${interpreterShellGuidance.slice(2)}
 - For app-tool workflows that require CLI discovery, start with \`${INTERPRETER_CLI_COMMAND} --help\`; skip this for browser-control tasks; the browser-control skill names the exact \`builtin-js-repl\` commands.
@@ -321,7 +317,7 @@ export function getMainAgentDeveloperPrompt(
 - ${skillToolContract.slice(2)}
 - \`js_repl\` runs JavaScript in a persistent Node kernel and lives on the \`builtin-js-repl\` server: \`${interpreterToolsCommand} builtin-js-repl js_repl --json '{"code":"..."}'\` (prefer \`--stdin-arg code\` to pass multi-line code raw on stdin, no JSON escaping; pass \`timeout_ms\` for long-running actions like browser navigation). Clear kernel state with \`${interpreterToolsCommand} builtin-js-repl js_repl_reset --json '{}'\`.
 - The OIX shell tool is a command surface. It cannot call native runtime tools by name. Do not run bare commands named \`js_repl\`, \`apply_patch\`, or other non-command capabilities.
-- For office files, prefer the matching Interpreter app tool path before generic shell or Python fallback.
+- For document files, follow the matching bundled skill and use OIX code execution with permissively licensed libraries.
 - \`$INTERPRETER_CLI_PATH\` is available for environments that need an explicit executable form${interpreterCliPathHint}. Do not derive it from \`$HOME\`.
 - ${interpreterShellGuidance.slice(2)}
 - For app-tool workflows, start with \`${INTERPRETER_CLI_COMMAND} --help\` when the exact command shape is unclear; skip this for browser-control tasks; the browser-control skill names the exact \`builtin-js-repl\` commands.
@@ -437,5 +433,5 @@ ${visibleSkillsSection ? `\n${visibleSkillsSection}\n` : ''}
 - This app ships bundled global Interpreter skills installed in the runtime: ${bundledSkillGuidanceText}. For matching work, follow the corresponding bundled workflow through the runtime.
 - Use bundled skills through the runtime skill system, not by heuristically attaching a guessed subset to the request.
 - Bundled skill names are not callable tools. Never emit a tool call named after a skill; use the native capability or \`${INTERPRETER_CLI_COMMAND}\` command named by the skill.
-- A bundled skill never overrides a matching Interpreter app office tool path. Prefer the matching \`${INTERPRETER_CLI_COMMAND}\` workflow before any generic shell or Python fallback.${mediaAiGuidance}`;
+- For document files, the bundled skill is the canonical workflow. Use its OIX code-execution path rather than looking for a proprietary document tool server.${mediaAiGuidance}`;
 }

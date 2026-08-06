@@ -93,6 +93,7 @@ import {
 } from '../shared/interpreterConfigPaths';
 import { getCodexClient } from './utils/codexServiceBridge';
 import { migrateLegacyMcpOAuthToCodex } from './utils/legacyMcpOAuthMigration';
+import { resolveInterpreterHome } from '../shared/interpreterHome';
 
 // Re-export MCP types for convenience
 export type { McpServerConfig, McpServerConnectionFailure };
@@ -118,10 +119,10 @@ export interface AppConfig {
   agents: Record<string, AgentConfig>; // agentId -> config
   mcpServers?: Record<string, McpServerConfig>; // serverId -> config
   builtinToolsEnabled?: Record<string, boolean>; // builtinServerId -> enabled state
-  profiles?: Profile[]; // Merged model profiles view (persisted in codex-home/config.toml)
-  defaultProfileId?: string; // Last selected profile for new agents (persisted in codex-home/config.toml)
-  fastProfileId?: string; // Global fast profile used by subagent tooling (persisted in codex-home/config.toml)
-  providers?: Record<string, Provider>; // Merged provider view (persisted in codex-home/config.toml)
+  profiles?: Profile[]; // Merged model profiles view (persisted in ~/.openinterpreter/config.toml)
+  defaultProfileId?: string; // Last selected profile for new agents (persisted in ~/.openinterpreter/config.toml)
+  fastProfileId?: string; // Global fast profile used by subagent tooling (persisted in ~/.openinterpreter/config.toml)
+  providers?: Record<string, Provider>; // Merged provider view (persisted in ~/.openinterpreter/config.toml)
   backgroundOpacity?: number; // Background opacity (0-1 range)
   zoomFactor?: number; // Interface zoom factor (0.5-3 range)
   theme?: 'light' | 'dark' | 'system'; // Theme preference
@@ -279,7 +280,7 @@ function stripLegacyRootFilePermissionFields(config: AppConfig): AppConfig {
 }
 let migrationPromise: Promise<void> | null = null;
 
-export function getInterpreterHomeDir(): string {
+export function getInterpreterAppDataDir(): string {
   return resolveInterpreterDataDir();
 }
 
@@ -306,7 +307,7 @@ function startConfigFileWatcher(): void {
 
 function createConfigStore(): Conf<AppConfig> {
   const nextStore = new Conf<AppConfig>({
-    cwd: getInterpreterHomeDir(),
+    cwd: getInterpreterAppDataDir(),
     configName: 'config',
     serialize: (value: AppConfig) => JSON.stringify(value, null, 2),
     accessPropertiesByDotNotation: false,
@@ -382,7 +383,7 @@ function trackLegacyConfigFileMigration(): void {
 }
 
 async function migrateLegacyConfigFile(): Promise<void> {
-  const configDir = getInterpreterHomeDir();
+  const configDir = getInterpreterAppDataDir();
   const configFile = getConfigFilePath();
 
   if (configFile === LEGACY_CONFIG_FILE) {
@@ -749,7 +750,7 @@ async function ensureModelConfigMigrated(baseConfig?: AppConfig): Promise<void> 
 }
 
 function resolveModelConfigTomlPath(): string {
-  return pathJoin(resolveInterpreterDataDir(), 'codex-home', 'config.toml');
+  return pathJoin(resolveInterpreterHome(), 'config.toml');
 }
 
 function getErrorMessage(error: unknown): string {
@@ -1064,7 +1065,7 @@ export function setInterpreterHomeDir(homeDir: string | null): void {
     const resolvedHomeDir = resolve(homeDir);
     process.env[INTERPRETER_USER_DATA_DIR_ENV] = resolvedHomeDir;
     process.env[INTERPRETER_HOME_ENV] = resolvedHomeDir;
-    process.env[CODEX_HOME_ENV] = pathJoin(resolvedHomeDir, 'codex-home');
+    process.env[CODEX_HOME_ENV] = resolvedHomeDir;
   } else {
     delete process.env[INTERPRETER_USER_DATA_DIR_ENV];
     delete process.env[INTERPRETER_HOME_ENV];

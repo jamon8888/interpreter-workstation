@@ -309,7 +309,7 @@ describe('ExplorerNode', () => {
     expect(node.select).not.toHaveBeenCalled();
   });
 
-  test('filters the convert submenu down to formats every selected file supports', async () => {
+  test('does not offer the removed built-in document converter', async () => {
     const tree = createMockTree();
     const node = createMockNode(tree, {
       name: 'draft.docx',
@@ -339,7 +339,7 @@ describe('ExplorerNode', () => {
     }>;
     const convertItem = items.find((item) => item.label === 'Convert');
 
-    expect(convertItem?.submenu?.map((item) => item.label)).toEqual(['To .pdf']);
+    expect(convertItem).toBeUndefined();
   });
 
   test('shows every selected item in Finder from the context menu', async () => {

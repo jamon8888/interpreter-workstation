@@ -193,7 +193,7 @@ describe('formatWorkstationContext', () => {
     expect(result).toContain('- shape shape-2: Rectangle');
   });
 
-  test('pdf form field selection includes fill_pdf_form target id', () => {
+  test('pdf form field selection points to the permissive PDF skill workflow', () => {
     const ctx = baseContext({
       selection: {
         type: 'pdf',
@@ -212,7 +212,8 @@ describe('formatWorkstationContext', () => {
 
     expect(formatted).toContain('Selected PDF Form Field (from /workspace/form.pdf, page 1):');
     expect(formatted).toContain('[f7] "email" (text)');
-    expect(formatted).toContain('fields: [{ "id": "f7", "value": ... }]');
+    expect(formatted).toContain('Follow the bundled PDF skill and use permissive Python code');
+    expect(formatted).toContain('exact field named "email"');
   });
 
   test('sidebars none open', () => {

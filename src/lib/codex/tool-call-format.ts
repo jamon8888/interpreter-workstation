@@ -776,34 +776,7 @@ function appToolFileMentions(args: Record<string, unknown> | null, cwd: string |
   return mention(resolvePath(path, cwd), "file");
 }
 
-function builtinAppToolVerb(serverId: string, toolName: string): Pick<BuiltinAppToolCall, "label" | "active" | "past" | "kind"> {
-  const normalized = `${serverId} ${toolName}`.toLowerCase();
-  const toolTokens = toolName.toLowerCase().split(/[_-]+/).filter(Boolean);
-  const hasToolToken = (...tokens: string[]) => tokens.some((token) => toolTokens.includes(token));
-  if (serverId === "builtin-cells" || /\.(?:xlsx|xlsm|xls|csv)\b/.test(normalized)) {
-    if (hasToolToken("read", "search", "inspect", "list")) {
-      return { label: "Read spreadsheet", active: "Reading spreadsheet...", past: "Read spreadsheet", kind: "read" };
-    }
-    if (hasToolToken("recalculate", "calculate", "refresh")) {
-      return { label: "Recalculate spreadsheet", active: "Recalculating spreadsheet...", past: "Recalculated spreadsheet", kind: "run" };
-    }
-    return { label: "Edit spreadsheet", active: "Editing spreadsheet...", past: "Edited spreadsheet", kind: "write" };
-  }
-
-  if (serverId === "builtin-docx" || normalized.includes("document")) {
-    if (/(read|inspect|extract)/.test(normalized)) {
-      return { label: "Read document", active: "Reading document...", past: "Read document", kind: "read" };
-    }
-    return { label: "Edit document", active: "Editing document...", past: "Edited document", kind: "write" };
-  }
-
-  if (serverId === "builtin-pdf" || normalized.includes("pdf")) {
-    if (/(fill|write|edit)/.test(normalized)) {
-      return { label: "Edit PDF", active: "Editing PDF...", past: "Edited PDF", kind: "write" };
-    }
-    return { label: "Read PDF", active: "Reading PDF...", past: "Read PDF", kind: "read" };
-  }
-
+function builtinAppToolVerb(toolName: string): Pick<BuiltinAppToolCall, "label" | "active" | "past" | "kind"> {
   if (toolName === "interpreter_refresh_file") {
     return { label: "Refresh file view", active: "Refreshing file view...", past: "Refreshed file view", kind: "run" };
   }
@@ -821,7 +794,7 @@ function parseInterpreterAppBuiltinToolCommand(command: string, cwd: string | un
   }
 
   const args = parseJsonFlag(parts, target.flagStartIndex);
-  const verb = builtinAppToolVerb(target.serverId, target.toolName);
+  const verb = builtinAppToolVerb(target.toolName);
   return {
     serverId: target.serverId,
     toolName: target.toolName,

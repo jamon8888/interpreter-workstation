@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs';
-import { copyFile, mkdir, rm } from 'node:fs/promises';
+import { mkdir, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import type { Page, TestInfo } from '@playwright/test';
@@ -35,16 +35,12 @@ type RuntimePermissionState = {
   macosTempAccess: boolean;
 };
 
-const FIXTURE_PDF_PATH = path.join(
-  process.cwd(),
-  'tests',
-  'fixtures',
-  'workspace-template',
-  'pdfs',
-  'test-document.pdf',
-);
 const WORKSPACE_WRITE_PROMPT = 'Interpreter wants to change files in this workspace.';
-const PDF_HTML = '<html><body><h1>Permission test</h1><p>Interpreter file permissions e2e.</p></body></html>';
+const FILE_CONTENT = 'Interpreter file permissions e2e.\n';
+const TEST_FILESYSTEM_TOOLS = [
+  'builtin-test-filesystem__read_file',
+  'builtin-test-filesystem__write_file',
+];
 
 function toPathSlug(value: string): string {
   return value
@@ -116,19 +112,20 @@ async function ensureBoundAgentTabs(
     workspacePath: request.workspacePath,
   }));
 
-  await page.evaluate(async ({ nextBindings }) => {
+  await page.evaluate(async ({ nextBindings, allowedToolNames }) => {
     for (const binding of nextBindings as BoundAgentTab[]) {
       const result = await (window as any).electron.agentTabs.registerThread({
         agentId: binding.id,
         threadId: binding.threadId,
         callerToken: binding.callerToken,
         workspacePath: binding.workspacePath,
+        allowedToolNames,
       });
       if (!result?.success) {
         throw new Error(result?.error || `Failed to register thread for ${binding.id}`);
       }
     }
-  }, { nextBindings: bindings });
+  }, { nextBindings: bindings, allowedToolNames: TEST_FILESYSTEM_TOOLS });
 
   return bindings;
 }
@@ -353,9 +350,9 @@ async function removeIfPresent(targetPath: string): Promise<void> {
   await rm(targetPath, { force: true, recursive: true });
 }
 
-async function seedPdf(targetPath: string): Promise<void> {
+async function seedFile(targetPath: string): Promise<void> {
   await mkdir(path.dirname(targetPath), { recursive: true });
-  await copyFile(FIXTURE_PDF_PATH, targetPath);
+  await writeFile(targetPath, FILE_CONTENT, 'utf8');
 }
 
 test.describe.serial('Agent file permissions', () => {
@@ -374,10 +371,10 @@ test.describe.serial('Agent file permissions', () => {
     const { port, windowWorkspacePath, agents } = await prepareScenario(page, testInfo, ['agent-a', 'agent-b']);
     const agentA = agents[0]!;
     const agentB = agents[1]!;
-    const agentARelativeOutput = 'agent-a-relative.pdf';
+    const agentARelativeOutput = 'agent-a-relative.txt';
     const agentAExpectedPath = path.join(agentA.workspacePath, agentARelativeOutput);
-    const agentAForbiddenPath = path.join(agentB.workspacePath, 'agent-a-forbidden.pdf');
-    const agentBRelativeOutput = 'agent-b-relative.pdf';
+    const agentAForbiddenPath = path.join(agentB.workspacePath, 'agent-a-forbidden.txt');
+    const agentBRelativeOutput = 'agent-b-relative.txt';
     const agentBExpectedPath = path.join(agentB.workspacePath, agentBRelativeOutput);
 
     await setRuntimePermissions(page, {
@@ -390,27 +387,27 @@ test.describe.serial('Agent file permissions', () => {
     const agentAWrite = await startCliToolRequest({
       port,
       callerToken: agentA.callerToken,
-      serverId: 'builtin-pdf',
-      toolName: 'create_pdf',
+      serverId: 'builtin-test-filesystem',
+      toolName: 'write_file',
       args: {
         path: agentARelativeOutput,
-        content: PDF_HTML,
+        content: FILE_CONTENT,
       },
     });
     expect(agentAWrite.ok).toBe(true);
     expect(agentAWrite.data.isError).toBe(false);
-    expect(extractToolText(agentAWrite)).toContain(`Created PDF at: ${agentAExpectedPath}`);
+    expect(extractToolText(agentAWrite)).toContain(`Wrote file at: ${agentAExpectedPath}`);
     expect(existsSync(agentAExpectedPath)).toBe(true);
     expect(existsSync(path.join(windowWorkspacePath, agentARelativeOutput))).toBe(false);
 
     const forbiddenWrite = await startCliToolRequest({
       port,
       callerToken: agentA.callerToken,
-      serverId: 'builtin-pdf',
-      toolName: 'create_pdf',
+      serverId: 'builtin-test-filesystem',
+      toolName: 'write_file',
       args: {
         path: agentAForbiddenPath,
-        content: PDF_HTML,
+        content: FILE_CONTENT,
       },
     });
     expect(forbiddenWrite.ok).toBe(true);
@@ -422,16 +419,16 @@ test.describe.serial('Agent file permissions', () => {
     const agentBWrite = await startCliToolRequest({
       port,
       callerToken: agentB.callerToken,
-      serverId: 'builtin-pdf',
-      toolName: 'create_pdf',
+      serverId: 'builtin-test-filesystem',
+      toolName: 'write_file',
       args: {
         path: agentBRelativeOutput,
-        content: PDF_HTML,
+        content: FILE_CONTENT,
       },
     });
     expect(agentBWrite.ok).toBe(true);
     expect(agentBWrite.data.isError).toBe(false);
-    expect(extractToolText(agentBWrite)).toContain(`Created PDF at: ${agentBExpectedPath}`);
+    expect(extractToolText(agentBWrite)).toContain(`Wrote file at: ${agentBExpectedPath}`);
     expect(existsSync(agentBExpectedPath)).toBe(true);
   });
 
@@ -440,9 +437,9 @@ test.describe.serial('Agent file permissions', () => {
 
     const { port, outsidePath, agents } = await prepareScenario(page, testInfo);
     const agent = agents[0]!;
-    const outsidePdfPath = path.join(outsidePath, 'outside-read-denied.pdf');
+    const outsideFilePath = path.join(outsidePath, 'outside-read-denied.txt');
 
-    await seedPdf(outsidePdfPath);
+    await seedFile(outsideFilePath);
 
     await setRuntimePermissions(page, {
       approvalPolicy: 'never',
@@ -454,10 +451,10 @@ test.describe.serial('Agent file permissions', () => {
     const response = await startCliToolRequest({
       port,
       callerToken: agent.callerToken,
-      serverId: 'builtin-pdf',
-      toolName: 'read_pdf',
+      serverId: 'builtin-test-filesystem',
+      toolName: 'read_file',
       args: {
-        path: outsidePdfPath,
+        path: outsideFilePath,
       },
     });
 
@@ -472,9 +469,9 @@ test.describe.serial('Agent file permissions', () => {
 
     const { port, outsidePath, agents } = await prepareScenario(page, testInfo);
     const agent = agents[0]!;
-    const outsidePdfPath = path.join(outsidePath, 'outside-read-allowed.pdf');
+    const outsideFilePath = path.join(outsidePath, 'outside-read-allowed.txt');
 
-    await seedPdf(outsidePdfPath);
+    await seedFile(outsideFilePath);
 
     await setRuntimePermissions(page, {
       approvalPolicy: 'never',
@@ -486,17 +483,17 @@ test.describe.serial('Agent file permissions', () => {
     const response = await startCliToolRequest({
       port,
       callerToken: agent.callerToken,
-      serverId: 'builtin-pdf',
-      toolName: 'read_pdf',
+      serverId: 'builtin-test-filesystem',
+      toolName: 'read_file',
       args: {
-        path: outsidePdfPath,
+        path: outsideFilePath,
       },
     });
 
     expect(response.ok).toBe(true);
     expect(response.data.isError).toBe(false);
-    expect(extractToolText(response)).toContain(`# ${path.basename(outsidePdfPath)}`);
-    expect(extractToolText(response)).toContain('Test PDF Document');
+    expect(extractToolText(response)).toContain(`Read file at: ${outsideFilePath}`);
+    expect(extractToolText(response)).toContain(FILE_CONTENT.trim());
   });
 
   test('prompts before workspace writes in ask-first mode and allows the write when approved', async ({ page }, testInfo) => {
@@ -504,7 +501,7 @@ test.describe.serial('Agent file permissions', () => {
 
     const { port, agents } = await prepareScenario(page, testInfo);
     const agent = agents[0]!;
-    const outputPath = path.join(agent.workspacePath, 'approved-write.pdf');
+    const outputPath = path.join(agent.workspacePath, 'approved-write.txt');
     const controller = new AbortController();
 
     await setRuntimePermissions(page, {
@@ -518,11 +515,11 @@ test.describe.serial('Agent file permissions', () => {
       const requestPromise = startCliToolRequest({
         port,
         callerToken: agent.callerToken,
-        serverId: 'builtin-pdf',
-        toolName: 'create_pdf',
+        serverId: 'builtin-test-filesystem',
+        toolName: 'write_file',
         args: {
           path: outputPath,
-          content: PDF_HTML,
+          content: FILE_CONTENT,
         },
         signal: controller.signal,
       });
@@ -533,7 +530,7 @@ test.describe.serial('Agent file permissions', () => {
       const response = await requestPromise;
       expect(response.ok).toBe(true);
       expect(response.data.isError).toBe(false);
-      expect(extractToolText(response)).toContain(`Created PDF at: ${outputPath}`);
+      expect(extractToolText(response)).toContain(`Wrote file at: ${outputPath}`);
       expect(existsSync(outputPath)).toBe(true);
     } finally {
       controller.abort();
@@ -545,7 +542,7 @@ test.describe.serial('Agent file permissions', () => {
 
     const { port, agents } = await prepareScenario(page, testInfo);
     const agent = agents[0]!;
-    const outputPath = path.join(agent.workspacePath, 'denied-write.pdf');
+    const outputPath = path.join(agent.workspacePath, 'denied-write.txt');
     const controller = new AbortController();
 
     await setRuntimePermissions(page, {
@@ -559,11 +556,11 @@ test.describe.serial('Agent file permissions', () => {
       const requestPromise = startCliToolRequest({
         port,
         callerToken: agent.callerToken,
-        serverId: 'builtin-pdf',
-        toolName: 'create_pdf',
+        serverId: 'builtin-test-filesystem',
+        toolName: 'write_file',
         args: {
           path: outputPath,
-          content: PDF_HTML,
+          content: FILE_CONTENT,
         },
         signal: controller.signal,
       });
@@ -586,7 +583,7 @@ test.describe.serial('Agent file permissions', () => {
 
     const { port, outsidePath, agents } = await prepareScenario(page, testInfo);
     const agent = agents[0]!;
-    const outputPath = path.join(outsidePath, 'anywhere-write.pdf');
+    const outputPath = path.join(outsidePath, 'anywhere-write.txt');
 
     await setRuntimePermissions(page, {
       approvalPolicy: 'never',
@@ -598,17 +595,17 @@ test.describe.serial('Agent file permissions', () => {
     const response = await startCliToolRequest({
       port,
       callerToken: agent.callerToken,
-      serverId: 'builtin-pdf',
-      toolName: 'create_pdf',
+      serverId: 'builtin-test-filesystem',
+      toolName: 'write_file',
       args: {
         path: outputPath,
-        content: PDF_HTML,
+        content: FILE_CONTENT,
       },
     });
 
     expect(response.ok).toBe(true);
     expect(response.data.isError).toBe(false);
-    expect(extractToolText(response)).toContain(`Created PDF at: ${outputPath}`);
+    expect(extractToolText(response)).toContain(`Wrote file at: ${outputPath}`);
     expect(existsSync(outputPath)).toBe(true);
   });
 
@@ -618,7 +615,7 @@ test.describe.serial('Agent file permissions', () => {
 
     const { port, agents } = await prepareScenario(page, testInfo);
     const agent = agents[0]!;
-    const tempOutputPath = path.join(os.tmpdir(), `agent-file-permissions-${Date.now()}.pdf`);
+    const tempOutputPath = path.join(os.tmpdir(), `agent-file-permissions-${Date.now()}.txt`);
 
     await removeIfPresent(tempOutputPath);
 
@@ -632,11 +629,11 @@ test.describe.serial('Agent file permissions', () => {
     const deniedResponse = await startCliToolRequest({
       port,
       callerToken: agent.callerToken,
-      serverId: 'builtin-pdf',
-      toolName: 'create_pdf',
+      serverId: 'builtin-test-filesystem',
+      toolName: 'write_file',
       args: {
         path: tempOutputPath,
-        content: PDF_HTML,
+        content: FILE_CONTENT,
       },
     });
     expect(deniedResponse.ok).toBe(true);
@@ -651,16 +648,16 @@ test.describe.serial('Agent file permissions', () => {
     const allowedResponse = await startCliToolRequest({
       port,
       callerToken: agent.callerToken,
-      serverId: 'builtin-pdf',
-      toolName: 'create_pdf',
+      serverId: 'builtin-test-filesystem',
+      toolName: 'write_file',
       args: {
         path: tempOutputPath,
-        content: PDF_HTML,
+        content: FILE_CONTENT,
       },
     });
     expect(allowedResponse.ok).toBe(true);
     expect(allowedResponse.data.isError).toBe(false);
-    expect(extractToolText(allowedResponse)).toContain(`Created PDF at: ${tempOutputPath}`);
+    expect(extractToolText(allowedResponse)).toContain(`Wrote file at: ${tempOutputPath}`);
     expect(existsSync(tempOutputPath)).toBe(true);
 
     await removeIfPresent(tempOutputPath);

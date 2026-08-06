@@ -12,6 +12,15 @@ const DIST_DIR = path.join(ROOT, 'dist');
 const PRODUCT_NAME = 'Interpreter';
 const PACKAGE_SMOKE_SENTINEL = '[package-smoke] js_repl runtime ok';
 const PACKAGE_SMOKE_SENTRY_SENTINEL = '[package-smoke] sentry runtime ok';
+const REQUIRED_LICENSE_RESOURCES = [
+  'NOTICE',
+  'THIRD_PARTY_NOTICES.md',
+  'sharp-libvips-v1.2.4-THIRD-PARTY-NOTICES.md',
+  'sharp-libvips-v1.3.2-THIRD-PARTY-NOTICES.md',
+  'LGPL-3.0.txt',
+  'GPL-3.0.txt',
+  'release-policy.json',
+];
 
 function getArchFlag() {
   if (process.arch === 'arm64') {
@@ -83,6 +92,17 @@ function resolvePackagedAppBinary(resourcesRoot) {
   }
 
   throw new Error(`[package-smoke] Could not find packaged app binary next to ${resourcesRoot}`);
+}
+
+function assertPackagedLicenseResources() {
+  const resourcesRoot = findBundledResourcesRoot();
+  for (const fileName of REQUIRED_LICENSE_RESOURCES) {
+    const requiredPath = path.join(resourcesRoot, 'licenses', fileName);
+    if (!existsSync(requiredPath)) {
+      throw new Error(`[package-smoke] Packaged license resource is missing: ${requiredPath}`);
+    }
+  }
+  console.log('[package-smoke] packaged license resources ok');
 }
 
 function runJsReplRuntimeSmoke() {
@@ -224,6 +244,7 @@ function main() {
     },
   });
 
+  assertPackagedLicenseResources();
   runJsReplRuntimeSmoke();
   runSentryRuntimeSmoke();
 }

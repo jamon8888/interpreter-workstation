@@ -6,7 +6,7 @@ describe('getConversionTargets', () => {
     expect(getConversionTargets('report.docx')).toEqual(['pdf', 'odt', 'rtf', 'txt', 'html', 'epub', 'fb2']);
   });
 
-  test('.xlsx returns the formats supported by the community document pipeline', () => {
+  test('.xlsx returns only permissive x2t conversion targets', () => {
     expect(getConversionTargets('data.xlsx')).toEqual(['pdf', 'ods', 'csv']);
   });
 

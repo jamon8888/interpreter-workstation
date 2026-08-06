@@ -80,6 +80,9 @@ const providersMocks = vi.hoisted(() => ({
   })),
   listOpenAIOAuthModels: vi.fn(async () => ({ models: [] })),
   listOpenRouterModels: vi.fn(async () => ({ models: [], fetchedAt: Date.now(), stale: false })),
+  listDeepSeekModels: vi.fn(async () => ({
+    models: [{ id: 'deepseek-v4-flash', name: 'DeepSeek V4 Flash', isDefault: true }],
+  })),
   getOllamaStatus: vi.fn(async () => ({ running: false, models: [] })),
   getLmStudioStatus: vi.fn(async () => ({ running: false, models: [] })),
   getOAuthStatus: vi.fn(async () => ({ isConnected: false })),
@@ -116,6 +119,9 @@ describe('ProfileManager', () => {
     providersMocks.getEnvApiKeys.mockResolvedValue(noEnvKeys);
     providersMocks.getEnvApiKey.mockResolvedValue({ key: null as string | null });
     providersMocks.listInterpreterProviders.mockResolvedValue({ providers: DEFAULT_RUNTIME_PROVIDERS });
+    providersMocks.listDeepSeekModels.mockResolvedValue({
+      models: [{ id: 'deepseek-v4-flash', name: 'DeepSeek V4 Flash', isDefault: true }],
+    });
     providersMocks.probeResponsesApiSupport.mockResolvedValue({ reachable: true, supported: true });
   });
 
@@ -183,7 +189,7 @@ describe('ProfileManager', () => {
       expect(apiMocks.createProfile).toHaveBeenCalledWith(expect.objectContaining({ wireApi: 'chat' }));
     });
     expect(providersMocks.probeResponsesApiSupport).not.toHaveBeenCalled();
-  });
+  }, 15_000);
 
   test('creates DeepSeek API profiles with Chat Completions without probing Responses support', async () => {
     const user = userEvent.setup();

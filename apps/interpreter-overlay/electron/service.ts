@@ -9,9 +9,9 @@ import { mouse } from '@nut-tree-fork/nut-js';
 import { approvalManager } from '../../../server/approvalManager';
 import { agentTabManager } from '../../../server/agentTabManager';
 import { startAgentTask } from '../../../server/agentTaskService';
-import { readWordTool } from '../../../server/tools/builtin-tools/docx/readWordTool';
-import { readPdfTool } from '../../../server/tools/builtin-tools/pdf/readPdfTool';
-import { readSpreadsheetAttachment } from '../../../server/utils/readSpreadsheetAttachment';
+import { readDocxText } from '../../../server/utils/documentText';
+import { readPdfStructure } from '../../../server/utils/pdfStructure';
+import { readSpreadsheetTextPreview } from '../../../server/utils/spreadsheetText';
 import type { ToolCallResponse } from '../../../server/tools/toolTypes';
 import {
   getRecentFolders,
@@ -975,23 +975,6 @@ async function normalizeOverlayFileContextItem(file: OverlayFileContextItem): Pr
   throw new Error(`Unsupported overlay file "${name}" (${mimeType}). Drop an image, PDF, Word, Excel, text, Markdown, CSV, TSV, or JSON file.`);
 }
 
-function extractOverlayReaderText(result: ToolCallResponse): string {
-  if (result.isError) {
-    const message = result.content
-      .map((item) => (typeof item.text === 'string' ? item.text : null))
-      .filter(Boolean)
-      .join('\n')
-      .trim();
-    throw new Error(message || 'Attachment reader failed.');
-  }
-
-  return result.content
-    .map((item) => (typeof item.text === 'string' ? item.text : null))
-    .filter(Boolean)
-    .join('\n')
-    .trim();
-}
-
 async function withOverlayAttachmentPath<T>(
   attachment: Pick<OverlayUserAttachment, 'id' | 'name' | 'mimeType' | 'dataUrl' | 'filePath'>,
   callback: (filePath: string) => Promise<T>,
@@ -1035,19 +1018,30 @@ export async function readOverlayAttachmentText(
   }
 
   if (isOverlayPdfFileContext(mimeType, filePath, name)) {
-    return await withOverlayAttachmentPath(attachment, async (readPath) =>
-      extractOverlayReaderText(await readPdfTool.handler({ path: readPath })),
-    );
+    return await withOverlayAttachmentPath(attachment, async (readPath) => {
+      const structure = await readPdfStructure(readPath);
+      return structure.elements
+        .map((element) => (
+          element.text
+          || element.contents
+          || (element.fieldName ? `${element.fieldName}: ${element.fieldValue ?? ''}` : '')
+        ))
+        .filter(Boolean)
+        .join('\n')
+        .trim();
+    });
   }
 
   if (extension === '.docx') {
-    return await withOverlayAttachmentPath(attachment, async (readPath) =>
-      extractOverlayReaderText(await readWordTool.handler({ path: readPath })),
-    );
+    return await withOverlayAttachmentPath(attachment, async (readPath) => (
+      readDocxText(await fs.readFile(readPath))
+    ));
   }
 
   if (['.xlsx', '.xls', '.xlsm'].includes(extension)) {
-    return await withOverlayAttachmentPath(attachment, readSpreadsheetAttachment);
+    return await withOverlayAttachmentPath(attachment, async (readPath) =>
+      readSpreadsheetTextPreview(readPath),
+    );
   }
 
   throw new Error(`Attachment "${name}" (${mimeType}) is not readable as text.`);

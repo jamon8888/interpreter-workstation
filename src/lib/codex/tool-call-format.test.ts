@@ -369,15 +369,15 @@ describe("parseShellActions", () => {
     assert.equal(value[0]?.past, "Listed Records");
   });
 
-  test("should_render_interpreter_app_spreadsheet_reads_as_app_actions", () => {
+  test("should_not_present_unknown_builtins_as_native_document_engines", () => {
     const value = parseShellActions(
-      "interpreter-app tools builtin-cells read_spreadsheet --json '{\"path\":\"April-2026/close.xlsx\"}'",
+      "interpreter-app tools builtin-example generate_report --json '{\"path\":\"April-2026/close.xlsx\"}'",
       "/Users/vic/project",
     );
 
-    assert.equal(value[0]?.kind, "read");
-    assert.equal(value[0]?.active, "Reading spreadsheet...");
-    assert.equal(value[0]?.past, "Read spreadsheet");
+    assert.equal(value[0]?.kind, "run");
+    assert.equal(value[0]?.active, "Using app tool...");
+    assert.equal(value[0]?.past, "Used app tool");
     assert.deepEqual(value[0]?.mentions.map((entry) => entry.path), [
       "/Users/vic/project/April-2026/close.xlsx",
     ]);
@@ -385,27 +385,27 @@ describe("parseShellActions", () => {
 
   test("should_decode_shell_wrapped_interpreter_app_json_paths", () => {
     const value = parseShellActions(
-      `/bin/zsh -lc "interpreter-app tools builtin-cells read_spreadsheet --json '{\\"path\\":\\"April-2026/close.xlsx\\",\\"sheet\\":\\"Close Summary\\"}'"`,
+      `/bin/zsh -lc "interpreter-app tools builtin-interpreter interpreter_refresh_file --json '{\\"path\\":\\"April-2026/close.xlsx\\"}'"`,
       "/Users/vic/project",
     );
 
-    assert.equal(value[0]?.kind, "read");
+    assert.equal(value[0]?.kind, "run");
     assert.deepEqual(value[0]?.mentions.map((entry) => entry.path), [
       "/Users/vic/project/April-2026/close.xlsx",
     ]);
   });
 
-  test("should_render_interpreter_app_spreadsheet_writes_as_app_actions", () => {
+  test("should_render_skill-driven_spreadsheet_code_as_a_script_action", () => {
     const value = parseShellActions(
-      "interpreter-app tools builtin-cells batch_edit_spreadsheet --json '{\"path\":\"April-2026/close.xlsx\"}'",
+      "python scripts/edit_spreadsheet.py April-2026/close.xlsx",
       "/Users/vic/project",
     );
 
-    assert.equal(value[0]?.kind, "write");
-    assert.equal(value[0]?.active, "Editing spreadsheet...");
-    assert.equal(value[0]?.past, "Edited spreadsheet");
+    assert.equal(value[0]?.kind, "run");
+    assert.equal(value[0]?.active, "Running script...");
+    assert.equal(value[0]?.past, "Ran script");
     assert.deepEqual(value[0]?.mentions.map((entry) => entry.path), [
-      "/Users/vic/project/April-2026/close.xlsx",
+      "/Users/vic/project/scripts/edit_spreadsheet.py",
     ]);
   });
 

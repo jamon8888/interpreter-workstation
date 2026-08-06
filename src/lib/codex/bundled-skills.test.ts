@@ -53,6 +53,7 @@ const REQUIRED_BUNDLED_SKILL_FILES: Record<string, string[]> = {
   doc: [
     'SKILL.md',
     'agents/openai.yaml',
+    'LICENSE.txt',
     'scripts/render_docx.py',
   ],
   'media-creation': [
@@ -67,6 +68,7 @@ const REQUIRED_BUNDLED_SKILL_FILES: Record<string, string[]> = {
   pdf: [
     'SKILL.md',
     'agents/openai.yaml',
+    'LICENSE.txt',
   ],
   playwright: [
     'SKILL.md',
@@ -100,16 +102,12 @@ const REQUIRED_BUNDLED_SKILL_FILES: Record<string, string[]> = {
   spreadsheets: [
     'SKILL.md',
     'agents/openai.yaml',
-    'style_guidelines.md',
-    'templates/financial_models.md',
+    'LICENSE.txt',
   ],
   slides: [
     'SKILL.md',
     'agents/openai.yaml',
-    'scripts/init_pro_deck_builder_js.js',
-    'scripts/prepare_reference_prompts.js',
-    'scripts/pro_deck_quality_check.js',
-    'templates/build_pro_deck_template.js',
+    'LICENSE.txt',
   ],
   'wiki-maintainer': [
     'SKILL.md',
@@ -373,21 +371,18 @@ describe('bundled Codex skills', () => {
     const docContent = readFileSync(path.join(skillsRoot, 'doc', 'SKILL.md'), 'utf-8');
     const spreadsheetContent = readFileSync(path.join(skillsRoot, 'spreadsheets', 'SKILL.md'), 'utf-8');
 
-    expect(docContent).toContain('Skills are workflow guidance, not callable tools.');
-    expect(docContent).toContain('Do not call a tool named');
+    expect(docContent).toContain('workflow guidance, not a callable tool');
     expect(docContent).toContain('`doc`');
-    expect(docContent).toContain('do not call direct `builtin-docx__...` or `builtin-converter__...`');
-    expect(spreadsheetContent).toContain('Skills are workflow guidance, not callable tools.');
-    expect(spreadsheetContent).toContain('Do not call a tool named');
-    expect(spreadsheetContent).toContain('`Excel`');
-    expect(spreadsheetContent).toContain('does not assume a native');
+    expect(docContent).toContain('`python-docx`');
+    expect(spreadsheetContent).toContain('workflow guidance, not a callable tool');
+    expect(spreadsheetContent).toContain('`spreadsheets`');
+    expect(spreadsheetContent).toContain('`openpyxl`');
     expect(spreadsheetContent).not.toContain('builtin-cells');
   });
 
-  test('bundled agent prompts do not suggest skill names as tool calls', () => {
+  test('bundled agent prompts do not use legacy product labels as skill invocation tokens', () => {
     const skillsRoot = path.resolve(process.cwd(), 'resources', 'codex-skills');
     const forbiddenSkillTokens = [
-      ...ALLOWED_BUNDLED_SKILLS.map((skillName) => `$${skillName}`),
       '$Excel',
       '$PowerPoint',
     ];

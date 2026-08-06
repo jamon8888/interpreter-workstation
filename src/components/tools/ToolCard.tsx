@@ -28,11 +28,6 @@ import {
   WhatsAppIcon,
   TelegramIcon,
   NylasIcon,
-  PdfIcon,
-  WordIcon,
-  ExcelIcon,
-  SlidesIcon,
-  ConverterIcon,
 } from '../icons/BrandIcons';
 import type { ToolServer } from '../../api';
 import type { McpStoreEntry } from './mcpStoreData';
@@ -69,11 +64,6 @@ const TOOL_ICONS: Record<string, React.ComponentType<{ className?: string }>> = 
   'builtin-whatsapp': WhatsAppIcon,
   'builtin-telegram': TelegramIcon,
   'builtin-browser': Globe,
-  'builtin-pdf': PdfIcon,
-  'builtin-docx': WordIcon,
-  'builtin-cells': ExcelIcon,
-  'builtin-slides': SlidesIcon,
-  'builtin-converter': ConverterIcon,
   'builtin-interpreter': Wrench,
   'builtin-mcp-management': Server,
   'builtin-utility': Wrench,

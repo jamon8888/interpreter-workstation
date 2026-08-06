@@ -57,11 +57,12 @@ export function isWindowsOoEditorsSpawnPermissionError(
 export function resolveOoEditorsNodeRuntime({
   processExecPath,
 }: OoEditorsNodeRuntimeOptions): OoEditorsNodeRuntime {
-  // NOTE(victor): oo-editors is bundled with the desktop app, so production
-  // users are not expected to provide Node. Do not honor INTERPRETER_NODE_BIN
-  // or PATH lookups here; keep this on the app executable with
-  // ELECTRON_RUN_AS_NODE, matching README.md's shipped app-binary runtime
-  // contract. The executable cwd matters on Windows: Sentry issues
+  // A compatible engine is installed separately under userData, but it runs
+  // through the Electron executable shipped with the desktop app so users are
+  // not expected to provide Node. Do not honor INTERPRETER_NODE_BIN or PATH
+  // lookups here; keep this on the app executable with ELECTRON_RUN_AS_NODE,
+  // matching README.md's shipped app-binary runtime contract. The executable
+  // cwd matters on Windows: Sentry issues
   // openinterpreter/iworkstation-issues#1758, #1759, and #1760 captured
   // Interpreter.exe launched for oo-editors with the oo-editors cwd, followed
   // by Chromium ICU data fd errors and exit 2147483651.

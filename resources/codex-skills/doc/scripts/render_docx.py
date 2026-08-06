@@ -1,12 +1,10 @@
 import argparse
-import json
-import os
 import re
 import subprocess
 import tempfile
 import xml.etree.ElementTree as ET
 from os import makedirs, replace
-from os.path import abspath, basename, exists, expanduser, join, splitext
+from os.path import abspath, basename, dirname, exists, expanduser, join, splitext
 from shutil import which
 import sys
 from typing import Sequence, cast
@@ -19,13 +17,14 @@ TWIPS_PER_INCH: int = 1440
 
 def ensure_system_tools() -> None:
     missing: list[str] = []
-    for tool in ("interpreter-app", "pdftoppm"):
-        if which(tool) is None:
-            missing.append(tool)
+    if which("soffice") is None and which("libreoffice") is None:
+        missing.append("LibreOffice")
+    if which("pdftoppm") is None:
+        missing.append("Poppler")
     if missing:
         tools = ", ".join(missing)
         raise RuntimeError(
-            f"Missing required system tool(s): {tools}. Install the Interpreter CLI and Poppler, then retry."
+            f"Missing required system tool(s): {tools}. Install a permissive office renderer and Poppler, then retry."
         )
 
 
@@ -97,32 +96,30 @@ def calc_dpi_via_pdf(input_path: str, max_w_px: int, max_h_px: int) -> int:
         return round(min(max_w_px / width_in, max_h_px / height_in))
 
 
-def run_converter_cli(input_path: str, output_path: str) -> None:
-    payload = json.dumps({
-        "path": input_path,
-        "format": "pdf",
-        "output_path": output_path,
-    })
+def run_office_renderer(input_path: str, output_path: str) -> None:
+    executable = which("soffice") or which("libreoffice")
+    if executable is None:
+        raise RuntimeError("LibreOffice is required to render DOCX files.")
     cmd = [
-        "interpreter-app",
-        "tools",
-        "builtin-converter",
-        "convert_file",
-        "--json",
-        payload,
+        executable,
+        "--headless",
+        "--convert-to",
+        "pdf",
+        "--outdir",
+        dirname(output_path),
+        input_path,
     ]
     result = subprocess.run(
         cmd,
         check=False,
         capture_output=True,
         text=True,
-        env=os.environ.copy(),
     )
     if result.returncode != 0:
         stderr = result.stderr.strip()
         stdout = result.stdout.strip()
         details = stderr or stdout or f"exit code {result.returncode}"
-        raise RuntimeError(f"Interpreter converter failed: {details}")
+        raise RuntimeError(f"Office renderer failed: {details}")
 
 
 def convert_to_pdf(
@@ -131,7 +128,7 @@ def convert_to_pdf(
     stem: str,
 ) -> str:
     pdf_path = join(convert_tmp_dir, f"{stem}.pdf")
-    run_converter_cli(doc_path, pdf_path)
+    run_office_renderer(doc_path, pdf_path)
     return pdf_path if exists(pdf_path) else ""
 
 
@@ -158,7 +155,7 @@ def rasterize(
 
         if not pdf_path or not exists(pdf_path):
             raise RuntimeError(
-                "Failed to produce PDF for rasterization via the built-in converter."
+                "Failed to produce PDF for rasterization via the office renderer."
             )
         paths_raw = cast(
             list[str],

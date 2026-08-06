@@ -6,7 +6,16 @@ import {
   configureMainProcessSentryIntegrations,
   getMainProcessBeforeSendTelemetry,
   sanitizeCodexSentryEvent,
+  shouldSendSentryEvent,
 } from './codexSentry';
+
+describe('shouldSendSentryEvent', () => {
+  test('fails closed until the user explicitly opts in', () => {
+    expect(shouldSendSentryEvent(null)).toBe(false);
+    expect(shouldSendSentryEvent(false)).toBe(false);
+    expect(shouldSendSentryEvent(true)).toBe(true);
+  });
+});
 
 describe('configureMainProcessSentryIntegrations', () => {
   test('replaces crash-stack and rejection integrations and removes auto native minidumps', () => {

@@ -92,6 +92,10 @@ type NamedIntegration = {
   name: string;
 };
 
+export function shouldSendSentryEvent(telemetryEnabled: boolean | null): boolean {
+  return telemetryEnabled === true;
+}
+
 type OnUnhandledRejectionIntegrationFactory<T extends NamedIntegration> = (options: {
   ignore: MainProcessUnhandledRejectionIgnoreMatcher[];
   mode: 'none' | 'strict' | 'warn';

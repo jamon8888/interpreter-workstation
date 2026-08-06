@@ -53,14 +53,14 @@ export function getPathExtension(filePath: string): string {
 
 /**
  * Returns all target formats accepted by convert_file for the given input extension.
- * Returns only formats declared by the configured document-engine contract.
+ * Returns the formats supported by the optional compatible document engine.
  */
 export function getConversionTargetsForExtension(inputExtension: string): string[] | null {
   const ext = normalizeExtension(inputExtension);
   if (!ext) return null;
 
-  const targets = X2T_CONVERTIBLE_FORMATS[ext] ?? [];
-  return targets.length > 0 ? [...targets] : null;
+  const unique = Array.from(new Set(X2T_CONVERTIBLE_FORMATS[ext] ?? []));
+  return unique.length > 0 ? unique : null;
 }
 
 export function getConversionTargetsForPath(filePath: string): string[] | null {

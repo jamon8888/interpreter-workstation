@@ -22,9 +22,7 @@ import {
   projectRunner,
   type ContextMenuItem,
 } from '@/ipc';
-import { callTool } from '@/api';
 import { useToast } from '../../contexts/ToastContext';
-import { getConversionTargetsForPath, getPathExtension } from '../../../shared/utils/converterFormats';
 import type { ProjectRunnerState } from '../../../shared/types/projectRunner';
 import {
   AGENT_SIDEBAR_ID,
@@ -112,14 +110,6 @@ interface ContextTargetItem {
   path: string;
   type: 'file' | 'directory';
   name: string;
-}
-
-function extractToolText(result: any): string {
-  const content = result?.content;
-  if (Array.isArray(content) && content[0] && typeof content[0].text === 'string') {
-    return content[0].text;
-  }
-  return '';
 }
 
 function isPointInsideRect(clientX: number, clientY: number, rect: DOMRect): boolean {
@@ -387,32 +377,6 @@ export const ExplorerNode = React.memo(function ExplorerNode({
     return [{ path: fullPath, type: data.type, name: data.name }];
   }, [node, workspacePath, fullPath, data.type, data.name]);
 
-  const getCommonConversionTargets = useCallback((items: ContextTargetItem[]): string[] => {
-    if (items.length === 0 || !items.every((item) => item.type === 'file')) {
-      return [];
-    }
-
-    const paths = items.map((item) => item.path);
-    const firstTargets = getConversionTargetsForPath(paths[0]) ?? [];
-    if (firstTargets.length === 0) {
-      return [];
-    }
-
-    return firstTargets.filter((format) => {
-      const formatLower = format.toLowerCase();
-      const supportedByAll = paths.every((filePath) => {
-        const targets = getConversionTargetsForPath(filePath) ?? [];
-        return targets.includes(format);
-      });
-      if (!supportedByAll) {
-        return false;
-      }
-
-      // Hide no-op conversions where every selected file already has this extension.
-      return !paths.every((filePath) => getPathExtension(filePath) === `.${formatLower}`);
-    });
-  }, []);
-
   const handleContextMenu = useCallback(async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -423,7 +387,6 @@ export const ExplorerNode = React.memo(function ExplorerNode({
 
     const contextTargets = getContextTargetItems();
     const hasMultipleTargets = contextTargets.length > 1;
-    const conversionTargets = getCommonConversionTargets(contextTargets);
 
     const items: ContextMenuItem[] = [
       { label: 'Open', action: 'open' },
@@ -435,18 +398,6 @@ export const ExplorerNode = React.memo(function ExplorerNode({
       ...(isDevelopmentRenderer ? [{ label: 'New Automation Here', action: 'new-automation' }] : []),
       { label: 'New Folder Here', action: 'new-folder' },
     ];
-
-    if (conversionTargets.length > 0) {
-      items.push({ label: '', action: '', separator: true });
-      items.push({
-        label: 'Convert',
-        action: '',
-        submenu: conversionTargets.map((format) => ({
-          label: `To .${format}`,
-          action: `convert:${format}`,
-        })),
-      });
-    }
 
     items.push(
       { label: '', action: '', separator: true },
@@ -461,8 +412,6 @@ export const ExplorerNode = React.memo(function ExplorerNode({
     );
 
     const action = await showContextMenu(items, 'file_tree_node');
-    const targetFiles = contextTargets.filter((item) => item.type === 'file');
-
     if (action === 'open') {
       contextTargets.forEach((item) => onFileOpen(item.path));
     } else if (action === 'ask-agent') {
@@ -526,54 +475,10 @@ export const ExplorerNode = React.memo(function ExplorerNode({
       await navigator.clipboard.writeText(contextTargets.map((item) => item.path).join('\n'));
     } else if (action === 'show-in-finder') {
       await showItemsInFolder(contextTargets.map((item) => item.path));
-    } else if (action?.startsWith('convert:')) {
-      const targetFormat = action.slice('convert:'.length).toLowerCase();
-      let successCount = 0;
-      let failureCount = 0;
-      let firstError = '';
-
-      for (const item of targetFiles) {
-        try {
-          const result = await callTool('builtin-converter', 'convert_file', {
-            path: item.path,
-            format: targetFormat,
-          });
-
-          if (result?.isError) {
-            failureCount++;
-            if (!firstError) {
-              firstError = extractToolText(result) || `Failed converting ${item.name}`;
-            }
-            continue;
-          }
-
-          successCount++;
-        } catch (error) {
-          failureCount++;
-          if (!firstError) {
-            firstError = error instanceof Error ? error.message : `Failed converting ${item.name}`;
-          }
-        }
-      }
-
-      if (failureCount === 0) {
-        showToast(
-          `Converted ${successCount} ${successCount === 1 ? 'file' : 'files'} to .${targetFormat}`,
-          'success',
-          3000
-        );
-      } else {
-        showToast(
-          `Converted ${successCount}, failed ${failureCount}. ${firstError}`,
-          'error',
-          5000
-        );
-      }
     }
   }, [
     data.type,
     fullPath,
-    getCommonConversionTargets,
     getContextTargetItems,
     isDevelopmentRenderer,
     isMovieAvailable,

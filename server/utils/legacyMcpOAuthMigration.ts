@@ -3,7 +3,7 @@ import { chmod, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 
 import type { AppConfig } from '../configStore';
-import { resolveInterpreterDataDir } from '../../shared/interpreterConfigPaths';
+import { resolveInterpreterHome } from '../../shared/interpreterHome';
 
 type LegacyAwareAppConfig = AppConfig & { mcpOAuth?: unknown };
 
@@ -100,11 +100,7 @@ function resolveCodexHome(codexHome?: string): string {
     return resolve(codexHome);
   }
 
-  if (process.env.CODEX_HOME?.trim()) {
-    return resolve(process.env.CODEX_HOME);
-  }
-
-  return join(resolveInterpreterDataDir(), 'codex-home');
+  return resolveInterpreterHome();
 }
 
 function getFallbackFilePath(codexHome?: string): string {

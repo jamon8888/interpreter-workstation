@@ -2,7 +2,12 @@
 
 const path = require('path');
 const fs = require('fs');
+const { listPackage } = require('@electron/asar');
 const { assertBundledCodexSkills } = require('./checkBundledCodexSkills.cjs');
+
+function listAsarEntries(archivePath) {
+  return listPackage(archivePath);
+}
 
 function copyOptionalFile(source, destination) {
   if (!fs.existsSync(source)) return false;
@@ -18,6 +23,49 @@ function copyDirectory(source, destination) {
   fs.rmSync(destination, { recursive: true, force: true });
   fs.mkdirSync(path.dirname(destination), { recursive: true });
   fs.cpSync(source, destination, { recursive: true });
+}
+
+function wildcardMatches(pattern, value) {
+  const escaped = pattern.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replaceAll('*', '.*');
+  return new RegExp(`^${escaped}$`).test(value);
+}
+
+function assertBundledRelayLibvipsPolicy(resourcesRoot) {
+  const scopeDir = path.join(resourcesRoot, 'browser-extension-relay', 'node_modules', '@img');
+  if (!fs.existsSync(scopeDir)) return;
+
+  const packageDirs = fs.readdirSync(scopeDir, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory() && entry.name.startsWith('sharp-libvips-'));
+  if (packageDirs.length === 0) return;
+
+  const policyPath = path.join(resourcesRoot, 'licenses', 'release-policy.json');
+  const policy = JSON.parse(fs.readFileSync(policyPath, 'utf8'));
+  for (const packageDir of packageDirs) {
+    const manifestPath = path.join(scopeDir, packageDir.name, 'package.json');
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+    const family = policy.licenseFamilies.find(
+      (item) => wildcardMatches(item.packagePattern, manifest.name) && item.version === manifest.version,
+    );
+    if (!family) {
+      throw new Error(
+        `[afterPack] Bundled relay LGPL package has no reviewed release policy: ${manifest.name}@${manifest.version}`,
+      );
+    }
+    if (manifest.license !== family.inventoryLicense) {
+      throw new Error(
+        `[afterPack] Bundled relay license drifted for ${manifest.name}@${manifest.version}: ${manifest.license}`,
+      );
+    }
+    for (const required of [family.notice, family.licenseText, family.incorporatedLicenseText]) {
+      const relativePath = required.replace(/^licenses\//, '');
+      if (!fs.existsSync(path.join(resourcesRoot, 'licenses', relativePath))) {
+        throw new Error(`[afterPack] Missing bundled relay LGPL compliance file: ${required}`);
+      }
+    }
+    console.log(
+      `[afterPack] Verified bundled relay LGPL policy: ${manifest.name}@${manifest.version}`,
+    );
+  }
 }
 
 function copyWindowsRuntimeDlls(targetDir) {
@@ -55,7 +103,14 @@ function assertWindowsDelayLoadDlls(appOutDir) {
 function getRequiredBundledResourcePaths(resourcesRoot, platform, arch) {
   const isWin = platform === 'win32' || platform === 'windows';
   const binarySuffix = isWin ? '.exe' : '';
-  const oixRuntimePaths = [
+  const sharedResourcePaths = [
+    path.join(resourcesRoot, 'licenses', 'NOTICE'),
+    path.join(resourcesRoot, 'licenses', 'THIRD_PARTY_NOTICES.md'),
+    path.join(resourcesRoot, 'licenses', 'sharp-libvips-v1.2.4-THIRD-PARTY-NOTICES.md'),
+    path.join(resourcesRoot, 'licenses', 'sharp-libvips-v1.3.2-THIRD-PARTY-NOTICES.md'),
+    path.join(resourcesRoot, 'licenses', 'LGPL-3.0.txt'),
+    path.join(resourcesRoot, 'licenses', 'GPL-3.0.txt'),
+    path.join(resourcesRoot, 'licenses', 'release-policy.json'),
     path.join(resourcesRoot, 'oix', 'bin', `interpreter${binarySuffix}`),
     path.join(resourcesRoot, 'oix', 'bin', `i${binarySuffix}`),
     path.join(resourcesRoot, 'oix', 'bin', `codex-code-mode-host${binarySuffix}`),
@@ -63,7 +118,7 @@ function getRequiredBundledResourcePaths(resourcesRoot, platform, arch) {
     path.join(resourcesRoot, 'oix', 'codex-path', `rg${binarySuffix}`),
   ];
   if (!isWin) {
-    oixRuntimePaths.push(
+    sharedResourcePaths.push(
       path.join(resourcesRoot, 'oix', 'codex-resources', 'zsh', 'bin', 'zsh'),
     );
   }
@@ -84,7 +139,7 @@ function getRequiredBundledResourcePaths(resourcesRoot, platform, arch) {
 
   if (platform === 'darwin' || platform === 'mac') {
     return [
-      ...oixRuntimePaths,
+      ...sharedResourcePaths,
       path.join(resourcesRoot, 'pdfcpu', 'pdfcpu'),
       ...jsReplRuntimePaths,
       ...relayRuntimePaths,
@@ -106,7 +161,7 @@ function getRequiredBundledResourcePaths(resourcesRoot, platform, arch) {
 
   if (platform === 'linux') {
     return [
-      ...oixRuntimePaths,
+      ...sharedResourcePaths,
       path.join(resourcesRoot, 'pdfcpu', 'pdfcpu'),
       ...jsReplRuntimePaths,
       ...relayRuntimePaths,
@@ -116,7 +171,7 @@ function getRequiredBundledResourcePaths(resourcesRoot, platform, arch) {
 
   if (platform === 'win32' || platform === 'windows') {
     return [
-      ...oixRuntimePaths,
+      ...sharedResourcePaths,
       path.join(resourcesRoot, 'codex-command-runner.exe'),
       path.join(resourcesRoot, 'pdfcpu', 'pdfcpu.exe'),
       path.join(resourcesRoot, 'codex-windows-sandbox-setup.exe'),
@@ -145,6 +200,7 @@ function assertRequiredBundledResources(resourcesRoot, platform, arch) {
   if (fs.existsSync(relayArchivePath)) {
     throw new Error(`[afterPack] Packaged app must not include a relay archive: ${relayArchivePath}`);
   }
+  assertBundledRelayLibvipsPolicy(resourcesRoot);
 }
 
 function getMacExtraResourceBinariesForSigning(resourcesRoot) {
@@ -287,6 +343,54 @@ async function afterPack(context) {
   const nodeModulesDirs = getNodeModulesDirs();
   console.log('[afterPack] node_modules directories:', nodeModulesDirs);
 
+  if (isMac || isLinux) {
+    const libvipsPlatform = isMac ? 'darwin' : 'linux';
+    const expectedPackage = `@img/sharp-libvips-${libvipsPlatform}-${arch}`;
+    const asarPath = path.join(resourcesRoot, 'app.asar');
+    const packagedPathFragment = `/node_modules/${expectedPackage}/`;
+    const packagedInsideAsar = fs.existsSync(asarPath)
+      && listAsarEntries(asarPath).some((entry) => entry.includes(packagedPathFragment));
+    const packageRoot = nodeModulesDirs
+      .map((nodeModulesDir) => findPackageInNodeModules(nodeModulesDir, expectedPackage))
+      .find(Boolean);
+
+    if (packagedInsideAsar && !packageRoot) {
+      throw new Error(
+        `[afterPack] LGPL shared-library package is trapped inside ASAR: ${expectedPackage}`,
+      );
+    }
+    if (!packagedInsideAsar && !packageRoot) {
+      console.log(
+        `[afterPack] ${expectedPackage} is present in the conservative license inventory but is not bundled in this artifact`,
+      );
+    }
+    if (!packageRoot) {
+      // Nothing in this target artifact links or distributes the optional package.
+      // Notices are still included because the lockfile inventory is deliberately conservative.
+    } else {
+      const libraryFiles = [];
+      const collectLibraries = (directory) => {
+        for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+          const entryPath = path.join(directory, entry.name);
+          if (entry.isDirectory()) collectLibraries(entryPath);
+          else if (
+            entry.isFile()
+            && (entry.name.includes('.dylib') || entry.name.includes('.so.'))
+          ) {
+            libraryFiles.push(entryPath);
+          }
+        }
+      };
+      collectLibraries(packageRoot);
+      if (libraryFiles.length === 0) {
+        throw new Error(`[afterPack] No replaceable shared libraries found in ${packageRoot}`);
+      }
+      console.log(
+        `[afterPack] Verified ${libraryFiles.length} replaceable LGPL/shared libraries in ${expectedPackage}`,
+      );
+    }
+  }
+
   // --- macOS binary signing ---
   if (isMac) {
     console.log('[afterPack] Building macOS binary signing list...');
@@ -349,6 +453,7 @@ async function afterPack(context) {
 
 module.exports = afterPack;
 module.exports.assertRequiredBundledResources = assertRequiredBundledResources;
+module.exports.assertBundledRelayLibvipsPolicy = assertBundledRelayLibvipsPolicy;
 module.exports.copyWindowsRuntimeDlls = copyWindowsRuntimeDlls;
 module.exports.assertWindowsDelayLoadDlls = assertWindowsDelayLoadDlls;
 module.exports.getMacExtraResourceBinariesForSigning = getMacExtraResourceBinariesForSigning;

@@ -135,7 +135,7 @@ describe('OfficeExtensionViewer', () => {
 
     render(<OfficeExtensionViewer filePath="/workspace/report.docx" />);
 
-    expect(await screen.findByText('Office extension required')).toBeInTheDocument();
+    expect(await screen.findByText('Compatible document engine required')).toBeInTheDocument();
     expect(checkInstalled).toHaveBeenCalledTimes(1);
     expect(ensureRunning).not.toHaveBeenCalled();
 

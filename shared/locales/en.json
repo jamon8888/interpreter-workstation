@@ -144,7 +144,7 @@
   "settings.general.versionLabel": "Interpreter v{{version}}",
   "settings.general.resetConfirmMessage": "This will reset all settings and start the onboarding flow from scratch. Are you sure?",
   "settings.general.resetRuntimeConfigs": "Reset local runtime config files",
-  "settings.general.resetRuntimeConfigsConfirmMessage": "This deletes ~/.interpreter/config.json and codex-home/config.toml so the app can regenerate clean runtime config files. Continue?",
+  "settings.general.resetRuntimeConfigsConfirmMessage": "This deletes ~/.interpreter/config.json and ~/.openinterpreter/config.toml so the app can regenerate clean runtime config files. Continue?",
   "settings.general.resetRuntimeConfigsSuccess": "Local runtime config files were reset. Restart Interpreter to apply a clean runtime state.",
   "settings.general.resetRuntimeConfigsGenericError": "Failed to reset local runtime config files.",
   "settings.tools.integrationsSection": "Tools",

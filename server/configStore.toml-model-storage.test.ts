@@ -5,7 +5,8 @@ import { z } from 'zod';
 
 import { MODEL_OPTIONS } from '../shared/types/model';
 import { BUILTIN_PROVIDERS, type Provider } from '../shared/types/provider';
-import { resolveInterpreterConfigFile, resolveInterpreterDataDir, resolveLegacyInterpreterConfigFile } from '../shared/interpreterConfigPaths';
+import { resolveInterpreterConfigFile, resolveLegacyInterpreterConfigFile } from '../shared/interpreterConfigPaths';
+import { resolveInterpreterHome } from '../shared/interpreterHome';
 import { createHostedFallbackModelConfigState } from './modelConfigTomlStore';
 
 declare const Bun: {
@@ -17,7 +18,7 @@ declare const Bun: {
 const CONFIG_FILE = resolveInterpreterConfigFile();
 const CONFIG_DIR = dirname(CONFIG_FILE);
 const LEGACY_CONFIG_FILE = resolveLegacyInterpreterConfigFile();
-const MODEL_CONFIG_FILE = join(resolveInterpreterDataDir(), 'codex-home', 'config.toml');
+const MODEL_CONFIG_FILE = join(resolveInterpreterHome(), 'config.toml');
 const CORRUPTED_RECOVERY_CONFIG_FIXTURE = new URL('./test-fixtures/corrupted-recovery-config.toml', import.meta.url);
 const USER_RESERVED_LOCAL_PROVIDER_CONFIG_FIXTURE = new URL('./test-fixtures/user-reserved-local-provider-config.toml', import.meta.url);
 const MOCK_MODEL_CONFIG_FILE = '/tmp/test-codex-home/config.toml';

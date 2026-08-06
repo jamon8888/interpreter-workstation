@@ -109,9 +109,7 @@ function formatPdfSelection(selection: Extract<Selection, { type: 'pdf' }>): str
   const valuePart = selection.value === undefined || selection.value === null || selection.value === ''
     ? ''
     : `\nCurrent value: ${Array.isArray(selection.value) ? selection.value.join(', ') : String(selection.value)}`;
-  const actionHint = selection.fieldId
-    ? `Use builtin-pdf fill_pdf_form with fields: [{ "id": "${selection.fieldId}", "value": ... }].`
-    : 'Use builtin-pdf read_pdf first to get this field\'s fN id before calling fill_pdf_form.';
+  const actionHint = `Follow the bundled PDF skill and use permissive Python code to update the exact field named "${selection.fieldName}", then visually verify the saved PDF.`;
   return `Selected PDF Form Field (from ${selection.filePath}, page ${selection.page}):\n${idPart} "${selection.fieldName}" (${selection.fieldType})${valuePart}\n${actionHint}`;
 }
 

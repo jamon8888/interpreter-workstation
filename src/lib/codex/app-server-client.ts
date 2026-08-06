@@ -1,6 +1,7 @@
 import { execFile, type ChildProcessWithoutNullStreams, spawn } from "node:child_process";
-import { copyFile, mkdir, readFile, readdir, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, readFile, readdir, rename, writeFile } from "node:fs/promises";
 import { existsSync, lstatSync, mkdirSync, readlinkSync, rmSync, symlinkSync } from "node:fs";
+import { createHash, randomUUID } from "node:crypto";
 import os from "node:os";
 import path from "node:path";
 import readline from "node:readline";
@@ -50,17 +51,21 @@ import {
 } from "./sandbox-policy";
 import { getInterpreterCliShellRuntimeDir } from "../../../server/utils/interpreterCliRuntime";
 import {
-  getBundledSkillsDisabledInCurrentApp,
   getStrippedSystemSkillPathsInCurrentApp,
   isBundledSkillEnabledInCurrentApp,
 } from "../../../server/utils/bundledSkillAvailability";
 import {
   resolveBundledResourceCandidates,
 } from "../../../server/utils/bundledRuntimePaths";
+import {
+  resolveOrInstallOixRuntime,
+  type OixRuntimeResolution,
+} from "../../../server/utils/oixRuntime";
 import type {
   ToolConnectionState,
   ToolServerStatus,
 } from "../../../server/tools/toolTypes";
+import { resolveInterpreterHome } from "../../../shared/interpreterHome";
 
 async function getConfigApprovalPolicy(): Promise<string> {
   try {
@@ -187,18 +192,18 @@ function buildUserInput(params: {
 }
 
 const BUNDLED_SKILLS_DIR_NAME = "codex-skills";
+const MANAGED_SKILLS_MANIFEST_FILE = ".interpreter-managed-skills.json";
+const MANAGED_SKILLS_BACKUP_DIR = ".interpreter-managed-skill-backups";
+const MANAGED_SKILLS_STAGING_DIR = ".interpreter-managed-skill-staging";
+const LEGACY_WORKSTATION_HOME_MIGRATION_MARKER = ".workstation-runtime-home-migrated-v1";
 const STDOUT_DIAGNOSTIC_MAX_LINES = 8;
 const STDOUT_DIAGNOSTIC_MAX_CHARS_PER_LINE = 1200;
 const CODEX_CLI_MAX_BUFFER_BYTES = 8 * 1024 * 1024;
 const CODEX_CLI_TIMEOUT_MS = 30_000;
-// Pin the interpreter runtime so it never self-updates. The OIX binary is
-// bundled and code-signed inside the app (on macOS under
-// Contents/Resources/oix/...); an in-place self-update rewrites files inside the
-// sealed bundle and invalidates its signature, and could swap in an oix build
-// whose app-server protocol no longer matches our generated TS bindings. We bump
-// the bundled version deliberately (regenerate types/schema, then cut a release)
-// instead. `check_for_update_on_startup` is the first gate the runtime checks
-// before any startup update work, so false disables it for the spawned runtime.
+// The desktop-owned app-server process must not launch an interactive update
+// while it is serving active conversations. The same managed OIX installation
+// remains terminal-visible and keeps OIX's normal interactive update behavior;
+// this per-process config only disables the startup check for `app-server`.
 const DISABLE_INTERPRETER_AUTO_UPDATE_CONFIG = "check_for_update_on_startup=false";
 const CODEX_CONFIG_HEADER_PREFIX = [
   "# Interpreter user configuration",
@@ -932,57 +937,15 @@ const RETRYABLE_RPC_METHODS = new Set<keyof RequestMap>([
   CLIENT_METHOD.threadRead,
 ]);
 
-function resolveInterpreterDataDir(
-  platform: NodeJS.Platform = process.platform,
-  env: NodeJS.ProcessEnv = process.env,
-  homeDir = env.HOME ?? os.homedir(),
-): string {
-  const platformPath = platform === "win32" ? path.win32 : path.posix;
-  const interpreterHome = env.INTERPRETER_HOME?.trim();
-
-  if (interpreterHome) {
-    return interpreterHome;
-  }
-
-  if (platform === "win32") {
-    const appData = env.APPDATA;
-    if (!appData) {
-      throw new Error("APPDATA is required to resolve Interpreter data directory");
-    }
-    return platformPath.join(appData, "interpreter");
-  }
-
-  if (platform === "darwin") {
-    return platformPath.join(
-      homeDir,
-      "Library",
-      "Application Support",
-      "interpreter",
-    );
-  }
-
-  return platformPath.join(
-    env.XDG_CONFIG_HOME ?? platformPath.join(homeDir, ".config"),
-    "interpreter",
-  );
-}
-
 export function resolveDefaultCodexHome(
   platform: NodeJS.Platform = process.platform,
   env: NodeJS.ProcessEnv = process.env,
   homeDir = env.HOME ?? os.homedir(),
 ): string {
-  const explicitCodexHome = env.CODEX_HOME?.trim();
-  if (explicitCodexHome) {
-    return explicitCodexHome;
-  }
-
-  const platformPath = platform === "win32" ? path.win32 : path.posix;
-  return platformPath.join(
-    resolveInterpreterDataDir(platform, env, homeDir),
-    "codex-home",
-  );
+  return resolveInterpreterHome(platform, env, homeDir);
 }
+
+export const resolveDefaultInterpreterHome = resolveDefaultCodexHome;
 
 export function getInterpreterCliSandboxReadableRoots(
   platform: NodeJS.Platform = process.platform,
@@ -1204,6 +1167,113 @@ async function copyDirectoryRecursive(sourceDir: string, targetDir: string): Pro
   }
 }
 
+async function copyMissingDirectoryTree(sourceDir: string, targetDir: string): Promise<void> {
+  await mkdir(targetDir, { recursive: true });
+  const entries = await readdir(sourceDir, { withFileTypes: true });
+  for (const entry of entries) {
+    const sourcePath = path.join(sourceDir, entry.name);
+    const targetPath = path.join(targetDir, entry.name);
+    if (entry.isDirectory()) {
+      await copyMissingDirectoryTree(sourcePath, targetPath);
+    } else if (entry.isFile() && !existsSync(targetPath)) {
+      await copyFile(sourcePath, targetPath);
+    }
+  }
+}
+
+async function migrateLegacyWorkstationRuntimeHome(interpreterHome: string): Promise<void> {
+  const userDataDir = process.env.INTERPRETER_USER_DATA_DIR?.trim();
+  if (!userDataDir) {
+    return;
+  }
+
+  const legacyHome = path.join(path.resolve(userDataDir), "codex-home");
+  const markerPath = path.join(interpreterHome, LEGACY_WORKSTATION_HOME_MIGRATION_MARKER);
+  if (legacyHome === interpreterHome || !existsSync(legacyHome) || existsSync(markerPath)) {
+    return;
+  }
+
+  await copyMissingDirectoryTree(legacyHome, interpreterHome);
+  await writeFile(
+    markerPath,
+    `Copied missing runtime state from ${legacyHome} on ${new Date().toISOString()}.\n`,
+    "utf8",
+  );
+}
+
+type ManagedSkillManifest = {
+  schemaVersion: 1;
+  skills: Record<string, { installedTreeHash: string }>;
+};
+
+function emptyManagedSkillManifest(): ManagedSkillManifest {
+  return { schemaVersion: 1, skills: {} };
+}
+
+async function readManagedSkillManifest(interpreterHome: string): Promise<ManagedSkillManifest> {
+  try {
+    const parsed = JSON.parse(
+      await readFile(path.join(interpreterHome, MANAGED_SKILLS_MANIFEST_FILE), "utf8"),
+    ) as Partial<ManagedSkillManifest>;
+    if (parsed.schemaVersion === 1 && parsed.skills && typeof parsed.skills === "object") {
+      return { schemaVersion: 1, skills: parsed.skills };
+    }
+  } catch {
+    // First launch on the managed installer, or a corrupt manifest. Existing
+    // named skills are backed up before replacement when ownership is unknown.
+  }
+  return emptyManagedSkillManifest();
+}
+
+async function hashDirectoryTree(rootDir: string): Promise<string> {
+  const hash = createHash("sha256");
+
+  const visit = async (currentDir: string, relativeDir = ""): Promise<void> => {
+    const entries = (await readdir(currentDir, { withFileTypes: true }))
+      .sort((left, right) => left.name.localeCompare(right.name));
+    for (const entry of entries) {
+      const relativePath = path.posix.join(relativeDir.split(path.sep).join(path.posix.sep), entry.name);
+      const absolutePath = path.join(currentDir, entry.name);
+      if (entry.isDirectory()) {
+        hash.update(`d\0${relativePath}\0`);
+        await visit(absolutePath, path.join(relativeDir, entry.name));
+      } else if (entry.isFile()) {
+        hash.update(`f\0${relativePath}\0`);
+        hash.update(await readFile(absolutePath));
+        hash.update("\0");
+      }
+    }
+  };
+
+  await visit(rootDir);
+  return hash.digest("hex");
+}
+
+async function backupManagedSkill(
+  interpreterHome: string,
+  skillName: string,
+  sourceDir: string,
+): Promise<string> {
+  const backupDir = path.join(
+    interpreterHome,
+    MANAGED_SKILLS_BACKUP_DIR,
+    skillName,
+    `${new Date().toISOString().replace(/:/g, "-")}-${randomUUID()}`,
+  );
+  await copyDirectoryRecursive(sourceDir, backupDir);
+  return backupDir;
+}
+
+async function writeManagedSkillManifest(
+  interpreterHome: string,
+  manifest: ManagedSkillManifest,
+): Promise<void> {
+  const manifestPath = path.join(interpreterHome, MANAGED_SKILLS_MANIFEST_FILE);
+  const temporaryPath = `${manifestPath}.${process.pid}.${randomUUID()}.tmp`;
+  await writeFile(temporaryPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
+  await rename(temporaryPath, manifestPath);
+}
+
 export function getBundledSkillPlatformVariantFileName(
   skillName: string,
   platform: NodeJS.Platform = process.platform,
@@ -1423,6 +1493,7 @@ export class StdioJsonRpcTransport implements JsonRpcTransport {
   private recentStdoutDiagnostics: string[] = [];
   private droppedStdoutDiagnosticLineCount = 0;
   private startPromise: Promise<void> | null = null;
+  private oixRuntimeResolutionPromise: Promise<OixRuntimeResolution> | null = null;
 
   constructor(
     private readonly spawnProcess: SpawnProcess = (command, args, env) =>
@@ -1432,6 +1503,7 @@ export class StdioJsonRpcTransport implements JsonRpcTransport {
       }),
     private readonly codexHome?: string,
     private readonly runtimeAccessSnapshotLoader: () => Promise<CodexRuntimeAccessSnapshot> = loadCodexRuntimeAccessSnapshot,
+    private readonly oixRuntimeResolver: () => Promise<OixRuntimeResolution> = resolveOrInstallOixRuntime,
   ) {}
 
   async start() {
@@ -1467,7 +1539,7 @@ export class StdioJsonRpcTransport implements JsonRpcTransport {
     const disabledSystemSkillsConfig = formatDisabledSystemSkillsConfig(codeHome);
     console.log(`[interpreter-server] resolved app-server binary path: ${appServerBinary}`);
 
-    // Start the shared OIX `interpreter app-server` runtime with an empty MCP table so no
+    // Start Workstation's pinned OIX `interpreter app-server` runtime with an empty MCP table so no
     // ~/.codex MCP config leaks into the runtime and no unscoped Interpreter
     // tool surface is exposed globally. Per-thread config can inject a scoped
     // Interpreter MCP URL when a turn starts.
@@ -1515,8 +1587,9 @@ export class StdioJsonRpcTransport implements JsonRpcTransport {
     // becoming a second model-facing app-tool surface.
     args.push("-c", "mcp_servers={}");
 
-    // The bundled, signed binary is the single source of truth; never let it
-    // self-update. See DISABLE_INTERPRETER_AUTO_UPDATE_CONFIG.
+    // Disable startup update checks only for this long-lived app-server
+    // subprocess. The independently selected terminal CLI remains free to perform OIX's normal
+    // interactive update flow.
     args.push("-c", DISABLE_INTERPRETER_AUTO_UPDATE_CONFIG);
 
     args.push("--listen", "stdio://");
@@ -1609,28 +1682,19 @@ export class StdioJsonRpcTransport implements JsonRpcTransport {
   }
 
   private async resolveInterpreterCliBinary(): Promise<string> {
-    const platform = process.platform;
-    const arch = process.arch;
-    const binaryName = platform === "win32" ? "interpreter.exe" : "interpreter";
-    const candidatePaths = resolveBundledResourceCandidates({
-      packagedSegments: ["oix", "bin", binaryName],
-      sourceSegments: ["oix", `${platform}-${arch}`, "bin", binaryName],
-    });
-
-    for (const candidate of candidatePaths) {
-      if (existsSync(candidate)) {
-        if (candidate.includes(`${path.sep}resources${path.sep}oix${path.sep}`)) {
-          console.log(`[interpreter-server] using bundled interpreter CLI binary: ${candidate}`);
-        } else {
-          console.log(`[interpreter-server] using packaged interpreter CLI binary: ${candidate}`);
-        }
-        return candidate;
-      }
+    if (!this.oixRuntimeResolutionPromise) {
+      this.oixRuntimeResolutionPromise = this.oixRuntimeResolver().catch(
+        (error) => {
+          this.oixRuntimeResolutionPromise = null;
+          throw error;
+        },
+      );
     }
-
-    throw new Error(
-      `[interpreter-server] Bundled interpreter CLI binary not found. Checked: ${candidatePaths.join(", ")}`,
+    const runtime = await this.oixRuntimeResolutionPromise;
+    console.log(
+      `[interpreter-server] using ${runtime.source} OIX ${runtime.version}: ${runtime.binaryPath}`,
     );
+    return runtime.binaryPath;
   }
 
   send(message: string) {
@@ -1808,34 +1872,87 @@ export class StdioJsonRpcTransport implements JsonRpcTransport {
 
     const home = resolveDefaultCodexHome();
     mkdirSync(home, { recursive: true });
+    await migrateLegacyWorkstationRuntimeHome(home);
     return home;
   }
 
   private async installBundledSkills(codexHomeSkillsDir: string): Promise<void> {
-    for (const skillName of getBundledSkillsDisabledInCurrentApp()) {
-      rmSync(path.join(codexHomeSkillsDir, skillName), { recursive: true, force: true });
-    }
-
     const bundledSkillsRoot = resolveBundledSkillsRoot();
     if (!bundledSkillsRoot) {
       return;
     }
 
-    const entries = await readdir(bundledSkillsRoot, { withFileTypes: true });
-    for (const entry of entries) {
-      if (!entry.isDirectory() || entry.name.startsWith(".")) {
-        continue;
-      }
-      const targetDir = path.join(codexHomeSkillsDir, entry.name);
-      if (!isBundledSkillEnabledInCurrentApp(entry.name)) {
+    const interpreterHome = path.dirname(codexHomeSkillsDir);
+    const manifest = await readManagedSkillManifest(interpreterHome);
+    const nextManifest = emptyManagedSkillManifest();
+    const stagingRoot = path.join(interpreterHome, MANAGED_SKILLS_STAGING_DIR);
+    mkdirSync(stagingRoot, { recursive: true });
+    try {
+      const entries = await readdir(bundledSkillsRoot, { withFileTypes: true });
+      const desiredSkillNames = new Set(
+        entries
+          .filter((entry) => (
+            entry.isDirectory()
+            && !entry.name.startsWith(".")
+            && isBundledSkillEnabledInCurrentApp(entry.name)
+          ))
+          .map((entry) => entry.name),
+      );
+      const retiredSkillNames = Object.keys(manifest.skills).filter((skillName) => (
+        !desiredSkillNames.has(skillName)
+        && skillName !== "."
+        && skillName !== ".."
+        && path.basename(skillName) === skillName
+      ));
+      for (const skillName of retiredSkillNames) {
+        const targetDir = path.join(codexHomeSkillsDir, skillName);
+        const previousRecord = manifest.skills[skillName];
+        if (!previousRecord || !existsSync(targetDir)) {
+          continue;
+        }
+        const currentHash = await hashDirectoryTree(targetDir);
+        if (currentHash !== previousRecord.installedTreeHash) {
+          const backupDir = await backupManagedSkill(interpreterHome, skillName, targetDir);
+          console.warn(`[interpreter-skills] Backed up modified managed skill ${skillName} to ${backupDir}`);
+        }
         rmSync(targetDir, { recursive: true, force: true });
-        continue;
       }
 
-      const sourceDir = path.join(bundledSkillsRoot, entry.name);
-      rmSync(targetDir, { recursive: true, force: true });
-      await copyDirectoryRecursive(sourceDir, targetDir);
-      await applyBundledSkillPlatformVariant(entry.name, sourceDir, targetDir);
+      for (const entry of entries) {
+        if (!desiredSkillNames.has(entry.name)) {
+          continue;
+        }
+        const targetDir = path.join(codexHomeSkillsDir, entry.name);
+
+        const sourceDir = path.join(bundledSkillsRoot, entry.name);
+        const stagedDir = path.join(stagingRoot, `${entry.name}-${randomUUID()}`);
+        await copyDirectoryRecursive(sourceDir, stagedDir);
+        await applyBundledSkillPlatformVariant(entry.name, sourceDir, stagedDir);
+        const desiredHash = await hashDirectoryTree(stagedDir);
+
+        if (existsSync(targetDir)) {
+          const currentHash = await hashDirectoryTree(targetDir);
+          if (currentHash === desiredHash) {
+            rmSync(stagedDir, { recursive: true, force: true });
+            nextManifest.skills[entry.name] = { installedTreeHash: desiredHash };
+            continue;
+          }
+
+          const previousRecord = manifest.skills[entry.name];
+          if (!previousRecord || currentHash !== previousRecord.installedTreeHash) {
+            const backupDir = await backupManagedSkill(interpreterHome, entry.name, targetDir);
+            console.warn(`[interpreter-skills] Backed up modified managed skill ${entry.name} to ${backupDir}`);
+          }
+          rmSync(targetDir, { recursive: true, force: true });
+        }
+
+        await rename(stagedDir, targetDir);
+        nextManifest.skills[entry.name] = { installedTreeHash: desiredHash };
+      }
+
+      await writeManagedSkillManifest(interpreterHome, nextManifest);
+    } finally {
+      rmSync(stagingRoot, { recursive: true, force: true });
     }
   }
 }

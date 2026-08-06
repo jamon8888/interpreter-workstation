@@ -18,6 +18,7 @@ import {
   configureMainProcessSentryIntegrations,
   getMainProcessBeforeSendTelemetry,
   sanitizeCodexSentryEvent,
+  shouldSendSentryEvent,
 } from './utils/codexSentry';
 import {
   MAIN_PROCESS_SENTRY_IGNORE_ERRORS,
@@ -58,10 +59,8 @@ import { isInternal, isUpdating } from './autoUpdater';
 import { t, initI18nMain } from './i18n';
 import { attachConsoleSinkGuards, invokeConsoleSafely } from './utils/safeConsoleWrite';
 import { WORKSTATION_SENTRY_DSN } from '../shared/constants/sentry';
-import { isOfficeExtensionSupportedPlatform } from '../shared/constants/interpreter-overlay-platform';
 import { ACTIVE_BRAND } from '../shared/branding';
 import { registerElectronAppLifecycle } from './electron-lifecycle';
-import { ensureOfficeExtensionInstalledInBackground } from './services/office-extension-startup';
 import { WINDOWS_APP_USER_MODEL_ID } from './utils/windowsAppConfig';
 import { APP_VERSION } from '../shared/version';
 import { distributionProductConfig } from '../shared/productConfig';
@@ -127,7 +126,17 @@ Sentry.init({
   getSessions: () => [session.defaultSession, session.fromPartition(WORKSTATION_PARTITION)],
   release: `interpreter-workstation@${app.getVersion()}`,
   ignoreErrors: MAIN_PROCESS_SENTRY_IGNORE_ERRORS,
-  beforeSend: (event, hint) => {
+  beforeSend: async (event, hint) => {
+    try {
+      const { getTelemetryEnabled } = await import('../server/configStore');
+      if (!shouldSendSentryEvent(await getTelemetryEnabled())) {
+        return null;
+      }
+    } catch {
+      // Error reporting must fail closed when consent state cannot be read.
+      return null;
+    }
+
     const sanitized = sanitizeCodexSentryEvent(event, hint);
     if (!sanitized) {
       return null;
@@ -2699,21 +2708,6 @@ app.whenReady().then(async () => {
 
     // Initialize file watcher for workspace
     await initializeFileWatcher();
-
-    if (!distributionProductConfig.documentEngine.releaseRepository) {
-      console.log('[DocumentEngine] No engine configured; using code-and-skills workflows');
-    } else if (process.env.INTERPRETER_SKIP_OFFICE_EXTENSION_INSTALL === '1') {
-      console.log('[OfficeExtension] Skipping background install by environment request');
-    } else {
-      // Keep install warm in the background on supported platforms.
-      // The server itself starts lazily from OfficeExtensionViewer -> officeExtension.ensureRunning().
-      void ensureOfficeExtensionInstalledInBackground({
-        importOfficeExtension: () => import('./services/office-extension'),
-        isSupportedPlatform: isOfficeExtensionSupportedPlatform,
-        logger: console,
-        platform: process.platform,
-      });
-    }
 
     // Mark app as fully ready
     appReady = true;

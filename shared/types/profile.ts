@@ -308,7 +308,7 @@ export interface ProfileSetupStatus {
 }
 
 /**
- * Storage format for profiles in codex-home/config.toml
+ * Storage format for profiles in ~/.openinterpreter/config.toml
  * We store all profiles explicitly.
  */
 export interface ProfilesConfig {

@@ -1,13 +1,13 @@
 import { chmodSync, existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { getInterpreterHomeDir } from '../configStore';
 import { resolveBundledResourceCandidates, uniquePaths } from './bundledRuntimePaths';
 import {
   AGENT_SETTINGS_PATHS,
   INTERPRETER_CONFIG_PATH_ALIASES,
   SETTINGS_TABS,
 } from '../../shared/settingsCatalog';
+import { resolveInterpreterHome } from '../../shared/interpreterHome';
 
 export const INTERPRETER_CALLER_TOKEN_ENV = 'INTERPRETER_CALLER_TOKEN';
 export const INTERPRETER_CLI_COMMAND = 'interpreter-app';
@@ -104,51 +104,15 @@ export function getInterpreterCliRuntimeDir(
   platform: NodeJS.Platform = process.platform,
 ): string {
   const platformPath = platform === 'win32' ? path.win32 : path.posix;
-  return platformPath.join(getInterpreterHomeDir(), 'runtime', 'interpreter-cli');
+  return platformPath.join(resolveInterpreterCliHome(platform), 'runtime', 'interpreter-cli');
 }
 
-function resolveInterpreterCliCodexHome(
+function resolveInterpreterCliHome(
   platform: NodeJS.Platform = process.platform,
   env: NodeJS.ProcessEnv = process.env,
   homeDir: string = env.HOME ?? os.homedir(),
 ): string {
-  const explicitCodexHome = env.CODEX_HOME?.trim();
-  if (explicitCodexHome) {
-    return explicitCodexHome;
-  }
-
-  const platformPath = platform === 'win32' ? path.win32 : path.posix;
-  const explicitUserDataDir = env.INTERPRETER_USER_DATA_DIR?.trim();
-  if (explicitUserDataDir) {
-    if (path.isAbsolute(explicitUserDataDir)) {
-      return path.join(explicitUserDataDir, 'codex-home');
-    }
-    return platformPath.join(platformPath.resolve(explicitUserDataDir), 'codex-home');
-  }
-
-  if (platform === 'win32') {
-    const appData = env.APPDATA;
-    if (!appData) {
-      throw new Error('APPDATA is required to resolve the Codex home');
-    }
-    return platformPath.join(appData, 'interpreter', 'codex-home');
-  }
-
-  if (platform === 'darwin') {
-    return platformPath.join(
-      homeDir,
-      'Library',
-      'Application Support',
-      'interpreter',
-      'codex-home',
-    );
-  }
-
-  return platformPath.join(
-    env.XDG_CONFIG_HOME ?? platformPath.join(homeDir, '.config'),
-    'interpreter',
-    'codex-home',
-  );
+  return resolveInterpreterHome(platform, env, homeDir);
 }
 
 function getInterpreterCliShellHomeDir(
@@ -160,7 +124,7 @@ function getInterpreterCliShellHomeDir(
     return env.USERPROFILE || env.HOME || fallbackHomeDir;
   }
 
-  return path.join(resolveInterpreterCliCodexHome(platform, env, fallbackHomeDir), 'home');
+  return path.join(resolveInterpreterCliHome(platform, env, fallbackHomeDir), 'home');
 }
 
 export function getInterpreterCliShellRuntimeDir(
@@ -229,7 +193,18 @@ export function getInterpreterCliBridgeDir(
     return path.win32.join(getInterpreterCliRuntimeDir(platform), 'bridge', String(port));
   }
 
-  return path.join(os.tmpdir(), `interpreter-cli-bridge-${port}`);
+  // Agent shell commands run inside the OIX sandbox on macOS. Keep the file
+  // transport beside the shell-safe launcher in the runtime directory that is
+  // explicitly exposed to that sandbox. This also prevents stale requests in
+  // a machine-wide temporary directory from crossing app homes or test runs.
+  return path.join(
+    getInterpreterCliShellRuntimeDir(
+      platform,
+      getInterpreterCliShellHomeDir(platform),
+    ),
+    'bridge',
+    String(port),
+  );
 }
 
 export function buildInterpreterCliServerConnection(
@@ -395,8 +370,6 @@ Tips:
   interpreter-app tools list                  # list visible servers only
   interpreter-app tools list <server-id>      # list tools on that server
   interpreter-app tools find interpreter_vault
-  interpreter-app tools find "read word docx"
-  interpreter-app tools find "convert docx to pdf"
   interpreter-app tools <server-id> <tool-name> --help
   interpreter-app tools <server-id>__<tool-name> --help
   --stdin-arg <key> reads raw stdin (for example a heredoc) as that string argument, no JSON escaping; combine with --json for other fields.
@@ -404,9 +377,7 @@ Tips:
   Many built-in tools live on shared servers such as builtin-interpreter.
 
 Examples:
-  interpreter-app tools builtin-docx read_word --json '{"path":"Notes.docx"}'
-  interpreter-app tools builtin-pdf read_pdf --json '{"path":"packet.pdf"}'
-  interpreter-app tools builtin-converter convert_file --json '{"path":"Notes.docx","format":"pdf"}'
+  interpreter-app tools builtin-interpreter interpreter_refresh_file --json '{"path":"report.pdf"}'
   interpreter-app tools builtin-interpreter interpreter_refresh_file --json '{"path":"report.xlsx"}'
 EOF
 }
@@ -1653,15 +1624,11 @@ function showToolsUsage() {
   process.stderr.write('Tips:\\n');
   process.stderr.write('  interpreter-app tools list builtin-interpreter\\n');
   process.stderr.write('  interpreter-app tools find interpreter_vault\\n');
-  process.stderr.write('  interpreter-app tools find \"read word docx\"\\n');
-  process.stderr.write('  interpreter-app tools find \"convert docx to pdf\"\\n');
   process.stderr.write('  interpreter-app tools <server-id> <tool-name> --help\\n');
   process.stderr.write('  interpreter-app tools <server-id>__<tool-name> --help\\n');
   process.stderr.write('  --stdin-arg <key> reads raw stdin as that string argument, no JSON escaping; combine with --json for other fields.\\n');
   process.stderr.write('Examples:\\n');
-  process.stderr.write('  interpreter-app tools builtin-docx read_word --json \\'{\"path\":\"Notes.docx\"}\\'\\n');
-  process.stderr.write('  interpreter-app tools builtin-pdf read_pdf --json \\'{\"path\":\"packet.pdf\"}\\'\\n');
-  process.stderr.write('  interpreter-app tools builtin-converter convert_file --json \\'{\"path\":\"Notes.docx\",\"format\":\"pdf\"}\\'\\n');
+  process.stderr.write('  interpreter-app tools builtin-interpreter interpreter_refresh_file --json \\'{\"path\":\"report.pdf\"}\\'\\n');
   process.stderr.write('  interpreter-app tools builtin-interpreter interpreter_refresh_file --json \\'{\"path\":\"report.xlsx\"}\\'\\n');
 }
 
@@ -2398,12 +2365,10 @@ function Show-ToolsUsage {
   [Console]::Error.WriteLine('Tips:')
   [Console]::Error.WriteLine('  interpreter-app tools list builtin-interpreter')
   [Console]::Error.WriteLine('  interpreter-app tools find interpreter_vault')
-  [Console]::Error.WriteLine('  interpreter-app tools find \"read word docx\"')
   [Console]::Error.WriteLine('  interpreter-app tools <server-id> <tool-name> --help')
   [Console]::Error.WriteLine('  interpreter-app tools <server-id>__<tool-name> --help')
   [Console]::Error.WriteLine('Examples:')
-  [Console]::Error.WriteLine('  interpreter-app tools builtin-docx read_word --json ''{\"path\":\"Notes.docx\"}''')
-  [Console]::Error.WriteLine('  interpreter-app tools builtin-pdf read_pdf --json ''{\"path\":\"packet.pdf\"}''')
+  [Console]::Error.WriteLine('  interpreter-app tools builtin-interpreter interpreter_refresh_file --json ''{\"path\":\"report.pdf\"}''')
   [Console]::Error.WriteLine('  interpreter-app tools builtin-interpreter interpreter_refresh_file --json ''{\"path\":\"report.xlsx\"}''')
 }
 

@@ -2,8 +2,8 @@ import { afterEach, beforeEach, describe, test } from "bun:test";
 import assert from "node:assert/strict";
 import { type ChildProcessWithoutNullStreams } from "node:child_process";
 import { EventEmitter } from "node:events";
-import { lstatSync, readlinkSync } from "node:fs";
-import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { existsSync, lstatSync, readlinkSync } from "node:fs";
+import { chmod, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { PassThrough } from "node:stream";
@@ -930,38 +930,76 @@ describe("CodexAppServerClient", () => {
     );
   });
 
-  test("resolves default codex home inside Interpreter app data on macOS", () => {
+  test("resolves the shared Open Interpreter home on macOS", () => {
     assert.equal(
       resolveDefaultCodexHome("darwin", {}, "/Users/alice"),
-      "/Users/alice/Library/Application Support/interpreter/codex-home",
+      "/Users/alice/.openinterpreter",
     );
   });
 
-  test("resolves default codex home from CODEX_HOME when explicitly set", () => {
+  test("resolves the shared home from INTERPRETER_HOME and ignores CODEX_HOME", () => {
     assert.equal(
       resolveDefaultCodexHome("darwin", {
-        CODEX_HOME: "/tmp/explicit-codex-home",
+        CODEX_HOME: "/tmp/legacy-codex-home",
+        INTERPRETER_HOME: "/tmp/explicit-interpreter-home",
       }, "/Users/alice"),
-      "/tmp/explicit-codex-home",
+      "/tmp/explicit-interpreter-home",
+    );
+    assert.equal(
+      resolveDefaultCodexHome("darwin", { CODEX_HOME: "/tmp/legacy-codex-home" }, "/Users/alice"),
+      "/Users/alice/.openinterpreter",
     );
   });
 
-  test("resolves default codex home inside APPDATA on Windows", () => {
+  test("resolves the shared Open Interpreter home on Windows", () => {
     assert.equal(
       resolveDefaultCodexHome("win32", {
-        APPDATA: "C:\\Users\\Alice\\AppData\\Roaming",
-      }),
-      "C:\\Users\\Alice\\AppData\\Roaming\\interpreter\\codex-home",
+        USERPROFILE: "C:\\Users\\Alice",
+      }, "C:\\Users\\Alice"),
+      "C:\\Users\\Alice\\.openinterpreter",
     );
   });
 
-  test("resolves default codex home inside XDG config dir on Linux", () => {
+  test("resolves the shared Open Interpreter home on Linux", () => {
     assert.equal(
       resolveDefaultCodexHome("linux", {
         XDG_CONFIG_HOME: "/home/alice/.config",
       }, "/home/alice"),
-      "/home/alice/.config/interpreter/codex-home",
+      "/home/alice/.openinterpreter",
     );
+  });
+
+  test("copies missing legacy app runtime state into the shared home without deleting the source", async () => {
+    const tempRoot = await mkdtemp(path.join(os.tmpdir(), "interpreter-home-migration-"));
+    const userDataDir = path.join(tempRoot, "app-data");
+    const interpreterHome = path.join(tempRoot, ".openinterpreter");
+    const legacyHome = path.join(userDataDir, "codex-home");
+    const originalInterpreterHome = process.env.INTERPRETER_HOME;
+    const originalUserDataDir = process.env.INTERPRETER_USER_DATA_DIR;
+
+    try {
+      process.env.INTERPRETER_HOME = interpreterHome;
+      process.env.INTERPRETER_USER_DATA_DIR = userDataDir;
+      await mkdir(legacyHome, { recursive: true });
+      await writeFile(path.join(legacyHome, "legacy-state.txt"), "preserved legacy state", "utf8");
+
+      const transport = new StdioJsonRpcTransport(() => {
+        throw new Error("spawn is not expected while resolving the runtime home");
+      });
+      assert.equal(await (transport as any).resolveCodexHome(), interpreterHome);
+      assert.equal(
+        await readFile(path.join(interpreterHome, "legacy-state.txt"), "utf8"),
+        "preserved legacy state",
+      );
+      assert.equal(await readFile(path.join(legacyHome, "legacy-state.txt"), "utf8"), "preserved legacy state");
+      assert.equal(existsSync(path.join(interpreterHome, ".workstation-runtime-home-migrated-v1")), true);
+    } finally {
+      if (originalInterpreterHome === undefined) delete process.env.INTERPRETER_HOME;
+      else process.env.INTERPRETER_HOME = originalInterpreterHome;
+      if (originalUserDataDir === undefined) delete process.env.INTERPRETER_USER_DATA_DIR;
+      else process.env.INTERPRETER_USER_DATA_DIR = originalUserDataDir;
+      await rm(tempRoot, { recursive: true, force: true });
+    }
   });
 
   test("rejects pending requests when process closes", async () => {
@@ -3097,6 +3135,81 @@ describe("StdioJsonRpcTransport", () => {
     }
   });
 
+  test("updates app-managed skills, retires removed ones, and preserves user skills", async () => {
+    const interpreterHome = await mkdtemp(path.join(os.tmpdir(), "interpreter-managed-skills-"));
+    const skillsDir = path.join(interpreterHome, "skills");
+    const transport = new StdioJsonRpcTransport(() => {
+      throw new Error("spawn is not used by this test");
+    }, interpreterHome);
+
+    try {
+      await mkdir(skillsDir, { recursive: true });
+      await (transport as any).installBundledSkills(skillsDir);
+
+      const managedDocPath = path.join(skillsDir, "doc", "SKILL.md");
+      const shippedDoc = await readFile(managedDocPath, "utf8");
+      await writeFile(managedDocPath, `${shippedDoc}\nUSER EDIT\n`, "utf8");
+      await mkdir(path.join(skillsDir, "my-company-skill"), { recursive: true });
+      await writeFile(
+        path.join(skillsDir, "my-company-skill", "SKILL.md"),
+        "---\nname: my-company-skill\ndescription: private\n---\n",
+        "utf8",
+      );
+      const retiredSkillDir = path.join(skillsDir, "retired-app-skill");
+      await mkdir(retiredSkillDir, { recursive: true });
+      await writeFile(path.join(retiredSkillDir, "SKILL.md"), "retired but edited\n", "utf8");
+      const manifestPath = path.join(interpreterHome, ".interpreter-managed-skills.json");
+      const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as {
+        skills: Record<string, { installedTreeHash: string }>;
+      };
+      manifest.skills["retired-app-skill"] = { installedTreeHash: "previous-release-hash" };
+      await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
+
+      await (transport as any).installBundledSkills(skillsDir);
+
+      assert.equal(await readFile(managedDocPath, "utf8"), shippedDoc);
+      assert.equal(
+        await readFile(path.join(skillsDir, "my-company-skill", "SKILL.md"), "utf8"),
+        "---\nname: my-company-skill\ndescription: private\n---\n",
+      );
+
+      const backupSkillRoot = path.join(
+        interpreterHome,
+        ".interpreter-managed-skill-backups",
+        "doc",
+      );
+      const backupEntries = await readdir(backupSkillRoot);
+      assert.equal(backupEntries.length, 1);
+      assert.match(
+        await readFile(path.join(backupSkillRoot, backupEntries[0], "SKILL.md"), "utf8"),
+        /USER EDIT/,
+      );
+      assert.equal(
+        existsSync(path.join(interpreterHome, ".interpreter-managed-skills.json")),
+        true,
+      );
+      assert.equal(existsSync(retiredSkillDir), false);
+      const retiredBackups = await readdir(path.join(
+        interpreterHome,
+        ".interpreter-managed-skill-backups",
+        "retired-app-skill",
+      ));
+      assert.equal(retiredBackups.length, 1);
+      assert.equal(
+        await readFile(path.join(
+          interpreterHome,
+          ".interpreter-managed-skill-backups",
+          "retired-app-skill",
+          retiredBackups[0],
+          "SKILL.md",
+        ), "utf8"),
+        "retired but edited\n",
+      );
+    } finally {
+      await rm(interpreterHome, { recursive: true, force: true });
+    }
+  });
+
   test("handles stdin EPIPE errors without uncaught exceptions", async () => {
     const childEvents = new EventEmitter();
     const child = Object.assign(childEvents, {
@@ -3453,7 +3566,7 @@ describe("StdioJsonRpcTransport", () => {
     }
   });
 
-  test("resolves packaged interpreter CLI sidecar for MCP auth checks", async () => {
+  test("uses and caches the shared OIX runtime resolver", async () => {
     const resourcesRoot = await mkdtemp(path.join(os.tmpdir(), "interpreter-cli-resource-"));
     const binaryName = process.platform === "win32" ? "interpreter.exe" : "interpreter";
     const packagedInterpreterPath = path.join(resourcesRoot, "oix", "bin", binaryName);
@@ -3468,14 +3581,33 @@ describe("StdioJsonRpcTransport", () => {
         value: resourcesRoot,
       });
 
-      const transport = new StdioJsonRpcTransport(() => {
-        throw new Error("spawn should not run while resolving interpreter CLI binary");
-      }, "/tmp/codex-home-test");
+      let resolverCalls = 0;
+      const transport = new StdioJsonRpcTransport(
+        () => {
+          throw new Error("spawn should not run while resolving interpreter CLI binary");
+        },
+        "/tmp/codex-home-test",
+        undefined,
+        async () => {
+          resolverCalls += 1;
+          return {
+            binaryPath: packagedInterpreterPath,
+            packageDir: path.dirname(path.dirname(packagedInterpreterPath)),
+            source: "installed",
+            version: "0.0.34",
+          };
+        },
+      );
 
       assert.equal(
         await (transport as any).resolveInterpreterCliBinary(),
         packagedInterpreterPath,
       );
+      assert.equal(
+        await (transport as any).resolveInterpreterCliBinary(),
+        packagedInterpreterPath,
+      );
+      assert.equal(resolverCalls, 1);
     } finally {
       Object.defineProperty(process, "resourcesPath", {
         configurable: true,
@@ -3486,7 +3618,7 @@ describe("StdioJsonRpcTransport", () => {
     }
   });
 
-  test("resolves packaged Windows unified interpreter runtime for support issues 1361 and 1395", async () => {
+  test("uses the shared Windows OIX runtime for support issues 1361 and 1395", async () => {
     const resourcesRoot = await mkdtemp(path.join(os.tmpdir(), "interpreter-runtime-resource-"));
     const packagedInterpreterPath = path.join(resourcesRoot, "oix", "bin", "interpreter.exe");
     await mkdir(path.dirname(packagedInterpreterPath), { recursive: true });
@@ -3510,9 +3642,19 @@ describe("StdioJsonRpcTransport", () => {
         value: "x64",
       });
 
-      const transport = new StdioJsonRpcTransport(() => {
-        throw new Error("spawn should not run while resolving interpreter runtime");
-      }, "/tmp/codex-home-test");
+      const transport = new StdioJsonRpcTransport(
+        () => {
+          throw new Error("spawn should not run while resolving interpreter runtime");
+        },
+        "/tmp/codex-home-test",
+        undefined,
+        async () => ({
+          binaryPath: packagedInterpreterPath,
+          packageDir: path.dirname(path.dirname(packagedInterpreterPath)),
+          source: "installed",
+          version: "0.0.34",
+        }),
+      );
 
       assert.equal(
         await (transport as any).resolveInterpreterCliBinary(),
@@ -3585,7 +3727,11 @@ describe("StdioJsonRpcTransport", () => {
         resolved = await (transport as any).resolveInterpreterCliBinary();
       } catch (error) {
         assert.ok(error instanceof Error);
-        assert.ok(error.message.includes("interpreter CLI binary not found"));
+        assert.ok(
+          error.message.includes(
+            "No valid bundled Open Interpreter runtime",
+          ),
+        );
         assert.ok(!error.message.includes("app.asar"));
       }
       if (resolved !== null) {

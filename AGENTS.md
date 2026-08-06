@@ -2,11 +2,30 @@
 
 These rules are architecture constraints for this repository.
 
+## Canonical checkout guard
+
+This repository is the canonical OSS Workstation application. Before editing
+or testing application code, run `git rev-parse --show-toplevel` and verify that
+the result is this repository's root. Read every applicable ancestor
+`AGENTS.md`; if one marks the checkout as legacy or migration-only, stop. Work
+performed or tested in a copied legacy tree is not current Workstation work and
+must never be reported as verification of this repository.
+
+The product website is a separate repository. Do not add website source,
+website build output, or website release configuration here. This repository
+owns the official client configuration, packaging profiles, and client release
+workflows as well as all application behavior and tests. A private operations
+repository may trigger these workflows or hold deployment credentials,
+organization-specific policy, and internal binary artifacts, but it must never
+become a second application or owner of canonical client release logic.
+
 ## Before changing code
 
 - Use `pnpm` for repository commands.
 - Read `README.md` and the relevant document under `docs/` before editing that
   subsystem.
+- Verify the canonical checkout guard above before making the first edit or
+  running acceptance tests.
 - Read `docs/agent-testing.md` before writing or running tests.
 - Preserve user work and unrelated changes. Never publish, push, or create a
   public artifact without explicit authorization.
@@ -23,6 +42,9 @@ These rules are architecture constraints for this repository.
   agent scope, not merely a global workspace setting.
 - The community distribution is fully usable without hosted accounts,
   telemetry, or proprietary services.
+- Official, internal, community, and enterprise profiles use the same open
+  client capabilities. A subscription may authorize operated services; it must
+  not unlock a private client feature.
 - Distribution-specific endpoints and branding are injected through
   `product.json` overlays. Do not fork application behavior for a distribution.
 - Rich document engines are optional external integrations. The default
@@ -67,4 +89,3 @@ the real pinned submodule path in addition to unit coverage.
 
 Never claim an end-to-end path works from typechecking alone. Prove the actual
 boundary and report any platform or credential-dependent step that was not run.
-

@@ -5,7 +5,7 @@
  * - Socket creation, credential save queue, backup-before-save
  * - Message deduplication, group metadata caching
  * - Text extraction via Baileys internals (extract.ts)
- * - Reconnection with exponential backoff, Boom error formatting
+ * - Rust-owned reconnection with Boom error formatting
  *
  * Our own code (not from Open Claw):
  * - Chat list cache (chatStore) populated via `messaging-history.set`
@@ -25,7 +25,7 @@ import {
   fetchLatestBaileysVersion,
   makeCacheableSignalKeyStore,
   makeWASocket,
-  useMultiFileAuthState,
+  useLegacyMultiFileAuthState as useMultiFileAuthState,
   isJidGroup,
   type WASocket,
   type WAMessage,
@@ -55,8 +55,6 @@ let socket: WhatsAppSocket | null = null;
 let connectionState: 'disconnected' | 'connecting' | 'connected' = 'disconnected';
 let currentPhoneNumber: string | undefined;
 let connectedAtMs: number | undefined;
-let reconnectAttempts = 0;
-let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
 // In-memory stores populated by Baileys events
 const chatStore = new Map<string, CachedChat>();
@@ -350,36 +348,6 @@ function formatError(err: unknown): string {
 }
 
 // ============================================================================
-// Reconnection with exponential backoff
-// ============================================================================
-
-const MAX_RECONNECT_DELAY_MS = 60_000;
-const BASE_RECONNECT_DELAY_MS = 2_000;
-
-function scheduleReconnect(): void {
-  if (reconnectTimer) return;
-  const delay = Math.min(
-    BASE_RECONNECT_DELAY_MS * Math.pow(2, reconnectAttempts),
-    MAX_RECONNECT_DELAY_MS,
-  );
-  reconnectAttempts++;
-  console.log(`[WhatsApp] Reconnecting in ${delay}ms (attempt ${reconnectAttempts})`);
-  reconnectTimer = setTimeout(() => {
-    reconnectTimer = null;
-    initializeSocket().catch(err =>
-      console.error('[WhatsApp] Reconnection failed:', formatError(err))
-    );
-  }, delay);
-}
-
-function cancelReconnect(): void {
-  if (reconnectTimer) {
-    clearTimeout(reconnectTimer);
-    reconnectTimer = null;
-  }
-}
-
-// ============================================================================
 // Socket initialization
 // ============================================================================
 
@@ -427,10 +395,14 @@ export async function initializeSocket(): Promise<void> {
         connectionEvents.emit('qr', qr);
       }
 
+      if (connection === 'connecting') {
+        connectionState = 'connecting';
+        connectionEvents.emit('connecting');
+      }
+
       if (connection === 'open') {
         connectionState = 'connected';
         connectedAtMs = Date.now();
-        reconnectAttempts = 0; // Reset backoff on successful connection
         const me = sock.user;
         if (me?.id) {
           currentPhoneNumber = me.id.split('@')[0].split(':')[0];
@@ -452,9 +424,9 @@ export async function initializeSocket(): Promise<void> {
         };
 
         connectionState = 'disconnected';
-        socket = null;
 
         if (reason.isLoggedOut) {
+          socket = null;
           console.log('[WhatsApp] Logged out - clearing credentials');
           chatStore.clear();
           messageStore.length = 0;
@@ -466,7 +438,9 @@ export async function initializeSocket(): Promise<void> {
         } else {
           console.log('[WhatsApp] Disconnected:', formatError(lastDisconnect?.error));
           connectionEvents.emit('disconnected', reason);
-          scheduleReconnect();
+          // baileyrs reconnects the same Rust-backed socket internally. Keep
+          // this socket reference alive; creating a second one would race the
+          // engine and leak the first connection.
         }
       }
     } catch (err) {
@@ -793,10 +767,10 @@ export async function initializeSocket(): Promise<void> {
 // ============================================================================
 
 export async function disconnectSocket(): Promise<void> {
-  cancelReconnect();
   if (socket) {
     try {
-      socket.end(undefined);
+      socket.setAutoReconnect(false);
+      await socket.end(undefined);
     } catch {
       // Ignore close errors
     }
@@ -805,7 +779,6 @@ export async function disconnectSocket(): Promise<void> {
   connectionState = 'disconnected';
   currentPhoneNumber = undefined;
   connectedAtMs = undefined;
-  reconnectAttempts = 0;
   chatStore.clear();
   messageStore.length = 0;
   groupMetaCache.clear();
