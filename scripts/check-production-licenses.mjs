@@ -5,9 +5,11 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { resolveInventoryPath } from './release-license-cli.mjs';
+
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const policyPath = path.join(root, 'licenses', 'release-policy.json');
-const inventoryPath = process.argv[2] ? path.resolve(process.argv[2]) : null;
+const inventoryPath = resolveInventoryPath(process.argv.slice(2));
 
 function readInventory() {
   if (inventoryPath) {
