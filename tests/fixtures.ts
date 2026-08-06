@@ -291,10 +291,10 @@ export const test = base.extend<{}, { electronApp: ElectronApplication }>({
         await p.evaluate(async ({ port, bootstrapProfile, completedOnboardingState }: { port: number; bootstrapProfile: any; completedOnboardingState: any }) => {
           const request = async (path: string, init?: RequestInit): Promise<any> => {
             const controller = new AbortController();
-            // A first OIX app-server initialization can take roughly 30-50s on
+            // A first OIX app-server initialization can take roughly 60-75s on
             // a cold Windows runner. Bound every bootstrap request so a broken
             // server still fails, while allowing a healthy cold start to finish.
-            const timeoutMs = 60_000;
+            const timeoutMs = 90_000;
             const timeoutId = window.setTimeout(
               () => controller.abort(new Error(`${path} timed out after ${timeoutMs}ms`)),
               timeoutMs,

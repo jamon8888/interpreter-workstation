@@ -40,9 +40,9 @@ async function broadcastProfilesChanged(profileId: string | null): Promise<{
   return { defaultProfileId, fastProfileId };
 }
 
-async function ensureAutomaticClaudeCodeTerminalProfile(): Promise<void> {
-  const config = await configStore.loadConfigWithModelState();
-
+async function ensureAutomaticClaudeCodeTerminalProfile(
+  config: Awaited<ReturnType<typeof configStore.loadConfigWithModelState>>,
+): Promise<void> {
   if (!shouldEnsureAutomaticClaudeCodeTerminalProfile(config, true)) {
     return;
   }
@@ -55,7 +55,11 @@ async function ensureAutomaticClaudeCodeTerminalProfile(): Promise<void> {
   const autoProfile = buildAutomaticClaudeCodeTerminalProfile();
   config.profiles = [...(config.profiles ?? []), autoProfile];
   await configStore.saveConfig(config);
-  await broadcastProfilesChanged(autoProfile.id);
+  broadcastEvent('profiles:changed', {
+    defaultProfileId: config.defaultProfileId ?? null,
+    fastProfileId: config.fastProfileId ?? null,
+    profileId: autoProfile.id,
+  });
 }
 
 async function listProfilesInternal(): Promise<{
@@ -63,11 +67,16 @@ async function listProfilesInternal(): Promise<{
   defaultProfileId: string | null;
   fastProfileId: string | null;
 }> {
-  await ensureAutomaticClaudeCodeTerminalProfile();
-  const profiles = await configStore.getAllProfiles();
-  const defaultProfileId = await configStore.getDefaultProfileId();
-  const fastProfileId = await configStore.getFastProfileId();
-  return { profiles, defaultProfileId, fastProfileId };
+  // Profile listing is part of first-run onboarding and must not multiply a
+  // cold OIX config read. Load the merged model state once and derive the
+  // complete response from that same snapshot.
+  const config = await configStore.loadConfigWithModelState();
+  await ensureAutomaticClaudeCodeTerminalProfile(config);
+  return {
+    profiles: config.profiles ?? [],
+    defaultProfileId: config.defaultProfileId ?? null,
+    fastProfileId: config.fastProfileId ?? null,
+  };
 }
 
 export async function listProfiles(): Promise<{
