@@ -47,7 +47,14 @@ jobs:
       - name: Write checksums and release notes
         working-directory: dist
         run: |
-          shasum -a 256 "Interpreter Internal"*.dmg "Interpreter Internal"*.zip > SHA256SUMS
+          # GitHub normalizes spaces in release-asset filenames to periods.
+          # Rename them ourselves first so the checksum manifest names the
+          # exact files users download instead of the pre-upload build names.
+          for source in "Interpreter Internal"*.dmg "Interpreter Internal"*.zip; do
+            published="${source// /.}"
+            mv "$source" "$published"
+          done
+          shasum -a 256 Interpreter.Internal*.dmg Interpreter.Internal*.zip > SHA256SUMS
           cat > INTERNAL_RELEASE.md <<EOF
           Internal test build of the official Interpreter distribution.
 
@@ -70,8 +77,8 @@ jobs:
         with:
           name: interpreter-internal-macos-arm64
           path: |
-            dist/Interpreter Internal*.dmg
-            dist/Interpreter Internal*.zip
+            dist/Interpreter.Internal*.dmg
+            dist/Interpreter.Internal*.zip
             dist/SHA256SUMS
             dist/INTERNAL_RELEASE.md
           if-no-files-found: error
@@ -84,8 +91,8 @@ jobs:
           version=$(node -p "require('./package.json').internalVersion")
           tag="internal-v${version}-build.${GITHUB_RUN_NUMBER}"
           gh release create "$tag" \
-            dist/Interpreter\ Internal*.dmg \
-            dist/Interpreter\ Internal*.zip \
+            dist/Interpreter.Internal*.dmg \
+            dist/Interpreter.Internal*.zip \
             dist/SHA256SUMS \
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
@@ -101,8 +108,8 @@ jobs:
           version=$(node -p "require('./package.json').internalVersion")
           tag="internal-v${version}-build.${GITHUB_RUN_NUMBER}"
           gh release create "$tag" \
-            dist/Interpreter\ Internal*.dmg \
-            dist/Interpreter\ Internal*.zip \
+            dist/Interpreter.Internal*.dmg \
+            dist/Interpreter.Internal*.zip \
             dist/SHA256SUMS \
             --repo "$INTERNAL_RELEASE_REPOSITORY" \
             --title "Interpreter Internal v${version}" \
