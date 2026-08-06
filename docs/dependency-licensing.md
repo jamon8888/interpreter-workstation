@@ -33,15 +33,14 @@ Known items requiring explicit release review:
   Preserve the npm and upstream Rust notices and audit the shipped native/WASM
   artifacts at every bridge update, because the pnpm inventory does not inspect
   licenses embedded inside prebuilt binaries.
-- Platform packages matching `@img/sharp-libvips-*` appear in pnpm's
-  conservative production inventory as optional peer-platform packages. They
-  are accepted only at the reviewed 1.3.2 release under LGPL-3.0-or-later.
-  Every app packages the exact upstream component notices, LGPL/GPL text, and
-  corresponding-source link. Packaging also verifies the target artifact: the
-  current app does not bundle these development-only platform packages, and a
-  future artifact that does include one must keep its shared libraries
-  replaceable outside ASAR. CI fails if another LGPL package or version appears
-  without review.
+- Platform packages matching `@img/sharp-libvips-*` appear in two reviewed
+  places: optional 1.3.2 packages in pnpm's conservative app inventory and a
+  platform-specific 1.2.4 package in the generated browser-relay runtime. Both
+  are LGPL-3.0-or-later. Every app packages exact-version upstream component
+  notices, LGPL/GPL text, and corresponding-source links. Release checks inspect
+  both dependency trees and fail if another LGPL package or version appears
+  without review. Shared libraries remain dynamically loaded and replaceable
+  outside ASAR.
 - `buffers@0.1.1` omits license metadata in its npm tarball. The release policy
   resolves it to MIT using Debian's reviewed source record and upstream commit,
   and the complete MIT notice is packaged. Any additional `Unknown` entry fails

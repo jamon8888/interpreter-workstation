@@ -88,14 +88,16 @@ before replacing a managed skill. OIX separately owns and updates its embedded
 ## Distributions
 
 Product-specific hosted services are configuration, not a separate application.
-Use the distribution wrapper to build with a JSON overlay:
+The official hosted profile and its release configuration are public and live
+in `distribution/`; no private client fork is required. Use the distribution
+wrapper for an organization-specific JSON overlay:
 
 ```bash
 node scripts/with-distribution-config.mjs ./path/to/product.overlay.json -- pnpm run build
 ```
 
 See [Distribution builds](docs/distributions.md) for the schema, security
-boundary, and packaging model.
+boundary, privacy contract, and community/official/internal packaging model.
 
 ## Document workflows
 
@@ -119,6 +121,8 @@ Do not put credentials in product overlays or commit local `.env` files.
 ## License
 
 Interpreter Workstation is licensed under the [Apache License 2.0](LICENSE).
+Official-release provenance and use of project marks are described in
+[TRADEMARKS.md](TRADEMARKS.md).
 Pinned dependencies and submodules retain their own licenses and notices. Read
 [Dependency licensing](docs/dependency-licensing.md) and the reviewed
 [third-party notices](licenses/THIRD_PARTY_NOTICES.md) before distributing a

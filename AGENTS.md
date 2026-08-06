@@ -12,10 +12,12 @@ performed or tested in a copied legacy tree is not current Workstation work and
 must never be reported as verification of this repository.
 
 The product website is a separate repository. Do not add website source,
-website build output, or website release configuration here. Downstream product
-distributions should consume this repository as an immutable source revision
-and apply only configuration, branding, signing, and release overlays; all
-application behavior and tests remain here.
+website build output, or website release configuration here. This repository
+owns the official client configuration, packaging profiles, and client release
+workflows as well as all application behavior and tests. A private operations
+repository may trigger these workflows or hold deployment credentials,
+organization-specific policy, and internal binary artifacts, but it must never
+become a second application or owner of canonical client release logic.
 
 ## Before changing code
 
@@ -40,6 +42,9 @@ application behavior and tests remain here.
   agent scope, not merely a global workspace setting.
 - The community distribution is fully usable without hosted accounts,
   telemetry, or proprietary services.
+- Official, internal, community, and enterprise profiles use the same open
+  client capabilities. A subscription may authorize operated services; it must
+  not unlock a private client feature.
 - Distribution-specific endpoints and branding are injected through
   `product.json` overlays. Do not fork application behavior for a distribution.
 - Rich document engines are optional external integrations. The default

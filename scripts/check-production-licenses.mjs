@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -44,8 +44,26 @@ function flattenInventory(inventory) {
   });
 }
 
+function readRelayLibvipsPackages() {
+  const scopeDir = path.join(root, 'resources', 'browser-extension-relay', 'node_modules', '@img');
+  if (!existsSync(scopeDir)) return [];
+
+  return readdirSync(scopeDir, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory() && entry.name.startsWith('sharp-libvips-'))
+    .map((entry) => {
+      const manifestPath = path.join(scopeDir, entry.name, 'package.json');
+      const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+      return {
+        package: manifest.name,
+        version: manifest.version,
+        inventoryLicense: manifest.license,
+      };
+    });
+}
+
 const policy = JSON.parse(readFileSync(policyPath, 'utf8'));
 const entries = flattenInventory(readInventory());
+const relayLibvipsEntries = readRelayLibvipsPackages();
 const failures = [];
 
 for (const noticeFile of policy.noticeFiles) {
@@ -116,6 +134,28 @@ for (const entry of entries.filter((item) => /LGPL/i.test(item.inventoryLicense)
   }
 }
 
+for (const entry of relayLibvipsEntries) {
+  const family = policy.licenseFamilies.find(
+    (item) => wildcardMatches(item.packagePattern, entry.package) && item.version === entry.version,
+  );
+  if (!family) {
+    failures.push(
+      `bundled relay LGPL package has no release-family policy: ${entry.package}@${entry.version}`,
+    );
+    continue;
+  }
+  if (entry.inventoryLicense !== family.inventoryLicense) {
+    failures.push(
+      `bundled relay ${entry.package}@${entry.version} license drifted from ${family.inventoryLicense} to ${entry.inventoryLicense}`,
+    );
+  }
+  for (const required of [family.notice, family.licenseText, family.incorporatedLicenseText]) {
+    if (!existsSync(path.join(root, required))) {
+      failures.push(`missing bundled relay LGPL compliance file for ${entry.package}: ${required}`);
+    }
+  }
+}
+
 if (failures.length > 0) {
   console.error('[release-licenses] policy check failed:');
   for (const failure of failures) console.error(`- ${failure}`);
@@ -124,5 +164,6 @@ if (failures.length > 0) {
 
 console.log(
   `[release-licenses] policy check passed for ${entries.length} production package versions; ` +
-  `${policy.decisions.length} explicit selections/resolutions and ${policy.licenseFamilies.length} LGPL family reviewed`,
+  `${policy.decisions.length} explicit selections/resolutions, ${policy.licenseFamilies.length} LGPL families, ` +
+  `${relayLibvipsEntries.length} bundled relay LGPL package(s) reviewed`,
 );

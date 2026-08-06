@@ -8,6 +8,7 @@ import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 const {
   assertRequiredBundledResources,
+  assertBundledRelayLibvipsPolicy,
   copyWindowsRuntimeDlls,
   assertWindowsDelayLoadDlls,
   getMacExtraResourceBinariesForSigning,
@@ -40,6 +41,15 @@ const JS_REPL_RUNTIME_FILES = [
   'js-repl-runtime/kernel/kernel.cjs',
   'js-repl-runtime/kernel/meriyah.umd.min.cjs',
 ];
+const LICENSE_RESOURCE_FILES = [
+  'licenses/NOTICE',
+  'licenses/THIRD_PARTY_NOTICES.md',
+  'licenses/sharp-libvips-v1.2.4-THIRD-PARTY-NOTICES.md',
+  'licenses/sharp-libvips-v1.3.2-THIRD-PARTY-NOTICES.md',
+  'licenses/LGPL-3.0.txt',
+  'licenses/GPL-3.0.txt',
+  'licenses/release-policy.json',
+];
 
 function makeTempDir(): string {
   const dir = mkdtempSync(path.join(tmpdir(), 'after-pack-test-'));
@@ -50,6 +60,14 @@ function makeTempDir(): string {
 function writeFile(filePath: string): void {
   mkdirSync(path.dirname(filePath), { recursive: true });
   writeFileSync(filePath, 'ok');
+}
+
+function makePackagedResourcesRoot(): string {
+  const resourcesRoot = makeTempDir();
+  for (const relativePath of LICENSE_RESOURCE_FILES) {
+    writeFile(path.join(resourcesRoot, relativePath));
+  }
+  return resourcesRoot;
 }
 
 function writeValidSkillDoc(filePath: string): void {
@@ -100,7 +118,7 @@ describe('assertRequiredBundledResources', () => {
   }
 
   test('allows packaged mac app with bundled live relay runtime', () => {
-    const resourcesRoot = makeTempDir();
+    const resourcesRoot = makePackagedResourcesRoot();
 
     for (const relativePath of [
       ...OIX_UNIX_PACKAGE_FILES,
@@ -130,7 +148,7 @@ describe('assertRequiredBundledResources', () => {
   });
 
   test('allows packaged Windows app with bundled live relay runtime', () => {
-    const resourcesRoot = makeTempDir();
+    const resourcesRoot = makePackagedResourcesRoot();
 
     for (const relativePath of [
       ...OIX_WINDOWS_PACKAGE_FILES,
@@ -149,7 +167,7 @@ describe('assertRequiredBundledResources', () => {
   });
 
   test('fails when a packaged mac app omits pdfcpu', () => {
-    const resourcesRoot = makeTempDir();
+    const resourcesRoot = makePackagedResourcesRoot();
 
     for (const relativePath of [
       ...OIX_UNIX_PACKAGE_FILES,
@@ -178,7 +196,7 @@ describe('assertRequiredBundledResources', () => {
   });
 
   test('fails when a packaged mac app omits the unified interpreter binary', () => {
-    const resourcesRoot = makeTempDir();
+    const resourcesRoot = makePackagedResourcesRoot();
 
     for (const relativePath of [
       ...OIX_UNIX_PACKAGE_FILES.filter((entry) => entry !== 'oix/bin/interpreter'),
@@ -208,7 +226,7 @@ describe('assertRequiredBundledResources', () => {
   });
 
   test('fails when a packaged mac app omits relay runtime-manifest.json', () => {
-    const resourcesRoot = makeTempDir();
+    const resourcesRoot = makePackagedResourcesRoot();
 
     for (const relativePath of [
       ...OIX_UNIX_PACKAGE_FILES,
@@ -244,7 +262,7 @@ describe('assertRequiredBundledResources', () => {
   });
 
   test('fails when a packaged mac app still includes relay archive', () => {
-    const resourcesRoot = makeTempDir();
+    const resourcesRoot = makePackagedResourcesRoot();
 
     for (const relativePath of [
       ...OIX_UNIX_PACKAGE_FILES,
@@ -275,7 +293,7 @@ describe('assertRequiredBundledResources', () => {
   });
 
   test('fails when a packaged Windows app omits codex-windows-sandbox-setup.exe', () => {
-    const resourcesRoot = makeTempDir();
+    const resourcesRoot = makePackagedResourcesRoot();
 
     for (const relativePath of [
       ...OIX_WINDOWS_PACKAGE_FILES,
@@ -293,7 +311,7 @@ describe('assertRequiredBundledResources', () => {
   });
 
   test('fails when a packaged Linux app omits relay runtime', () => {
-    const resourcesRoot = makeTempDir();
+    const resourcesRoot = makePackagedResourcesRoot();
 
     for (const relativePath of [
       ...OIX_UNIX_PACKAGE_FILES,
@@ -310,7 +328,7 @@ describe('assertRequiredBundledResources', () => {
   });
 
   test('fails when a packaged non-mac app still includes relay archive', () => {
-    const resourcesRoot = makeTempDir();
+    const resourcesRoot = makePackagedResourcesRoot();
 
     for (const relativePath of [
       ...OIX_WINDOWS_PACKAGE_FILES,
@@ -328,6 +346,57 @@ describe('assertRequiredBundledResources', () => {
 
     expect(() => assertRequiredBundledResources(resourcesRoot, 'win32', 'x64')).toThrow(
       `[afterPack] Packaged app must not include a relay archive: ${path.join(resourcesRoot, 'browser-extension-relay.zip')}`,
+    );
+  });
+
+  test('fails when packaged third-party notices are missing', () => {
+    const resourcesRoot = makePackagedResourcesRoot();
+    rmSync(path.join(resourcesRoot, 'licenses', 'NOTICE'));
+
+    expect(() => assertRequiredBundledResources(resourcesRoot, 'darwin', 'arm64')).toThrow(
+      `[afterPack] Missing required bundled resource: ${path.join(resourcesRoot, 'licenses', 'NOTICE')}`,
+    );
+  });
+});
+
+describe('assertBundledRelayLibvipsPolicy', () => {
+  function writeRelayLibvipsFixture(resourcesRoot: string, version: string): void {
+    writeFileSync(
+      path.join(resourcesRoot, 'licenses', 'release-policy.json'),
+      JSON.stringify({
+        licenseFamilies: [{
+          packagePattern: '@img/sharp-libvips-*',
+          version: '1.2.4',
+          inventoryLicense: 'LGPL-3.0-or-later',
+          notice: 'licenses/sharp-libvips-v1.2.4-THIRD-PARTY-NOTICES.md',
+          licenseText: 'licenses/LGPL-3.0.txt',
+          incorporatedLicenseText: 'licenses/GPL-3.0.txt',
+        }],
+      }),
+    );
+    const manifestPath = path.join(
+      resourcesRoot,
+      'browser-extension-relay/node_modules/@img/sharp-libvips-darwin-arm64/package.json',
+    );
+    mkdirSync(path.dirname(manifestPath), { recursive: true });
+    writeFileSync(manifestPath, JSON.stringify({
+      name: '@img/sharp-libvips-darwin-arm64',
+      version,
+      license: 'LGPL-3.0-or-later',
+    }));
+  }
+
+  test('accepts an exact reviewed relay LGPL package', () => {
+    const resourcesRoot = makePackagedResourcesRoot();
+    writeRelayLibvipsFixture(resourcesRoot, '1.2.4');
+    expect(() => assertBundledRelayLibvipsPolicy(resourcesRoot)).not.toThrow();
+  });
+
+  test('rejects an unreviewed relay LGPL version', () => {
+    const resourcesRoot = makePackagedResourcesRoot();
+    writeRelayLibvipsFixture(resourcesRoot, '9.9.9');
+    expect(() => assertBundledRelayLibvipsPolicy(resourcesRoot)).toThrow(
+      'has no reviewed release policy',
     );
   });
 });

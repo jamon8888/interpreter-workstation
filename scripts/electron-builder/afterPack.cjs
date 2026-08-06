@@ -25,6 +25,49 @@ function copyDirectory(source, destination) {
   fs.cpSync(source, destination, { recursive: true });
 }
 
+function wildcardMatches(pattern, value) {
+  const escaped = pattern.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replaceAll('*', '.*');
+  return new RegExp(`^${escaped}$`).test(value);
+}
+
+function assertBundledRelayLibvipsPolicy(resourcesRoot) {
+  const scopeDir = path.join(resourcesRoot, 'browser-extension-relay', 'node_modules', '@img');
+  if (!fs.existsSync(scopeDir)) return;
+
+  const packageDirs = fs.readdirSync(scopeDir, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory() && entry.name.startsWith('sharp-libvips-'));
+  if (packageDirs.length === 0) return;
+
+  const policyPath = path.join(resourcesRoot, 'licenses', 'release-policy.json');
+  const policy = JSON.parse(fs.readFileSync(policyPath, 'utf8'));
+  for (const packageDir of packageDirs) {
+    const manifestPath = path.join(scopeDir, packageDir.name, 'package.json');
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+    const family = policy.licenseFamilies.find(
+      (item) => wildcardMatches(item.packagePattern, manifest.name) && item.version === manifest.version,
+    );
+    if (!family) {
+      throw new Error(
+        `[afterPack] Bundled relay LGPL package has no reviewed release policy: ${manifest.name}@${manifest.version}`,
+      );
+    }
+    if (manifest.license !== family.inventoryLicense) {
+      throw new Error(
+        `[afterPack] Bundled relay license drifted for ${manifest.name}@${manifest.version}: ${manifest.license}`,
+      );
+    }
+    for (const required of [family.notice, family.licenseText, family.incorporatedLicenseText]) {
+      const relativePath = required.replace(/^licenses\//, '');
+      if (!fs.existsSync(path.join(resourcesRoot, 'licenses', relativePath))) {
+        throw new Error(`[afterPack] Missing bundled relay LGPL compliance file: ${required}`);
+      }
+    }
+    console.log(
+      `[afterPack] Verified bundled relay LGPL policy: ${manifest.name}@${manifest.version}`,
+    );
+  }
+}
+
 function copyWindowsRuntimeDlls(targetDir) {
   const dllNames = [
     'vcruntime140.dll',
@@ -63,6 +106,7 @@ function getRequiredBundledResourcePaths(resourcesRoot, platform, arch) {
   const sharedResourcePaths = [
     path.join(resourcesRoot, 'licenses', 'NOTICE'),
     path.join(resourcesRoot, 'licenses', 'THIRD_PARTY_NOTICES.md'),
+    path.join(resourcesRoot, 'licenses', 'sharp-libvips-v1.2.4-THIRD-PARTY-NOTICES.md'),
     path.join(resourcesRoot, 'licenses', 'sharp-libvips-v1.3.2-THIRD-PARTY-NOTICES.md'),
     path.join(resourcesRoot, 'licenses', 'LGPL-3.0.txt'),
     path.join(resourcesRoot, 'licenses', 'GPL-3.0.txt'),
@@ -156,6 +200,7 @@ function assertRequiredBundledResources(resourcesRoot, platform, arch) {
   if (fs.existsSync(relayArchivePath)) {
     throw new Error(`[afterPack] Packaged app must not include a relay archive: ${relayArchivePath}`);
   }
+  assertBundledRelayLibvipsPolicy(resourcesRoot);
 }
 
 function getMacExtraResourceBinariesForSigning(resourcesRoot) {
@@ -408,6 +453,7 @@ async function afterPack(context) {
 
 module.exports = afterPack;
 module.exports.assertRequiredBundledResources = assertRequiredBundledResources;
+module.exports.assertBundledRelayLibvipsPolicy = assertBundledRelayLibvipsPolicy;
 module.exports.copyWindowsRuntimeDlls = copyWindowsRuntimeDlls;
 module.exports.assertWindowsDelayLoadDlls = assertWindowsDelayLoadDlls;
 module.exports.getMacExtraResourceBinariesForSigning = getMacExtraResourceBinariesForSigning;

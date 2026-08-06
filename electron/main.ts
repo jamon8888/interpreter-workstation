@@ -18,6 +18,7 @@ import {
   configureMainProcessSentryIntegrations,
   getMainProcessBeforeSendTelemetry,
   sanitizeCodexSentryEvent,
+  shouldSendSentryEvent,
 } from './utils/codexSentry';
 import {
   MAIN_PROCESS_SENTRY_IGNORE_ERRORS,
@@ -125,7 +126,17 @@ Sentry.init({
   getSessions: () => [session.defaultSession, session.fromPartition(WORKSTATION_PARTITION)],
   release: `interpreter-workstation@${app.getVersion()}`,
   ignoreErrors: MAIN_PROCESS_SENTRY_IGNORE_ERRORS,
-  beforeSend: (event, hint) => {
+  beforeSend: async (event, hint) => {
+    try {
+      const { getTelemetryEnabled } = await import('../server/configStore');
+      if (!shouldSendSentryEvent(await getTelemetryEnabled())) {
+        return null;
+      }
+    } catch {
+      // Error reporting must fail closed when consent state cannot be read.
+      return null;
+    }
+
     const sanitized = sanitizeCodexSentryEvent(event, hint);
     if (!sanitized) {
       return null;

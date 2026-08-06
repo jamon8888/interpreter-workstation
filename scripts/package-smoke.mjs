@@ -15,6 +15,7 @@ const PACKAGE_SMOKE_SENTRY_SENTINEL = '[package-smoke] sentry runtime ok';
 const REQUIRED_LICENSE_RESOURCES = [
   'NOTICE',
   'THIRD_PARTY_NOTICES.md',
+  'sharp-libvips-v1.2.4-THIRD-PARTY-NOTICES.md',
   'sharp-libvips-v1.3.2-THIRD-PARTY-NOTICES.md',
   'LGPL-3.0.txt',
   'GPL-3.0.txt',
