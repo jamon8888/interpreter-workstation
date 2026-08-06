@@ -28,6 +28,15 @@ export const TIMEOUTS = {
   long: 30000,      // 30 seconds
 };
 
+// A clean Windows runner can spend roughly 40 seconds creating the first main
+// renderer and another 60-75 seconds starting OIX for the first time. Keep the
+// individual window, request, and readiness deadlines below; this larger budget
+// only lets those independently bounded setup stages complete cumulatively.
+const PAGE_FIXTURE_TIMEOUT_MS = (
+  process.platform === 'win32'
+  && Boolean(process.env.CI || process.env.GITHUB_ACTIONS)
+) ? 180000 : 120000;
+
 /**
  * Pause error checking during test setup operations (like changing workspace).
  * Call resumeErrorChecking() after the operation completes and the app stabilizes.
@@ -566,7 +575,7 @@ export const test = base.extend<{}, { electronApp: ElectronApplication }>({
 
     // DON'T close the page - keep it open for next tests to reuse
     // Cleanup happens when Electron instance closes
-  }, { scope: 'test', timeout: 120000 }],
+  }, { scope: 'test', timeout: PAGE_FIXTURE_TIMEOUT_MS }],
 });
 
 export { expect } from '@playwright/test';
