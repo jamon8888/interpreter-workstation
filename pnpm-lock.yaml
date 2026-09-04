@@ -15,7 +15,7 @@ overrides:
   brace-expansion@>=5 <6: 5.0.9
   browserslist: 4.28.7
   exceljs>uuid: 11.1.1
-  fast-uri@<3.1.5: 3.1.5
+  fast-uri@<3.1.7: 3.1.7
   hono@<4.12.34: 4.12.34
   '@jimp/core>file-type': 21.3.4
   js-yaml@<4: 3.15.1
@@ -48,6 +48,18 @@ importers:
       '@base-ui/react':
         specifier: 1.3.0
         version: 1.3.0(@types/react@19.2.15)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
+      '@file-viewer/react':
+        specifier: 3.0.0
+        version: 3.0.0(react@19.2.6)
+      '@file-viewer/renderer-pptx':
+        specifier: 3.0.0
+        version: 3.0.0
+      '@file-viewer/renderer-spreadsheet':
+        specifier: 3.0.0
+        version: 3.0.0
+      '@file-viewer/renderer-word':
+        specifier: 3.0.0
+        version: 3.0.0
       '@modelcontextprotocol/sdk':
         specifier: 1.30.0
         version: 1.30.0(zod@4.1.12)
@@ -388,6 +400,9 @@ importers:
       '@electron/rebuild':
         specifier: 4.2.0
         version: 4.2.0
+      '@file-viewer/vite-plugin':
+        specifier: 3.0.0
+        version: 3.0.0(vite@8.2.0(@types/node@24.9.1)(esbuild@0.27.0)(jiti@2.7.0)(terser@5.46.0)(tsx@4.20.6))
       '@moonshine-ai/moonshine-js':
         specifier: 0.1.29
         version: 0.1.29
@@ -1433,6 +1448,37 @@ packages:
   '@fast-csv/parse@4.3.6':
     resolution: {integrity: sha512-uRsLYksqpbDmWaSmzvJcuApSEe38+6NQZBUsuAyMZKqHxH0g1wcJgsKUvN3WC8tewaqFjBMMGrkHmC+T7k8LvA==}
 
+  '@file-viewer/core@3.0.0':
+    resolution: {integrity: sha512-2yf2KAjrCAFQtzcX+O8kKPLQcNxuacsKHkZNllwRky9xegsHgj10EO1jPVJaH0TF9D44LSzS4AoC6Brg4wCX8g==}
+
+  '@file-viewer/doc@3.0.0':
+    resolution: {integrity: sha512-vuGQS7CwyVNpTy5lkOeH6rBwq29Eyl5BSsqoF9aXhWN+sCt/oKpS6U5MQjsbVV6dE5YvM+woHQJj7TklK63VuQ==}
+
+  '@file-viewer/docx@0.3.28':
+    resolution: {integrity: sha512-EKi7TnQpHGkZX285ACHwLeu7pGKRSO4TXmIBQ0BNSLtBJRf0IoffLEut981qGgyvLfuXvJLoi6JoCh2xB6qMQA==}
+
+  '@file-viewer/pptx@3.0.0':
+    resolution: {integrity: sha512-6ZpVkC8wRFA7fkGK8I3ohfxh7/c6nl2Im+SM7a9jlVgoPA5fEA3SMB8f5StK/HbJzNPlRH/O+lExOJY8cZrpww==}
+
+  '@file-viewer/react@3.0.0':
+    resolution: {integrity: sha512-483TZMmYbf67FiXJnsk742/5UI5e0y3kX9245rruydznwV7+lkJ3LdcMX1L46geCa7Q6THd/HWm9ccvt1PkX/g==}
+    peerDependencies:
+      react: '>=17 <20'
+
+  '@file-viewer/renderer-pptx@3.0.0':
+    resolution: {integrity: sha512-crzBqog20MKhPIPpw/OetS9NmUTTfKt7MJG/cvL7rdJWpoHsyTojd2SqhrP3hvdoQx+IVKp6+qypmVW8FpgCtw==}
+
+  '@file-viewer/renderer-spreadsheet@3.0.0':
+    resolution: {integrity: sha512-uEx/+F8T2NybC9q5hnZcMtzRGSgvyAy/dcVSdzhlUEvrI78za+QGwmGjjXt3DOr7z+kSlxakNrLrwlzqeTVAgg==}
+
+  '@file-viewer/renderer-word@3.0.0':
+    resolution: {integrity: sha512-1udx8S6IfMbc6LBAxg3u1eKQV6qJVLqU6vsv5QczjElCgTEU/M1ON5OqFyiymw7/PHtQSnRNZ6tUr+9rNV79DA==}
+
+  '@file-viewer/vite-plugin@3.0.0':
+    resolution: {integrity: sha512-Nh/yNhhHhIr/FqzodmJRKqLOEzoKJcpC6Kv+9TddayPoxC84R5Kra22RqDBWzn0vybxU126zpWmmBPzyZkC2wA==}
+    peerDependencies:
+      vite: '>=5 <9'
+
   '@floating-ui/core@1.7.5':
     resolution: {integrity: sha512-1Ih4WTWyw0+lKyFMcBHGbb5U5FtuHJuujoyyr5zTaWS5EYMeT6Jb2AuDeftsCsEuchO+mM2ij5+q9crhydzLhQ==}
 
@@ -2044,19 +2090,16 @@ packages:
   '@nut-tree-fork/libnut-darwin@2.7.5':
     resolution: {integrity: sha512-LbqtPtMPTJUcg4XoPP2jsU1wc8flBcGyKTerKsIfK9cD7nBHROnO0QksbrsbSWEpLym8T8fRtuU7XEY83l6Z2Q==}
     engines: {node: '>=10.15.3'}
-    cpu: [x64, arm64]
     os: [darwin, linux, win32]
 
   '@nut-tree-fork/libnut-linux@2.7.5':
     resolution: {integrity: sha512-uxaXEcRKnFObAljsoR6tLOBUU1dJ2sctloG6gFgCBGN7+k6Jdv6jZfOuNjd/fpdq2C5WPMm0rtn9EE7h5J3Jcg==}
     engines: {node: '>=10.15.3'}
-    cpu: [x64, arm64]
     os: [darwin, linux, win32]
 
   '@nut-tree-fork/libnut-win32@2.7.5':
     resolution: {integrity: sha512-yqC87zvmFcDPwFrRU40DYhN0xmEVM3aSkOuyF0IX+y1x+HWSu/i0PNklATpPBhGid3QVb/TOHuVoaraMrUFCNw==}
     engines: {node: '>=10.15.3'}
-    cpu: [x64, arm64]
     os: [darwin, linux, win32]
 
   '@nut-tree-fork/libnut@4.2.6':
@@ -2070,7 +2113,6 @@ packages:
   '@nut-tree-fork/nut-js@4.2.6':
     resolution: {integrity: sha512-aI/WCX7gE1HFGPH3EZP/UWqpNMM1NMoM/EkXqp7pKMgXFCi8e5+o5p+jd/QOYpmALv9bQg7+s69nI7FONbMqDg==}
     engines: {node: '>=16'}
-    cpu: [x64, arm64]
     os: [linux, darwin, win32]
 
   '@nut-tree-fork/provider-interfaces@4.2.6':
@@ -4169,6 +4211,9 @@ packages:
   '@types/supertest@7.2.0':
     resolution: {integrity: sha512-uh2Lv57xvggst6lCqNdFAmDSvoMG7M/HDtX4iUCquxQ5EGPtaPM5PL5Hmi7LCvOG8db7YaCPNJEeoI8s/WzIQw==}
 
+  '@types/trusted-types@2.0.7':
+    resolution: {integrity: sha512-ScaPdn1dQczgbl0QFTeTOmVHFULt394XJgOQNoyVhZ6r2vLnMLJfBPd53SB52T/3G36VI1/g2MZaX0cwDuXsfw==}
+
   '@types/unist@2.0.11':
     resolution: {integrity: sha512-CmBKiL6NNo/OqgmMn95Fk9Whlp2mtvIv+KNpQKN2F4SjvrEesubTRWGYSg+BnWZOnlCaSTU1sMpsBOzgbYhnsA==}
 
@@ -4281,6 +4326,10 @@ packages:
   '@xmldom/xmldom@0.8.13':
     resolution: {integrity: sha512-KRYzxepc14G/CEpEGc3Yn+JKaAeT63smlDr+vjB8jRfgTBBI9wRj/nkQEO+ucV8p8I9bfKLWp37uHgFrbntPvw==}
     engines: {node: '>=10.0.0'}
+
+  '@xmldom/xmldom@0.9.12':
+    resolution: {integrity: sha512-5AXjrcMClTryPe9LgZrygpB1lj7s0S9E0+W+AHaVKAVyHanafK86iPSvG5xHVSp/jC+VH1UXu0TAEmY279xH7A==}
+    engines: {node: '>=14.6'}
 
   '@xterm/addon-canvas@0.7.0':
     resolution: {integrity: sha512-LF5LYcfvefJuJ7QotNRdRSPc9YASAVDeoT5uyXS/nZshZXjYplGXRECBGiznwvhNL2I8bq1Lf5MzRwstsYQ2Iw==}
@@ -5177,6 +5226,12 @@ packages:
   dom-walk@0.1.2:
     resolution: {integrity: sha512-6QvTW9mrGeIegrFXdtQi9pk7O/nSK6lSdXW2eqUspN5LWD7UTji2Fqw5V2YLjBpHEoU9Xl/eUWNpDeZvoyOv2w==}
 
+  dompurify@3.4.13:
+    resolution: {integrity: sha512-2vmYIoqjze2d+kakP8S/nS5shfsl587kzwEjcGlTdiksUVgFHnFCsLYDVj/JNqJVOQZGSYBTmuycv0PodwmnMQ==}
+
+  dompurify@3.4.14:
+    resolution: {integrity: sha512-dVoH9z+MY+C9IilgGCk3YfFqjLi3fChm2OiKJMzh6axrJ5qwxqWaZamgmHrpv22CN/KdbZJuGEGgfQoL00LTdg==}
+
   dot-case@3.0.4:
     resolution: {integrity: sha512-Kv5nKlh6yRrdrGvxeJ2e5y2eRUpkUosIW4A2AS38zwSz27zu7ufDwQPi5Jhs3XAlGNetl3bmnGhQsMtkKJnj3w==}
 
@@ -5209,6 +5264,9 @@ packages:
 
   duplexer2@0.1.4:
     resolution: {integrity: sha512-asLFVfWWtJ90ZyOUHMqk7/S2w2guQKxUI2itj3d92ADHhxUSbCMGi1f1cBcJ7xM1To+pE/Khbwo1yuNbMEPKeA==}
+
+  e-virt-table@1.3.26:
+    resolution: {integrity: sha512-STKVxs/nGfmhilrJ0HDWSUHmSYmJPWurheolZ9Lgm8NIK/pZSv9muYR0F/C0UdkaWIixOGuS3Ye/seZ/buttCA==}
 
   eastasianwidth@0.2.0:
     resolution: {integrity: sha512-I88TYZWc9XiYHRQ4/3c5rjjfgkjhLyW2luGIheGERbNQ6OY7yTybanSpDXZa8y7VUP9YmDcYa+eyq4ca7iLqWA==}
@@ -5555,8 +5613,8 @@ packages:
   fast-safe-stringify@2.1.1:
     resolution: {integrity: sha512-W+KJc2dmILlPplD/H4K9l9LcAHAfPtP6BY84uVLXQ6Evcz9Lcg33Y2z1IVblT6xdY54PXYVHEv+0Wpq8Io6zkA==}
 
-  fast-uri@3.1.5:
-    resolution: {integrity: sha512-gHwA1O9LDIcKunMKhObS/HimwtehO1nPUECKAu5TpKgaO19fcWEl4bliWe1jWxVFvIXztJjjQ4L8XQ1EU9f7Jw==}
+  fast-uri@3.1.7:
+    resolution: {integrity: sha512-dOvZVzjdZdz7phd9v6jCbwxrBW3fK6n8Rc0CtdmM4bumzMnxywBYhuph6J819RRw/ku+rLbelwfMunktuzVVHg==}
 
   fast-xml-builder@1.3.0:
     resolution: {integrity: sha512-F74cZEdCvuw9P41GAC3rod4X04jjWGM1JPEv/GWSqFTWLsdyMSBMBMlm9Hk3GLBgLBbdBNY8yee0pQh2RBVESQ==}
@@ -8269,6 +8327,11 @@ packages:
   style-to-object@1.0.14:
     resolution: {integrity: sha512-LIN7rULI0jBscWQYaSswptyderlarFkjQ+t79nzty8tcIAceVomEVlLzH5VP4Cmsv6MtKhs7qaAiwlcp+Mgaxw==}
 
+  styled-exceljs@0.21.4:
+    resolution: {integrity: sha512-oUoAJZmTG6+tyIKb7or9fOL/RI2lYtQj0++MboozfhaXErNkIhYTM0O+0zAJ+ZRavk9f2n+FARepUd08CDY9XA==}
+    engines: {node: '>=0.8'}
+    hasBin: true
+
   sumchecker@3.0.1:
     resolution: {integrity: sha512-MvjXzkz/BOfyVDkG0oFOtBxHX2u3gKbMHIF/dXblZsgD3BWOFLmHovIpZY7BykJdAjcqRCBi1WYBNdEC9yI7vg==}
     engines: {node: '>= 8.0'}
@@ -8642,6 +8705,9 @@ packages:
 
   utif2@4.1.0:
     resolution: {integrity: sha512-+oknB9FHrJ7oW7A2WZYajOcv4FcDR4CfoGB0dPNfxbi4GO05RRnFmt5oa23+9w32EanrYcSJWspUiJkLMs+37w==}
+
+  utif@3.1.0:
+    resolution: {integrity: sha512-WEo4D/xOvFW53K5f5QTaTbbiORcm2/pCL9P6qmJnup+17eYfKaEhDeX9PeQkuyEoIxlbGklDuGl8xwuXYMrrXQ==}
 
   util-deprecate@1.0.2:
     resolution: {integrity: sha512-EPD5q1uXyFxJpCrLnCc1nHnq3gOa6DZBocAIiI2TaSCA7VCJ1UJDMagCzIkXNsUYfD1daK//LTEQ8xiIbrHtcw==}
@@ -9831,6 +9897,57 @@ snapshots:
       lodash.isnil: 4.0.0
       lodash.isundefined: 3.0.1
       lodash.uniq: 4.5.0
+
+  '@file-viewer/core@3.0.0':
+    dependencies:
+      dompurify: 3.4.13
+
+  '@file-viewer/doc@3.0.0':
+    dependencies:
+      dompurify: 3.4.14
+
+  '@file-viewer/docx@0.3.28':
+    dependencies:
+      jszip: 3.10.1
+
+  '@file-viewer/pptx@3.0.0':
+    dependencies:
+      dingbat-to-unicode: 1.0.1
+      dompurify: 3.4.14
+      jszip: 3.10.1
+      tinycolor2: 1.6.0
+      utif: 3.1.0
+
+  '@file-viewer/react@3.0.0(react@19.2.6)':
+    dependencies:
+      '@file-viewer/core': 3.0.0
+      react: 19.2.6
+
+  '@file-viewer/renderer-pptx@3.0.0':
+    dependencies:
+      '@file-viewer/core': 3.0.0
+      '@file-viewer/pptx': 3.0.0
+
+  '@file-viewer/renderer-spreadsheet@3.0.0':
+    dependencies:
+      '@file-viewer/core': 3.0.0
+      '@xmldom/xmldom': 0.9.12
+      e-virt-table: 1.3.26
+      jszip: 3.10.1
+      styled-exceljs: 0.21.4
+      tinycolor2: 1.6.0
+      utif: 3.1.0
+
+  '@file-viewer/renderer-word@3.0.0':
+    dependencies:
+      '@file-viewer/core': 3.0.0
+      '@file-viewer/doc': 3.0.0
+      '@file-viewer/docx': 0.3.28
+      jszip: 3.10.1
+
+  '@file-viewer/vite-plugin@3.0.0(vite@8.2.0(@types/node@24.9.1)(esbuild@0.27.0)(jiti@2.7.0)(terser@5.46.0)(tsx@4.20.6))':
+    dependencies:
+      vite: 8.2.0(@types/node@24.9.1)(esbuild@0.27.0)(jiti@2.7.0)(terser@5.46.0)(tsx@4.20.6)
 
   '@floating-ui/core@1.7.5':
     dependencies:
@@ -12764,6 +12881,9 @@ snapshots:
       '@types/methods': 1.1.4
       '@types/superagent': 8.1.9
 
+  '@types/trusted-types@2.0.7':
+    optional: true
+
   '@types/unist@2.0.11': {}
 
   '@types/unist@3.0.3': {}
@@ -12913,6 +13033,8 @@ snapshots:
 
   '@xmldom/xmldom@0.8.13': {}
 
+  '@xmldom/xmldom@0.9.12': {}
+
   '@xterm/addon-canvas@0.7.0(@xterm/xterm@6.0.0)':
     dependencies:
       '@xterm/xterm': 6.0.0
@@ -12998,7 +13120,7 @@ snapshots:
   ajv@8.18.0:
     dependencies:
       fast-deep-equal: 3.1.3
-      fast-uri: 3.1.5
+      fast-uri: 3.1.7
       json-schema-traverse: 1.0.0
       require-from-string: 2.0.2
 
@@ -13802,6 +13924,14 @@ snapshots:
 
   dom-walk@0.1.2: {}
 
+  dompurify@3.4.13:
+    optionalDependencies:
+      '@types/trusted-types': 2.0.7
+
+  dompurify@3.4.14:
+    optionalDependencies:
+      '@types/trusted-types': 2.0.7
+
   dot-case@3.0.4:
     dependencies:
       no-case: 3.0.4
@@ -13834,6 +13964,10 @@ snapshots:
   duplexer2@0.1.4:
     dependencies:
       readable-stream: 2.3.8
+
+  e-virt-table@1.3.26:
+    dependencies:
+      '@floating-ui/dom': 1.7.6
 
   eastasianwidth@0.2.0: {}
 
@@ -14394,7 +14528,7 @@ snapshots:
 
   fast-safe-stringify@2.1.1: {}
 
-  fast-uri@3.1.5: {}
+  fast-uri@3.1.7: {}
 
   fast-xml-builder@1.3.0:
     dependencies:
@@ -17522,6 +17656,8 @@ snapshots:
     dependencies:
       inline-style-parser: 0.2.7
 
+  styled-exceljs@0.21.4: {}
+
   sumchecker@3.0.1:
     dependencies:
       debug: 4.4.3
@@ -17918,6 +18054,10 @@ snapshots:
   utf8-byte-length@1.0.5: {}
 
   utif2@4.1.0:
+    dependencies:
+      pako: 1.0.11
+
+  utif@3.1.0:
     dependencies:
       pako: 1.0.11
 

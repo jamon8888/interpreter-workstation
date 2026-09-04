@@ -2,6 +2,7 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { sentryVitePlugin } from "@sentry/vite-plugin";
+import { fileViewerRenderers } from '@file-viewer/vite-plugin';
 import path from "node:path";
 
 const reactCompilerPanicThreshold = process.env.REACT_COMPILER_PANIC_THRESHOLD ?? 'none';
@@ -25,6 +26,13 @@ export default defineConfig(() => {
         },
       }),
       tailwindcss(),
+      // Self-host File Viewer workers, fonts, and vendor assets in Electron.
+      fileViewerRenderers({
+        // Keep the offline asset plan limited to the explicitly installed OSS
+        // renderers. Binary .ppt uses a separate runtime and is not included.
+        formats: ['docx', 'xlsx', 'pptx'],
+        copyAssets: true,
+      }),
       sentryVitePlugin({
         org: 'open-interpreter',
         project: 'electron',
