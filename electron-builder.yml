@@ -30,6 +30,8 @@ asarUnpack:
   - "**/*.dylib"
 
 extraResources:
+  - from: node_modules/@jamon8888/basemind-fork/bin
+    to: basemind/bin
   - from: resources/smart-turn
     to: smart-turn
   - from: resources/js-repl-runtime/package.json
