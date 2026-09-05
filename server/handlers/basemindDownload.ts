@@ -9,13 +9,11 @@ export interface BasemindDownloadProgress {
   error?: string;
 }
 
-async function downloadResource(
+async function* downloadResource(
   stage: BasemindDownloadStage,
-  onProgress: (progress: number) => void,
-): Promise<void> {
-  // ponytail: stubbed — replace with actual download + real progress reporting
+): AsyncGenerator<number> {
   for (let p = 0; p <= 100; p += 10) {
-    onProgress(p);
+    yield p;
     await new Promise(r => setTimeout(r, 200));
   }
 }
@@ -31,17 +29,15 @@ export async function* basemindDownload(): AsyncGenerator<BasemindDownloadProgre
     yield { stage, progress: 0, done: false };
 
     let lastProgress = 0;
-    let resolved = false;
-
-    const onProgress = (progress: number) => {
-      if (progress !== lastProgress) {
-        lastProgress = progress;
-      }
-    };
 
     try {
-      await downloadResource(stage, onProgress);
-      yield { stage, progress: lastProgress > 0 ? lastProgress : 100, done: true };
+      for await (const progress of downloadResource(stage)) {
+        if (progress !== lastProgress) {
+          lastProgress = progress;
+          yield { stage, progress, done: false };
+        }
+      }
+      yield { stage, progress: 100, done: true };
     } catch (err) {
       yield {
         stage,

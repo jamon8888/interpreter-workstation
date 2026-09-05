@@ -15,7 +15,7 @@ export function useIndexingStatus() {
   const prevIndexingRef = useRef(false);
   const prevFileCountRef = useRef(0);
   const readyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const { toast } = useToast();
+  const { showToast, dismissToast } = useToast();
 
   const refresh = useCallback(async () => {
     try {
@@ -29,30 +29,28 @@ export function useIndexingStatus() {
       if (wasIndexing && !s.indexing && prevFileCount > 0) {
         setShowReady(true);
         readyTimerRef.current = setTimeout(() => setShowReady(false), READY_DISPLAY_MS);
-        toast.dismiss('basemind-indexing');
+        dismissToast('basemind-indexing');
       }
 
       if (!wasIndexing && s.indexing && s.fileCount >= LARGE_OP_THRESHOLD) {
-        toast({
-          variant: 'default',
-          title: t('basemind.indexing.progress', { count: s.fileCount }),
-          duration: 0,
-          id: 'basemind-indexing',
-        });
+        showToast(
+          t('basemind.indexing.progress', { count: s.fileCount }),
+          'info',
+          0,
+        );
       }
 
       if (!wasIndexing && s.indexing && s.fileCount > 0 && s.fileCount < LARGE_OP_THRESHOLD) {
-        toast({
-          variant: 'default',
-          title: t('basemind.indexing.progress', { count: s.fileCount }),
-          duration: 2000,
-          id: 'basemind-indexing-small',
-        });
+        showToast(
+          t('basemind.indexing.progress', { count: s.fileCount }),
+          'info',
+          2000,
+        );
       }
     } catch {
       // silently ignore
     }
-  }, [toast, t]);
+  }, [showToast, dismissToast, t]);
 
   useEffect(() => {
     refresh();
