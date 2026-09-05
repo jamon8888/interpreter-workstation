@@ -16,6 +16,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../utils/supabase/client';
 import { useInterpreterTokenUsage } from '../hooks/useInterpreterTokenUsage';
 import { ExpensiveModelBadge, UsageRemainingBadge } from './ModelSignalBadges';
+import { ModelPrivacyHint } from '../../agent/components/ModelPrivacyHint';
 import {
   LOW_USAGE_PERCENT_THRESHOLD,
   formatRemainingPercentLabel,
@@ -45,6 +46,8 @@ interface ProfileCardGridProps {
   onDeleteProfile?: (profileId: string) => void;
   /** Profile currently awaiting delete confirmation */
   confirmingDeleteProfileId?: string | null;
+  /** Show privacy hint (PII redacted) on each profile row in compact mode */
+  showPrivacyHint?: boolean;
 }
 
 const PROVIDER_ICONS: Record<string, React.ReactNode> = {
@@ -126,6 +129,7 @@ export function ProfileCardGrid({
   compactFooterLabel,
   onDeleteProfile,
   confirmingDeleteProfileId = null,
+  showPrivacyHint = false,
 }: ProfileCardGridProps) {
   const { t } = useTranslation();
   const { user, isAuthenticated } = useAuth();
@@ -226,6 +230,9 @@ export function ProfileCardGrid({
                     <span className="inline-block size-1.5 rounded-full bg-green-500 shrink-0" />
                   )}
                   <span className="truncate">{subtitle}</span>
+                  {showPrivacyHint && (
+                    <ModelPrivacyHint provider={profile.provider} className="shrink-0" />
+                  )}
                 </div>
               </div>
               <div className="ml-3 flex shrink-0 items-center gap-2">

@@ -38,6 +38,7 @@ export interface UserChoices {
   telemetryEnabled: boolean | null;
   bucket: OnboardingBucket | null;
   email: string;
+  basemindSetupComplete?: boolean;
 }
 
 export type NavigationDirection = 'forward' | 'backward';

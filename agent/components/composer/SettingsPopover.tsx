@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ChevronDown } from 'lucide-react';
 import { AgentModelConfig } from '../../../shared/types/model';
+import { PrivacyShieldBadge } from '../PrivacyShieldBadge';
 import type { Profile } from '../../../shared/types/profile';
 import {
   getTerminalAgentFromProfile,
@@ -309,6 +310,7 @@ export function SettingsPopover({
   );
   const selectedProfileId = matchingProfile?.id ?? modelConfig.profileId ?? null;
   const currentProfileLabel = matchingProfile?.name ?? (allProfiles.length > 0 ? 'Custom Agent' : 'Profile');
+  const currentProvider = resolveRuntimeModelProviderFromModelConfig(modelConfig);
   const lowUsageLabel = useMemo(() => {
     if (percentRemaining === null || percentRemaining >= LOW_USAGE_PERCENT_THRESHOLD) return null;
     return `${formatRemainingPercentLabel(percentRemaining)} left`;
@@ -582,6 +584,7 @@ export function SettingsPopover({
                 onPreviewVisibilityChange={setIsShortcutWheelVisible}
                 className="shrink-0"
               />
+              <PrivacyShieldBadge modelProvider={currentProvider} />
               <ChevronDown className={`size-3.5 shrink-0 transition-transform duration-150 ${isOpen ? 'rotate-180' : ''}`} />
             </ComposerSecondaryButton>
           </PopoverTrigger>
@@ -606,6 +609,7 @@ export function SettingsPopover({
           getCompactActionLabel={getCompactActionLabel}
           onNavigateToSettings={handleNavigateToSettings}
           onClose={() => setIsOpen(false)}
+          showPrivacyHint={true}
         >
           {reasoningCapability && displayedReasoningEffort ? (
             <div

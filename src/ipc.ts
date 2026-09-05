@@ -79,20 +79,6 @@ import {
   marketingDemoWindowIpc,
   marketingDemoWorkspaceIpc,
 } from './demo/marketingDemo';
-import {
-  getRemoteWorkstationFileUrl,
-  isRemoteWorkstationMode,
-  remoteWorkstationFilesIpc,
-  remoteWorkstationWorkspaceIpc,
-} from './remote/remoteWorkstation';
-import {
-  getBrowserWorkstationStorageKey,
-  getWorkstationApiBaseUrl,
-  isRemoteWorkstationHost,
-  isWorkstationReadOnly,
-  resolveWorkstationApiUrl,
-  workstationFetch,
-} from './remote/workstationConnection';
 
 // ============================================================================
 // Mode Detection
@@ -176,9 +162,7 @@ function initSSE(): void {
   if (sseConnection || isElectron || isMarketingDemoMode()) return;
 
   console.log('[IPC] Initializing SSE connection');
-  sseConnection = new EventSource(resolveWorkstationApiUrl('/api/events'), {
-    withCredentials: true,
-  });
+  sseConnection = new EventSource('/api/events');
 
   sseConnection.onopen = () => {
     console.log('[IPC] SSE connected');
@@ -247,7 +231,7 @@ async function httpCall<T = unknown>(
   method: string,
   args: unknown[]
 ): Promise<T> {
-  const response = await workstationFetch(`/api/ipc/${namespace}/${method}`, {
+  const response = await fetch(`/api/ipc/${namespace}/${method}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(args),
@@ -269,9 +253,6 @@ async function browserOpenFolderDialog(): Promise<{
   canceled: boolean;
   filePaths: string[];
 }> {
-  if (isRemoteWorkstationHost()) {
-    return { canceled: true, filePaths: [] };
-  }
   // Use File System Access API if available
   if ('showDirectoryPicker' in window) {
     try {
@@ -629,6 +610,36 @@ interface VaultIpc {
   searchNotes(request: { query: string; limit?: number }): Promise<{ results: VaultSearchResult[] }>;
 }
 
+export interface WorkspaceScanStatus {
+  redactionActive: boolean;
+  indexing: boolean;
+  fileCount: number;
+  lastScanAt: string | null;
+  xbergAvailable: boolean;
+  basemindAvailable: boolean;
+  resourcesReady: {
+    nerModel: boolean;
+    embeddings: boolean;
+    reranker: boolean;
+  };
+}
+
+interface WorkspaceScanIpc {
+  status(): Promise<WorkspaceScanStatus>;
+}
+
+interface BasemindDownloadResult {
+  stages: Array<{ stage: string; success: boolean; error?: string }>;
+  success: boolean;
+}
+
+interface BasemindIpc {
+  register(): Promise<{ serverId: string }>;
+  unregister(): Promise<{ success: boolean }>;
+  status(): Promise<{ status: string }>;
+  download(): Promise<BasemindDownloadResult>;
+}
+
 interface ProjectRunnerIpc {
   start(projectPath: string): Promise<{ success: boolean; state: ProjectRunnerState; error?: string }>;
   stop(projectPath: string): Promise<{ success: boolean; state: ProjectRunnerState; error?: string }>;
@@ -662,24 +673,6 @@ const disabledAgentThreadsIpc: AgentThreadsIpc = {
   },
 };
 
-const READ_ONLY_AGENT_TAB_MUTATIONS = new Set([
-  'created',
-  'completed',
-  'consumeStartup',
-  'registerThread',
-  'reportActivity',
-  'disposeBinding',
-]);
-
-const readOnlyAgentTabsIpc = new Proxy(client.agentTabs, {
-  get(target, method: string | symbol) {
-    if (typeof method === 'string' && READ_ONLY_AGENT_TAB_MUTATIONS.has(method)) {
-      return async () => ({ success: true });
-    }
-    return Reflect.get(target, method);
-  },
-});
-
 // ============================================================================
 // Exported Namespaces
 // ============================================================================
@@ -691,18 +684,20 @@ export const runtime: RuntimeIpc = isMarketingDemoMode()
     onRestarted: () => NOOP_UNSUBSCRIBE,
   }
   : client.runtime;
-export const agentTabs = isMarketingDemoMode()
-  ? marketingDemoAgentTabsIpc
-  : isWorkstationReadOnly() ? readOnlyAgentTabsIpc : client.agentTabs;
+export const agentTabs = isMarketingDemoMode() ? marketingDemoAgentTabsIpc : client.agentTabs;
 export const agentThreads: AgentThreadsIpc = isMarketingDemoMode()
   ? disabledAgentThreadsIpc
   : isElectron
     ? window.electron.agentThreads
     : disabledAgentThreadsIpc;
-export const workspace = isRemoteWorkstationMode()
-  ? remoteWorkstationWorkspaceIpc
-  : isMarketingDemoMode() ? marketingDemoWorkspaceIpc : client.workspace;
+export const workspace = isMarketingDemoMode() ? marketingDemoWorkspaceIpc : client.workspace;
 export const vault: VaultIpc = isMarketingDemoMode() ? marketingDemoVaultIpc : client.vault;
+export const workspaceScan: WorkspaceScanIpc = isMarketingDemoMode()
+  ? { status: async () => { throw new Error('Not available in demo mode'); } }
+  : (client.workspaceScan as WorkspaceScanIpc);
+export const basemind: BasemindIpc = isMarketingDemoMode()
+  ? { register: async () => { throw new Error('Not available in demo mode'); }, unregister: async () => { throw new Error('Not available in demo mode'); }, status: async () => { throw new Error('Not available in demo mode'); }, download: async () => { throw new Error('Not available in demo mode'); } }
+  : (client.basemind as BasemindIpc);
 export const setup = client.setup;
 export const computerUseSetup: ComputerUseSetupIpc = {
   onRequested: (callback) => client.computerUseSetup.onRequested(callback),
@@ -741,9 +736,7 @@ export const settings = client.settings;
 export const servers = isMarketingDemoMode() ? marketingDemoServersIpc : client.servers;
 export const pdf = isMarketingDemoMode() ? marketingDemoPdfIpc : client.pdf;
 export const markdown = client.markdown;
-export const files = isRemoteWorkstationMode()
-  ? remoteWorkstationFilesIpc
-  : isMarketingDemoMode() ? marketingDemoFilesIpc : client.files;
+export const files = isMarketingDemoMode() ? marketingDemoFilesIpc : client.files;
 export const projectRunner: ProjectRunnerIpc = client.projectRunner;
 export const movie = client.movie;
 export const remotion = client.remotion;
@@ -800,9 +793,7 @@ export const userName = isMarketingDemoMode() ? marketingDemoUserNameIpc : clien
 export const whatsNew = client.whatsNew;
 export const topNotices = isMarketingDemoMode() ? marketingDemoTopNoticesIpc : client.topNotices;
 export const interviewInvite = isMarketingDemoMode() ? marketingDemoInterviewInviteIpc : client.interviewInvite;
-export const telemetry = isMarketingDemoMode() || isWorkstationReadOnly()
-  ? marketingDemoTelemetryIpc
-  : client.telemetry;
+export const telemetry = isMarketingDemoMode() ? marketingDemoTelemetryIpc : client.telemetry;
 export const globalTools = isMarketingDemoMode() ? marketingDemoGlobalToolsIpc : client.globalTools;
 export const nativeTools: NativeToolsIpc = client.nativeTools;
 export const auth = client.auth;
@@ -873,7 +864,7 @@ export async function getServerPort(): Promise<number> {
 
 export async function getAppServerOrigin(): Promise<string> {
   if (!isElectron) {
-    return getWorkstationApiBaseUrl();
+    return '';
   }
   const port = await getServerPort();
   return `http://${ELECTRON_APP_SERVER_HOST}:${port}`;
@@ -885,7 +876,7 @@ export async function getAppServerOrigin(): Promise<string> {
  */
 export async function getApiUrl(path: string): Promise<string> {
   if (!isElectron) {
-    return resolveWorkstationApiUrl(path);
+    return path; // Relative URL goes through Vite proxy
   }
   const origin = await getAppServerOrigin();
   return appendWindowSessionKey(`${origin}${path}`);
@@ -897,9 +888,6 @@ export async function getApiUrl(path: string): Promise<string> {
  * constrained by the workspace-scoped HTTP file route.
  */
 export async function getFileUrl(filePath: string, raw = true): Promise<string> {
-  if (isRemoteWorkstationMode()) {
-    return getRemoteWorkstationFileUrl(filePath);
-  }
   if (isMarketingDemoMode()) {
     const demoFileUrl = getMarketingDemoFileUrl(filePath);
     if (demoFileUrl) {
@@ -926,7 +914,19 @@ export async function getFileThumbnails(
   if (isElectron) {
     return files.getThumbnails(paths, size);
   }
-  return files.getThumbnails(paths, size);
+
+  const response = await apiRequest({
+    method: 'POST',
+    path: '/api/workspace/thumbnails',
+    body: { paths, size },
+  });
+
+  if (!response.ok) {
+    const errorData = response.data as { error?: string } | undefined;
+    throw new Error(errorData?.error || `Request failed with status ${response.status}`);
+  }
+
+  return response.data as { thumbnails: Record<string, FileThumbnailData> };
 }
 
 export async function getWindowId(): Promise<number> {
@@ -936,7 +936,7 @@ export async function getWindowId(): Promise<number> {
 
 export function getWindowSessionKey(): string | null {
   if (!isElectron) {
-    return getBrowserWorkstationStorageKey();
+    return null;
   }
   return window.electron.getWindowSessionKey();
 }
@@ -984,7 +984,7 @@ export async function apiRequest(request: {
       if (request.body && request.method !== 'GET') {
         options.body = JSON.stringify(request.body);
       }
-      const response = await workstationFetch(request.path, options);
+      const response = await fetch(request.path, options);
       const data = await response.json();
       return { ok: response.ok, status: response.status, data };
     } catch (err: any) {
@@ -1085,9 +1085,6 @@ export async function savePathDialog(options?: {
 
 export async function showItemInFolder(path: string): Promise<void> {
   if (!isElectron) {
-    if (isRemoteWorkstationHost()) {
-      throw new Error('Native file-manager actions are unavailable for a remote Workstation host.');
-    }
     await shell.revealInFinder(path);
     return;
   }

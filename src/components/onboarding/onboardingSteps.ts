@@ -8,6 +8,7 @@ export interface OnboardingStepDefinition {
 export const ONBOARDING_STEPS = [
   { id: 'name', telemetryName: 'name', enabled: true, includeWhenBucketDetected: true },
   { id: 'privacy', telemetryName: 'privacy', enabled: true, includeWhenBucketDetected: true },
+  { id: 'basemind-setup', telemetryName: 'basemind_setup', enabled: true, includeWhenBucketDetected: true },
   { id: 'bucket', telemetryName: 'bucket', enabled: true, includeWhenBucketDetected: false },
   { id: 'feature-1', telemetryName: 'feature_1', enabled: true, includeWhenBucketDetected: true },
   { id: 'feature-2', telemetryName: 'feature_2', enabled: true, includeWhenBucketDetected: true },

@@ -45,6 +45,7 @@ import { WorkspaceChoiceScreen } from './screens/WorkspaceChoiceScreen';
 import { AiSetupScreen } from './screens/AiSetupScreen';
 import { OverlayFirstUseScreen } from './screens/OverlayFirstUseScreen';
 import { OverlayPermissionsScreen } from './screens/OverlayPermissionsScreen';
+import { BasemindSetupScreen } from './screens/BasemindSetupScreen';
 import { useInterpreterTokenUsage } from '../../hooks/useInterpreterTokenUsage';
 import type { ProfilesResponse } from '../../api';
 import type { UsageBreakdownSummaryResponse } from '../../../shared/types/usageBreakdown';
@@ -76,6 +77,7 @@ const TOTAL_STEPS = TOTAL_ONBOARDING_STEPS;
 
 const STEP_NAME = ONBOARDING_STEP_INDEX.name;
 const STEP_PRIVACY = ONBOARDING_STEP_INDEX.privacy;
+const STEP_BASEMIND_SETUP = ONBOARDING_STEP_INDEX['basemind-setup'];
 const STEP_BUCKET = ONBOARDING_STEP_INDEX.bucket;
 const STEP_FEATURE_1 = ONBOARDING_STEP_INDEX['feature-1'];
 const STEP_FEATURE_2 = ONBOARDING_STEP_INDEX['feature-2'];
@@ -683,6 +685,8 @@ function OnboardingOverlayContent({ onComplete }: OnboardingOverlayContentProps)
         return <NameScreen onNext={handleNameSubmit} initialName={initialName} />;
       case STEP_PRIVACY:
         return <PrivacyScreen onNext={handlePrivacySelect} />;
+      case STEP_BASEMIND_SETUP:
+        return <BasemindSetupScreen onNext={goForward} />;
       case STEP_BUCKET:
         return <BucketScreen onNext={handleBucketSelect} />;
 

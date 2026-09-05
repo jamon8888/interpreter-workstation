@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type DragEvent as ReactDragEvent } from 'react';
 import { Plus } from 'lucide-react';
+import { IndexingStatusIndicator } from './IndexingStatusIndicator';
 import { tr } from '../../src/i18n';
 
 import { getProfiles } from '../../src/api';
@@ -563,6 +564,9 @@ export function AgentSidebar({ className }: AgentSidebarProps) {
           <div className="flex min-h-0 flex-1 flex-col">
             <div className="rounded-sm overflow-visible">
               <SidebarTabStrip onNewAgent={() => createPinnedAgent()} />
+            </div>
+            <div className="px-2 pt-1">
+              <IndexingStatusIndicator />
             </div>
             <div className="relative min-h-0 flex-1">
               <div
