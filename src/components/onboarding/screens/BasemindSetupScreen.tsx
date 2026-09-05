@@ -33,10 +33,10 @@ export function BasemindSetupScreen({ onNext }: BasemindSetupScreenProps) {
   const [isDownloading, setIsDownloading] = useState(false);
   const [isSkipped, setIsSkipped] = useState(false);
 
-  const runDownload = useCallback(async (skipCurrent: Stage | null = null) => {
+  const runDownload = useCallback(async (onlyStage: Stage | null = null) => {
     setIsDownloading(true);
     for (const stage of STAGES) {
-      if (stage === skipCurrent) continue;
+      if (onlyStage !== null && stage !== onlyStage) continue;
       setCurrentStage(stage);
       setStageStates(prev => ({
         ...prev,
@@ -177,7 +177,7 @@ export function BasemindSetupScreen({ onNext }: BasemindSetupScreenProps) {
           <Button variant="default" onClick={handleContinue}>
             {t('onboarding.basemind.continue', 'Continue')}
           </Button>
-        ) : hasError ? (
+        ) : hasError && !isDownloading ? (
           <>
             <Button variant="ghost" onClick={handleSkip}>
               {t('basemind.download.skip')}

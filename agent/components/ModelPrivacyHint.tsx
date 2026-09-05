@@ -14,7 +14,7 @@ export function ModelPrivacyHint({ provider, className }: ModelPrivacyHintProps)
   if (!needsRedaction) return null;
 
   return (
-    <div
+    <span
       className={cn(
         'flex items-center gap-1 px-1 py-0.5 text-ui-xs text-muted-foreground',
         className,
@@ -22,6 +22,6 @@ export function ModelPrivacyHint({ provider, className }: ModelPrivacyHintProps)
     >
       <Lock className="size-2.5 shrink-0" />
       <span>{t('basemind.privacyHint')}</span>
-    </div>
+    </span>
   );
 }

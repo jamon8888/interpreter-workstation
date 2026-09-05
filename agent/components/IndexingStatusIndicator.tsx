@@ -26,9 +26,10 @@ export function useIndexingStatus() {
       prevFileCountRef.current = s.fileCount;
       setStatus(s);
 
-      if (wasIndexing && !s.indexing && prevFileCount === 0) {
+      if (wasIndexing && !s.indexing && prevFileCount > 0) {
         setShowReady(true);
         readyTimerRef.current = setTimeout(() => setShowReady(false), READY_DISPLAY_MS);
+        toast.dismiss('basemind-indexing');
       }
 
       if (!wasIndexing && s.indexing && s.fileCount >= LARGE_OP_THRESHOLD) {

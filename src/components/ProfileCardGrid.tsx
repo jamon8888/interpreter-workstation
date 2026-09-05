@@ -231,7 +231,10 @@ export function ProfileCardGrid({
                   )}
                   <span className="truncate">{subtitle}</span>
                   {showPrivacyHint && (
-                    <ModelPrivacyHint provider={profile.provider} className="shrink-0" />
+                    <ModelPrivacyHint
+                      provider={profile.modelId.split('-')[0].toLowerCase()}
+                      className="shrink-0"
+                    />
                   )}
                 </div>
               </div>

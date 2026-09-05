@@ -27,10 +27,10 @@ export function usePrivacyShieldState(modelProvider: string | null | undefined):
   }, [refresh]);
 
   if (!status || !modelProvider) return 'hidden';
-  if (!status.xbergAvailable) return 'hidden';
 
   const needsRedaction = !['mistral', 'local'].includes(modelProvider.toLowerCase());
   if (!needsRedaction) return 'hidden';
+  if (!status.xbergAvailable) return 'error';
   if (!status.redactionActive) return 'error';
   return 'active';
 }

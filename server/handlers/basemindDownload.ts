@@ -31,18 +31,17 @@ export async function* basemindDownload(): AsyncGenerator<BasemindDownloadProgre
     yield { stage, progress: 0, done: false };
 
     let lastProgress = 0;
-    let lastYielded: BasemindDownloadProgress = { stage, progress: 0, done: false };
+    let resolved = false;
 
     const onProgress = (progress: number) => {
       if (progress !== lastProgress) {
         lastProgress = progress;
-        lastYielded = { stage, progress, done: false };
       }
     };
 
     try {
       await downloadResource(stage, onProgress);
-      yield { stage, progress: 100, done: true };
+      yield { stage, progress: lastProgress > 0 ? lastProgress : 100, done: true };
     } catch (err) {
       yield {
         stage,
@@ -50,7 +49,7 @@ export async function* basemindDownload(): AsyncGenerator<BasemindDownloadProgre
         done: false,
         error: err instanceof Error ? err.message : String(err),
       };
-      return;
+      continue;
     }
   }
 }

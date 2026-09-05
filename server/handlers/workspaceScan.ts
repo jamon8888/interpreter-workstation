@@ -35,14 +35,18 @@ export interface WorkspaceScanStatus {
   };
 }
 
-let indexingInProgress = false;
+let activeScanCount = 0;
 let filesRemaining = 0;
 let lastScanAt: string | null = null;
 
 export function setIndexingState(inProgress: boolean, count: number = 0) {
-  indexingInProgress = inProgress;
+  if (inProgress) {
+    activeScanCount++;
+  } else {
+    activeScanCount = Math.max(0, activeScanCount - 1);
+  }
   filesRemaining = count;
-  if (!inProgress && count === 0) {
+  if (activeScanCount === 0 && count === 0) {
     lastScanAt = new Date().toISOString();
   }
 }
@@ -81,7 +85,7 @@ export function getWorkspaceScanStatus(): WorkspaceScanStatus {
 
   return {
     redactionActive: xbergAvailable,
-    indexing: indexingInProgress,
+    indexing: activeScanCount > 0,
     fileCount: filesRemaining,
     lastScanAt,
     xbergAvailable,
