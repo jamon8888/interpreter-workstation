@@ -1821,5 +1821,9 @@
   "basemind.download.retry": "Retry",
   "basemind.download.complete": "Complete",
   "basemind.degradedMode": "Reduced PII detection — some resources failed to download",
-  "basemind.settings.retryDownload": "Retry download"
+  "basemind.settings.retryDownload": "Retry download",
+  "onboarding.basemind.title": "Set up Basemind",
+  "onboarding.basemind.description": "Download the local knowledge base for enhanced context.",
+  "onboarding.basemind.startDownload": "Start Download",
+  "onboarding.basemind.continue": "Continue"
 }
