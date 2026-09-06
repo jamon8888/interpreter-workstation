@@ -12,7 +12,7 @@ Research decisions so far:
 - **Conversational**: `@ai-elements/react` + `@ai-sdk/react` + `useChat`
 - **Split pane**: `react-resizable-panels` (shadcn `resizable`)
 - **PII detection**: BLOCKED (T1) — GLiNER2 WASM is not available
-- **LLM**: TBD — MiniMax M3 is paid; free alternative needed (T2)
+- **LLM**: MiniMax 2.7 via `@ai-sdk/minimax` — free, confirmed.
 - **File handling**: File System Access API + `browser-fs-access`; pdf.js/mammoth.js/SheetJS/Tesseract.js for binary extraction
 - **ZIP**: jszip + FileSaver.js
 - **State**: React server components + Zustand for client state (assumed)
