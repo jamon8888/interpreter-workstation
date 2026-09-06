@@ -6,36 +6,73 @@ How do we build the `/api/redact` endpoint that wraps the Basemind CLI?
 
 ## Context
 
-T1 resolved: Basemind is an MCP/CLI binary with no HTTP API. We wrap it in a Next.js API route.
-
-**API contract (from T1):**
-```
-POST /api/redact
-Body: {
-  text: string,
-  categories?: string[],
-  strategy?: "token_replace" | "mask" | "hash" | "drop",
-  customPatterns?: { label: string, pattern: string }[]
-}
-Response: {
-  redactedText: string,
-  rehydrationMap: Record<[TYPE_N], originalValue>,
-  detections: { category: string, start: number, end: number, confidence: number }[]
-}
-```
-
-## Method
-
-1. Determine how to bundle/call the Basemind CLI in a Vercel serverless function:
-   - Is it available as an npm package we can `npm install`?
-   - Do we download the binary from GitHub releases at deploy time?
-   - Is it a local submodule we compile?
-2. Implement the `/api/redact` route using `child_process.execFile` or similar
-3. Parse the Basemind CLI output into the response shape
-4. Handle errors (Basemind not found, timeout, invalid input)
-5. Write a one-file test that mocks the Basemind binary
+T1 proposed wrapping the Basemind CLI in a Next.js API route. After examining the actual Basemind CLI (`basemind/src/main.rs`), a critical blocker was found: **`basemind scan` requires a git repository context** — it indexes a working tree, staging area, or git revision. There is no `basemind redact "some text"` subcommand. The PII modules exist but are not exposed as a standalone CLI command.
 
 ## Resolution
 
-- Post the confirmed approach and implementation notes.
-- The next ticket (T5) wires binary extraction to this route.
+### Critical finding
+
+Basemind's PII redaction is embedded in the document scanning pipeline (`src/extract/doc.rs` + `src/pii.rs`). It is not callable as a standalone text-processing tool. The CLI commands that accept text:
+- `basemind agents …` — multi-agent comms, not text redaction
+- `basemind vault …` — rehydration map encryption, not text redaction
+- `basemind compress-output` — compresses CLI output, not PII redaction
+
+**There is no `basemind redact <text>` command.**
+
+### Options
+
+**Option A — Add `basemind redact` to the fork (correct path)**
+Add a new `RedactArgs` CLI command to the Basemind fork that:
+1. Takes text via `--text` flag or stdin
+2. Runs the PII pipeline (regex + NER)
+3. Returns JSON: `{ redactedText, rehydrationMap, detections }`
+
+This is the clean solution. The fork is owned by the user (`github.com/jamon8888/basemind`). This is a new Rust CLI command that calls the existing `PiiEntity` + `DetectedSpan` pipeline directly.
+
+**Option B — Fake git repo (hack, won't work serverless)**
+Create a temp directory, `git init`, write text to a file, run `basemind scan`, parse output. Rejected: git operations don't work in Vercel serverless sandbox.
+
+**Option C — MCP server as subprocess**
+Spawn `basemind serve` (the MCP server) as a long-lived subprocess, send it JSON-RPC `agents` tool calls with `redaction.enabled: true`. The `agents` tool is not designed for arbitrary text processing — rejected.
+
+**Option D — Separate HTTP service**
+Build a minimal Actix/Rust HTTP server that exposes only the NER/redaction pipeline, deploy it separately. Overkill for what is essentially a text transformation.
+
+### Decision
+
+**Option A** — add `basemind redact` to the fork. This is a small, focused Rust addition:
+1. New `RedactArgs` struct with `--text`, `--strategy`, `--categories`, `--custom-patterns`
+2. A `run_redact()` function that calls the existing PII pipeline directly
+3. Output as JSON (matching the T1 API contract)
+
+This is the right place for this logic — it's a CLI command in the Basemind fork.
+
+### Implementation plan
+
+**In the Basemind fork** (`github.com/jamon8888/basemind`):
+```
+src/main.rs: add Redact subcommand
+src/cli/redact.rs: new file — RedactArgs, run_redact()
+Cargo.toml: no new deps needed
+```
+
+**In the Next.js app** (`privacy-redaction-app`):
+```
+src/app/api/redact/route.ts — shells out to basemind redact --text ...
+```
+
+### API contract (unchanged from T1)
+
+```
+POST /api/redact
+Body: { text, categories?, strategy?, customPatterns? }
+Response: { redactedText, rehydrationMap, detections }
+```
+
+### What this means for T5
+
+T5 (wire binary extraction) depends on the `basemind redact` command existing. Binary files: `basemind redact --text "$(cat file.pdf_text)"`. The `xberg/documents` pipeline handles PDF/Office extraction, then `basemind redact` handles the NER step.
+
+### New ticket surfaced
+
+- **T7** (new): Implement `basemind redact` CLI command in the Basemind fork — the actual Rust implementation of the text redaction pipeline.

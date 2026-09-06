@@ -47,25 +47,25 @@ A deployed Next.js web app where the user has a conversational loop with MiniMax
 - [T1: Basemind NER interface](tickets/T1-decision-basemind-ner-interface.md): No HTTP API — Basemind is MCP/CLI only. Wrap its CLI in a Next.js API route (`/api/redact`). Redaction tokens are `[TYPE_N]` (reversible) or `[REDACTED]` (irreversible). Vercel **serverless** runtime (native binary, not WASM edge). Binary file text extraction also goes through Basemind via its `xberg/documents` pipeline — NOT client-side libraries. Supports `custom_patterns` per-request.
 - [T2: Free model decision](tickets/T2-decision-free-model.md): **MiniMax 2.7** confirmed free. Use `@ai-sdk/minimax` with model `minimax-2.7`. Anthropic-compatible API, works with AI Elements.
 - [T3: Tech stack + project structure](tickets/T3-decision-tech-stack.md): Standalone `privacy-redaction-app` repo. Next.js 15 App Router + Vercel. `@ai-elements/react` + `useChat`. shadcn/ui + Tailwind. `@uiw/react-codemirror` + `react-markdown`. Zustand for file/editing state. jszip + FileSaver.js. Basemind CLI via `/api/redact` serverless route.
+- [T4: Build /api/redact route](tickets/T4-build-api-redact-route.md): **BLOCKER** — `basemind scan` requires git repo context. No `basemind redact` CLI command exists. Must add `basemind redact` to the Basemind fork first (new Rust CLI command calling the existing PII pipeline). T7 is the critical path.
 
 ## Blocking
 
-- T4 (build /api/redact route) — unblocked.
-- T5 (wire binary extraction) — blocked by T4.
+- T7 (implement `basemind redact` in Basemind fork) — unblocked; the critical path.
+- T5 (wire binary extraction) — blocked by T7 (needs the `basemind redact` command).
 
-**Frontier (open and unblocked):** T4.
+**Frontier (open and unblocked):** T7.
 
 ## Not yet specified
 
 <!-- in-scope fog; graduates to tickets as the frontier advances. -->
 
 - **Large folder handling**: What happens with 500+ files? Streaming extraction? Progress shown in chat?
-- **Artifact panel file state**: Does the artifact panel track "original vs redacted vs user-edited" per file? Or just the final state? (RESOLVED: redacted is state; user edits are tracked separately; original not retained server-side)
+- **Artifact panel file state**: Does the artifact panel track "original vs redacted vs user-edited" per file? Or just the final state? (RESOLVED: redacted is state; user edits tracked separately)
 - **Session persistence**: (RESOLVED: Zustand + sessionStorage, session-scoped)
 - **LLM prompt engineering**: What system prompt drives MiniMax 2.7 to stay in character as a privacy assistant?
 - **ZIP structure**: Flattened? Preserve folder hierarchy? Include a redaction manifest?
 - **Multi-file CodeMirror**: One file at a time (tabbed) or all at once?
-- **Basemind npm package**: `npm install basemind` — confirm it ships the correct platform binary for Vercel serverless runtime (linux x64).
 
 ## Out of scope
 
