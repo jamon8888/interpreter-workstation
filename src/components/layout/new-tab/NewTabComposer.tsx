@@ -175,6 +175,7 @@ export function NewTabProfileSelector() {
           selectedProfileId={defaultProfileId || undefined}
           onProfileSelect={handleProfileSelect}
           onNavigateToSettings={handleNavigateToSettings}
+          showPrivacyHint={true}
         />
       </PopoverContent>
     </Popover>
