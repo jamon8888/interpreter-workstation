@@ -44,24 +44,28 @@ A deployed Next.js web app where the user has a conversational loop with MiniMax
 - [R6: jszip + privacy animation](tickets/R6-research-jszip-privacy-animation.md): `generateAsync` + `saveAs`; ShieldCheck icon + "Files never leave your device" messaging; per-file progress via `onUpdate`.
 - [R7: Basemind NER + Edge](tickets/R7-research-basemind-ner-edge.md): MCP server only (stdio JSON-RPC, no HTTP). ONNX model via `xberg/ner-onnx`. Redaction stores SHA-256 hashes, not raw values. No Vercel Edge wrapper exists. Fork at `github.com/jamon8888/basemind`. Binary formats need `documents` feature (not yet wired).
 - [T1: Basemind NER interface](tickets/T1-decision-basemind-ner-interface.md): No HTTP API — Basemind is MCP/CLI only. Wrap its CLI in a Next.js API route (`/api/redact`). Redaction tokens are `[TYPE_N]` (reversible) or `[REDACTED]` (irreversible). Vercel **serverless** runtime (native binary, not WASM edge). Binary file text extraction also goes through Basemind via its `xberg/documents` pipeline — NOT client-side libraries. Supports `custom_patterns` per-request.
+- [T2: Free model decision](tickets/T2-decision-free-model.md): **MiniMax 2.7** confirmed free. Use `@ai-sdk/minimax` with model `minimax-2.7`. Anthropic-compatible API, works with AI Elements.
+- [T3: Tech stack + project structure](tickets/T3-decision-tech-stack.md): Standalone `privacy-redaction-app` repo. Next.js 15 App Router + Vercel. `@ai-elements/react` + `useChat`. shadcn/ui + Tailwind. `@uiw/react-codemirror` + `react-markdown`. Zustand for file/editing state. jszip + FileSaver.js. Basemind CLI via `/api/redact` serverless route.
 
 ## Blocking
 
-- T3 (tech stack + project structure) — blocked by T2; unblocked now.
-- T4 (build /api/redact route) — blocked by T3 (needs Next.js project scaffolded first).
-- T5 (wire binary extraction to redact API) — blocked by T4.
+- T4 (build /api/redact route) — blocked by T3; unblocked now.
+- T5 (wire binary extraction) — blocked by T4.
 - T6 (design rehydration map UX) — unblocked.
 
-**Frontier (open and unblocked):** T3, T6.
+**Frontier (open and unblocked):** T6, T4 (after T3 lands).
 
 ## Not yet specified
 
 <!-- in-scope fog; graduates to tickets as the frontier advances. -->
 
-- **Basemind CLI packaging**: How is the Basemind binary bundled/deployed with the Next.js Vercel serverless function? npm package? GitHub Release download at deploy time?
+- **Large folder handling**: What happens with 500+ files? Streaming extraction? Progress shown in chat?
+- **Artifact panel file state**: Does the artifact panel track "original vs redacted vs user-edited" per file? Or just the final state?
+- **Session persistence**: If the user refreshes, does the in-browser state survive? Zustand + sessionStorage covers this, but confirm.
 - **LLM prompt engineering**: What system prompt drives MiniMax 2.7 to stay in character as a privacy assistant?
 - **ZIP structure**: Flattened? Preserve folder hierarchy? Include a redaction manifest?
 - **Multi-file CodeMirror**: One file at a time (tabbed) or all at once?
+- **Basemind npm package**: `npm install basemind` as dependency — confirm it ships the correct platform binary for Vercel serverless runtime (linux x64).
 
 ## Out of scope
 
