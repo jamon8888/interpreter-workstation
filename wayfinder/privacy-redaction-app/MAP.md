@@ -18,18 +18,19 @@ A deployed Next.js web app where the user has a conversational loop with MiniMax
   - Files NEVER reach the LLM unredacted — Basemind (Vercel Edge) redacts first.
   - MiniMax 2.7 is the free conversational partner via `@ai-sdk/minimax`.
   - The conversational flow IS the app — no traditional navigation, just AI messages that trigger UI.
-  - Loading animations signal "processing via Basemind Edge Function" not server activity.
+  - Rehydration maps: browser-only, Zustand + `sessionStorage`. Never included in ZIP downloads.
+  - Loading animations signal "processing via Basemind serverless function" and "redacting PII".
   - Tracker: local markdown at `wayfinder/privacy-redaction-app/`.
 - Tracker: local markdown at `wayfinder/privacy-redaction-app/`. Tickets are files; the map is the index.
 
 ## Conversational Flow (destination behavior)
 
 1. AI greets user with an upload widget (drag-drop + file picker)
-2. User uploads files/folder → sent to `/api/redact` (Basemind CLI via Next.js serverless function) → loading animation ("redacting PII via Basemind")
-3. AI says "here are your files, you can edit them and add more PII" → 50% artifact sidebar appears with file finder + CodeMirror
-4. User edits markdown files, adds custom PII redactions
-5. AI asks "do you want to download a full ZIP ready for ChatGPT/Claude/Gemini without any personal info?"
-6. User downloads ZIP (client-side jszip)
+2. User uploads files/folder → sent to `/api/redact` (Basemind CLI via serverless function) → loading animation ("redacting PII via Basemind")
+3. AI says "I've redacted 47 items across 12 files. You can undo any redaction by clicking it in the editor. These mappings stay in your browser — close the tab and they're gone." → 50% artifact sidebar appears with file finder + CodeMirror
+4. User edits markdown files, adds custom PII redactions; clicks `[EMAIL_0]` to restore original inline
+5. AI asks "do you want to download a full ZIP ready for ChatGPT/Claude/Gemini without any personal info? Note: no rehydration map is included — close the tab and the reversibility is gone."
+6. User downloads ZIP (client-side jszip — redacted files only, no map)
 7. AI asks "upload new files or start over?" → shows upload widget again
 
 ## Decisions so far
@@ -49,23 +50,22 @@ A deployed Next.js web app where the user has a conversational loop with MiniMax
 
 ## Blocking
 
-- T4 (build /api/redact route) — blocked by T3; unblocked now.
+- T4 (build /api/redact route) — unblocked.
 - T5 (wire binary extraction) — blocked by T4.
-- T6 (design rehydration map UX) — unblocked.
 
-**Frontier (open and unblocked):** T6, T4 (after T3 lands).
+**Frontier (open and unblocked):** T4.
 
 ## Not yet specified
 
 <!-- in-scope fog; graduates to tickets as the frontier advances. -->
 
 - **Large folder handling**: What happens with 500+ files? Streaming extraction? Progress shown in chat?
-- **Artifact panel file state**: Does the artifact panel track "original vs redacted vs user-edited" per file? Or just the final state?
-- **Session persistence**: If the user refreshes, does the in-browser state survive? Zustand + sessionStorage covers this, but confirm.
+- **Artifact panel file state**: Does the artifact panel track "original vs redacted vs user-edited" per file? Or just the final state? (RESOLVED: redacted is state; user edits are tracked separately; original not retained server-side)
+- **Session persistence**: (RESOLVED: Zustand + sessionStorage, session-scoped)
 - **LLM prompt engineering**: What system prompt drives MiniMax 2.7 to stay in character as a privacy assistant?
 - **ZIP structure**: Flattened? Preserve folder hierarchy? Include a redaction manifest?
 - **Multi-file CodeMirror**: One file at a time (tabbed) or all at once?
-- **Basemind npm package**: `npm install basemind` as dependency — confirm it ships the correct platform binary for Vercel serverless runtime (linux x64).
+- **Basemind npm package**: `npm install basemind` — confirm it ships the correct platform binary for Vercel serverless runtime (linux x64).
 
 ## Out of scope
 
