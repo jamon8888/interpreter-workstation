@@ -86,6 +86,19 @@ export default defineConfig(() => {
         // Allow serving files from node_modules (for PDF.js worker)
         allow: ['..'],
       },
+      watch: {
+        // basemind/target is 63GB+ of build artifacts with 22k+ dirs and blows
+        // past the 63k inotify watcher limit, crashing Vite with ENOSPC.
+        // Other ignored paths are heavy build/cache dirs that don't affect HMR.
+        ignored: [
+          '**/basemind/target/**',
+          '**/basemind/**/target/**',
+          '**/dist/**',
+          '**/dist-electron/**',
+          '**/.git/**',
+          '**/node_modules/**',
+        ],
+      },
       proxy: {
         // Proxy API requests to the Express server (browser dev mode only)
         '/api': {
