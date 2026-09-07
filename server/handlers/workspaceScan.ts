@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
 import { basemindScan, basemindRescan } from '../utils/basemindManager';
 import { resolveXbergPipelineBinary } from '../utils/xbergPipelineBinary';
 import { resolveBasemindBinary } from '../utils/basemindManager';
@@ -51,15 +51,29 @@ export function setIndexingState(inProgress: boolean, count: number = 0) {
   }
 }
 
-const GLOBAL_RESOURCES_DIR = path.join(process.env.HOME ?? process.env.USERPROFILE ?? '', '.cache', 'basemind');
+function hubCacheDir(): string {
+  const home = process.env.HOME ?? process.env.USERPROFILE ?? '';
+  if (process.env.HF_HUB_CACHE) return process.env.HF_HUB_CACHE;
+  if (process.env.HUGGINGFACE_HUB_CACHE) return process.env.HUGGINGFACE_HUB_CACHE;
+  if (process.env.XDG_CACHE_HOME) return path.join(process.env.XDG_CACHE_HOME, 'huggingface', 'hub');
+  return path.join(home, '.cache', 'huggingface', 'hub');
+}
 
 function resourceReady(resource: 'nerModel' | 'embeddings' | 'reranker'): boolean {
-  const markers: Record<typeof resource, string> = {
-    nerModel: 'ner-model.ready',
-    embeddings: 'embeddings.ready',
-    reranker: 'reranker.ready',
+  // Mirror repos backing each lane; presence of any snapshotted file means
+  // the backend really has an artifact cached (hf-hub layout).
+  const repos: Record<typeof resource, string> = {
+    nerModel: 'models/xberg-io--gliner-models',
+    embeddings: 'models/xberg-io--embedding-models',
+    reranker: 'models/xberg-io--reranker-models',
   };
-  return existsSync(path.join(GLOBAL_RESOURCES_DIR, markers[resource]));
+  const snapshotsDir = path.join(hubCacheDir(), repos[resource], 'snapshots');
+  if (!existsSync(snapshotsDir)) return false;
+  try {
+    return readdirSync(snapshotsDir, { recursive: true }).length > 0;
+  } catch {
+    return false;
+  }
 }
 
 /**
