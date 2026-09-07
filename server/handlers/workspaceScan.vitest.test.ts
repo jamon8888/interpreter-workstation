@@ -67,4 +67,11 @@ describe('workspaceScan resourcesReady — truthful model presence', () => {
     const status = getWorkspaceScanStatus();
     expect(status.resourcesReady.nerModel).toBe(true);
   });
+
+  it('reports not-ready for an empty snapshot dir with no artifact file', () => {
+    const snapDir = join(cacheDir, 'hub', MIRRORED_REPOS.embeddings, 'snapshots', 'rev123');
+    mkdirSync(snapDir, { recursive: true });
+    const status = getWorkspaceScanStatus();
+    expect(status.resourcesReady.embeddings).toBe(false);
+  });
 });

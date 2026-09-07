@@ -70,7 +70,7 @@ function resourceReady(resource: 'nerModel' | 'embeddings' | 'reranker'): boolea
   const snapshotsDir = path.join(hubCacheDir(), repos[resource], 'snapshots');
   if (!existsSync(snapshotsDir)) return false;
   try {
-    return readdirSync(snapshotsDir, { recursive: true }).length > 0;
+    return readdirSync(snapshotsDir, { recursive: true, withFileTypes: true }).some((e) => e.isFile());
   } catch {
     return false;
   }
