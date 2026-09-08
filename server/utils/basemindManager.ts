@@ -205,6 +205,13 @@ export async function registerBasemindServer(): Promise<string> {
     return BASEMIND_SERVER_ID;
   }
 
+  // If a runtime entry exists but is not connected, disable it so addServer
+  // can re-register without hitting the "already exists" error.
+  const runtimeEntry = await getMcpService().getServerStatus(BASEMIND_SERVER_ID);
+  if (runtimeEntry) {
+    await getMcpService().disableServer(BASEMIND_SERVER_ID);
+  }
+
   const serverId = await toolManager.addServer({
     name: 'Basemind',
     description: 'Code map, document RAG, and semantic search - 300+ languages',
