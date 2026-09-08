@@ -200,9 +200,8 @@ export async function registerBasemindServer(): Promise<string> {
   const binaryPath = resolveBasemindBinary();
 
   const toolManager = new ToolManager();
-  // getServerStatus returns undefined (never throws) when nothing is registered.
   const existingServer = await toolManager.getServerStatus(BASEMIND_SERVER_ID);
-  if (existingServer !== undefined) {
+  if (existingServer?.state.status === 'connected') {
     return BASEMIND_SERVER_ID;
   }
 
