@@ -1,240 +1,150 @@
-import path from 'path';
+import { resolve } from 'node:path';
 import { existsSync } from 'node:fs';
-import { spawn } from 'node:child_process';
-import { ToolManager } from '../tools/toolManager';
-import { resolveBundledResourceCandidates } from './bundledRuntimePaths';
+import { homedir } from 'node:os';
+import { Socket } from 'node:net';
 
-import os from 'node:os';
+function findBasemindBinary(): string {
+  const projectRoot = process.cwd();
 
-let basemindBinaryPath: string | null = null;
+  const pathBin = process.env.PATH?.split(process.platform === 'win32' ? ';' : ':')
+    .map(p => resolve(p, process.platform === 'win32' ? 'basemind.exe' : 'basemind'))
+    .find(p => { try { return existsSync(p); } catch { return false; } }) ?? '';
+  if (pathBin) return pathBin;
 
-function findBasemindBinary(candidates: string[]): string | null {
-  for (const candidate of candidates) {
-    if (existsSync(candidate)) {
-      return candidate;
-    }
-    const withExe = candidate.endsWith('.exe') ? candidate : `${candidate}.exe`;
-    if (existsSync(withExe)) {
-      return withExe;
-    }
-  }
-  return null;
+  const localDebug = resolve(projectRoot, 'basemind', 'target', 'debug', 'basemind');
+  if (existsSync(localDebug)) return localDebug;
+
+  const localRelease = resolve(projectRoot, 'basemind', 'target', 'release', 'basemind');
+  if (existsSync(localRelease)) return localRelease;
+
+  const cargoBin = resolve(homedir(), '.cargo', 'bin', 'basemind');
+  if (existsSync(cargoBin)) return cargoBin;
+
+  try {
+    const npmPackageJson = require.resolve('basemind/package.json');
+    const npmBin = resolve(npmPackageJson, '..', 'bin', process.platform === 'win32' ? 'basemind.exe' : 'basemind');
+    if (existsSync(npmBin)) return npmBin;
+  } catch {}
+
+  return '';
 }
+
+function basemindCommsDir(): string {
+  return resolve(homedir(), '.local', 'share', 'basemind', 'comms');
+}
+
+export function isDaemonRunning(): boolean {
+  const sock = resolve(basemindCommsDir(), 'comms.sock');
+  if (!existsSync(sock)) return false;
+  const pidFile = resolve(basemindCommsDir(), 'daemon.pid');
+  if (!existsSync(pidFile)) return false;
+  try {
+    const content = require('node:fs').readFileSync(pidFile, 'utf8').trim();
+    const parsed = JSON.parse(content);
+    const pid = typeof parsed === 'object' && parsed !== null && 'pid' in parsed ? Number(parsed.pid) : Number(parsed);
+    if (!Number.isFinite(pid)) return false;
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+let _cachedBinary: string | null = null;
 
 export function resolveBasemindBinary(): string {
-  if (basemindBinaryPath) return basemindBinaryPath;
+  if (_cachedBinary === null) {
+    _cachedBinary = findBasemindBinary();
+  }
+  return _cachedBinary;
+}
 
-  const packagedCandidates = resolveBundledResourceCandidates({
-    packagedSegments: ['basemind', 'bin', 'basemind'],
+function mcpRequest(method: string, params: Record<string, unknown> = {}): Promise<unknown> {
+  const sockPath = resolve(basemindCommsDir(), 'comms.sock');
+  return new Promise((resolve, reject) => {
+    const sock = new Socket();
+    let data = '';
+    const timer = setTimeout(() => {
+      sock.destroy();
+      reject(new Error(`MCP request timed out: ${method}`));
+    }, 30_000);
+    sock.connect(sockPath, () => {
+      const req = JSON.stringify({ jsonrpc: '2.0', id: 1, method, params });
+      sock.write(req + '\n');
+    });
+    sock.on('data', (chunk) => {
+      data += chunk.toString();
+      try {
+        const resp = JSON.parse(data);
+        clearTimeout(timer);
+        sock.destroy();
+        resolve(resp.result ?? resp);
+      } catch {
+        // wait for more data
+      }
+    });
+    sock.on('error', (err) => {
+      clearTimeout(timer);
+      sock.destroy();
+      reject(err);
+    });
   });
+}
 
-  const found = findBasemindBinary(packagedCandidates);
-  if (found) {
-    basemindBinaryPath = found;
-    return basemindBinaryPath;
-  }
-
-  const devCandidates = [
-    path.join(process.cwd(), 'node_modules', '@jamon8888', 'basemind-fork', 'bin', 'basemind'),
-    path.join(process.cwd(), 'node_modules', '@jamon8888', 'basemind-fork', 'bin', 'basemind.exe'),
-    path.join(os.homedir(), '.local', 'bin', 'basemind'),
-  ];
-
-  const devFound = findBasemindBinary(devCandidates);
-  if (devFound) {
-    basemindBinaryPath = devFound;
-    return basemindBinaryPath;
-  }
-
+export async function basemindScan(opts: { root: string; paths?: string[]; json?: boolean }) {
+  if (!isDaemonRunning()) return { success: false, exitCode: null, stdout: '', stderr: '', error: 'daemon not running' };
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const basemind = require('@jamon8888/basemind-fork') as { binaryPath: string | null | undefined };
-    if (basemind.binaryPath && existsSync(basemind.binaryPath)) {
-      basemindBinaryPath = basemind.binaryPath;
-      return basemindBinaryPath;
-    }
-  } catch {
-    // ignore - fallback paths will be checked
+    await mcpRequest('tools/call', {
+      name: 'code',
+      arguments: { subcommand: 'files', root: opts.root, paths: opts.paths }
+    });
+    return { success: true, exitCode: 0, stdout: '', stderr: '', error: undefined };
+  } catch (err) {
+    return { success: false, exitCode: null, stdout: '', stderr: '', error: err instanceof Error ? err.message : String(err) };
   }
-
-  throw new Error(
-    `[basemind] Binary not found. Checked packaged: ${packagedCandidates.join(', ')}, dev: ${devCandidates.join(', ')}`,
-  );
 }
 
-export interface BasemindScanOptions {
-  root?: string;
-  paths?: string[];
-  json?: boolean;
+export async function basemindRescan(opts: { root: string; paths?: string[]; json?: boolean }) {
+  if (!isDaemonRunning()) return { success: false, exitCode: null, stdout: '', stderr: '', error: 'daemon not running' };
+  try {
+    await mcpRequest('tools/call', {
+      name: 'code',
+      arguments: { subcommand: 'files', root: opts.root, paths: opts.paths, full: true }
+    });
+    return { success: true, exitCode: 0, stdout: '', stderr: '', error: undefined };
+  } catch (err) {
+    return { success: false, exitCode: null, stdout: '', stderr: '', error: err instanceof Error ? err.message : String(err) };
+  }
 }
 
-export interface BasemindScanResult {
-  success: boolean;
-  stdout: string;
-  stderr: string;
-  exitCode: number | null;
-  error?: string;
-}
-
-/**
- * Run `basemind scan [paths]` as a one-shot subprocess.
- * Used after workspacePseudonymize writes shadow files to .redacted/.
- */
-export async function basemindScan(opts: BasemindScanOptions = {}): Promise<BasemindScanResult> {
-  const binaryPath = resolveBasemindBinary();
-  const args = ['scan'];
-
-  if (opts.root) {
-    args.push('--root', opts.root);
-  }
-  if (opts.paths && opts.paths.length > 0) {
-    args.push(...opts.paths);
-  }
-  if (opts.json) {
-    args.push('--json');
-  }
-
-  return new Promise((resolve) => {
-    const proc = spawn(binaryPath, args, {
-      stdio: ['ignore', 'pipe', 'pipe'],
-      timeout: 300_000, // 5 min timeout for large corpora
-    });
-
-    let stdout = '';
-    let stderr = '';
-
-    proc.stdout?.on('data', (chunk) => {
-      stdout += chunk.toString();
-    });
-
-    proc.stderr?.on('data', (chunk) => {
-      stderr += chunk.toString();
-    });
-
-    proc.on('close', (code) => {
-      resolve({
-        success: code === 0,
-        stdout,
-        stderr,
-        exitCode: code,
-      });
-    });
-
-    proc.on('error', (err) => {
-      resolve({
-        success: false,
-        stdout,
-        stderr,
-        exitCode: null,
-        error: err.message,
-      });
-    });
-  });
-}
-
-/**
- * Run `basemind rescan [paths]` to re-index specific paths.
- * Faster than full scan for incremental updates.
- */
-export async function basemindRescan(opts: BasemindScanOptions = {}): Promise<BasemindScanResult> {
-  const binaryPath = resolveBasemindBinary();
-  const args = ['rescan'];
-
-  if (opts.root) {
-    args.push('--root', opts.root);
-  }
-  if (opts.paths && opts.paths.length > 0) {
-    args.push(...opts.paths);
-  }
-  if (opts.json) {
-    args.push('--json');
-  }
-
-  return new Promise((resolve) => {
-    const proc = spawn(binaryPath, args, {
-      stdio: ['ignore', 'pipe', 'pipe'],
-      timeout: 300_000,
-    });
-
-    let stdout = '';
-    let stderr = '';
-
-    proc.stdout?.on('data', (chunk) => {
-      stdout += chunk.toString();
-    });
-
-    proc.stderr?.on('data', (chunk) => {
-      stderr += chunk.toString();
-    });
-
-    proc.on('close', (code) => {
-      resolve({
-        success: code === 0,
-        stdout,
-        stderr,
-        exitCode: code,
-      });
-    });
-
-    proc.on('error', (err) => {
-      resolve({
-        success: false,
-        stdout,
-        stderr,
-        exitCode: null,
-        error: err.message,
-      });
-    });
-  });
-}
-
-const BASEMIND_SERVER_ID = 'basemind';
-
-/**
- * Register basemind as an MCP tool server via ToolManager.
- * basemind serve runs as a long-running stdio MCP server.
- * Its tools (code { outline, symbols, grep, ... }, admin { rescan, ... }) are
- * exposed via the MCP route once registered.
- */
 export async function registerBasemindServer(): Promise<string> {
-  const binaryPath = resolveBasemindBinary();
-
-  const toolManager = new ToolManager();
-  const existingServer = await toolManager.getServerStatus(BASEMIND_SERVER_ID);
-  if (existingServer?.state.status === 'connected') {
-    return BASEMIND_SERVER_ID;
-  }
-
-  const serverId = await toolManager.addServer({
-    name: 'Basemind',
-    description: 'Code map, document RAG, and semantic search - 300+ languages',
-    transport: 'stdio',
-    command: binaryPath,
-    args: ['serve'],
-    enabled: true,
-    startupTimeoutSec: 30,
-    toolTimeoutSec: 60,
-  });
-
-  return serverId;
-}
-
-/**
- * Unregister basemind MCP server (for cleanup/testing).
- */
-export async function unregisterBasemindServer(): Promise<void> {
-  const toolManager = new ToolManager();
+  const { getToolManager } = await import('../tools/toolManagerAccessor');
+  const binary = resolveBasemindBinary();
+  if (!binary) return '';
   try {
-    await toolManager.removeServer(BASEMIND_SERVER_ID);
-  } catch {
-    // Ignore if not registered
+    const serverId = await getToolManager().addServer({
+      name: 'Basemind',
+      description: 'Local code search and semantic graph engine',
+      transport: 'stdio',
+      command: binary,
+      args: ['serve', '--no-watch'],
+      enabled: true,
+    });
+    return serverId;
+  } catch (err) {
+    if (err instanceof Error && err.message.includes('already exists')) return 'basemind';
+    return '';
   }
 }
 
-/**
- * Get basemind server status.
- */
-export async function getBasemindServerStatus() {
-  const toolManager = new ToolManager();
-  return toolManager.getServerStatus(BASEMIND_SERVER_ID);
+export async function unregisterBasemindServer(): Promise<void> {
+  const { getToolManager } = await import('../tools/toolManagerAccessor');
+  try {
+    await getToolManager().removeServer('basemind');
+  } catch {}
+}
+
+export async function getBasemindServerStatus(): Promise<{ status: string }> {
+  if (isDaemonRunning()) return { status: 'connected' };
+  return { status: 'disconnected' };
 }
