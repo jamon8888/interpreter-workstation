@@ -1,13 +1,13 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { getWorkspaceScanStatus } from './workspaceScan';
 
 const MIRRORED_REPOS = {
-  embeddings: 'models/xberg-io--embedding-models',
-  reranker: 'models/xberg-io--reranker-models',
-  nerModel: 'models/xberg-io--gliner-models',
+  embeddings: 'models--xberg-io--embedding-models',
+  reranker: 'models--xberg-io--reranker-models',
+  nerModel: 'models--xberg-io--gliner-models',
 } as const;
 
 let cacheDir: string;
@@ -73,5 +73,15 @@ describe('workspaceScan resourcesReady — truthful model presence', () => {
     mkdirSync(snapDir, { recursive: true });
     const status = getWorkspaceScanStatus();
     expect(status.resourcesReady.embeddings).toBe(false);
+  });
+
+  it('counts snapshot symlinks (hf-hub links blobs) as cached artifacts', () => {
+    const snapDir = join(cacheDir, 'hub', MIRRORED_REPOS.embeddings, 'snapshots', 'rev123');
+    mkdirSync(snapDir, { recursive: true });
+    const target = join(cacheDir, 'blob-target');
+    writeFileSync(target, 'fake-bytes');
+    symlinkSync(target, join(snapDir, 'model.onnx'));
+    const status = getWorkspaceScanStatus();
+    expect(status.resourcesReady.embeddings).toBe(true);
   });
 });

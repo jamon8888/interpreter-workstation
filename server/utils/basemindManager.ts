@@ -200,12 +200,10 @@ export async function registerBasemindServer(): Promise<string> {
   const binaryPath = resolveBasemindBinary();
 
   const toolManager = new ToolManager();
-  try {
-    // Check if already registered
-    await toolManager.getServerStatus(BASEMIND_SERVER_ID);
+  // getServerStatus returns undefined (never throws) when nothing is registered.
+  const existingServer = await toolManager.getServerStatus(BASEMIND_SERVER_ID);
+  if (existingServer !== undefined) {
     return BASEMIND_SERVER_ID;
-  } catch {
-    // Not registered yet, add it
   }
 
   const serverId = await toolManager.addServer({
