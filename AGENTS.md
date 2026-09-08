@@ -29,6 +29,9 @@ become a second application or owner of canonical client release logic.
 - Read `docs/agent-testing.md` before writing or running tests.
 - Preserve user work and unrelated changes. Never publish, push, or create a
   public artifact without explicit authorization.
+- **Every commit must include a DCO sign-off.** Use `git commit -s` or append
+  `Signed-off-by: Name <email>` to the commit message. CI rejects commits
+  without it. When amending or cherry-picking, re-add the sign-off.
 
 ## Product boundaries
 
