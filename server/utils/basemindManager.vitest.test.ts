@@ -17,8 +17,9 @@ describe('resolveBasemindBinary', () => {
     let result: string;
     try {
       result = resolveBasemindBinary();
-    } catch {
-      return;
+    } catch (err) {
+      if (err instanceof Error && err.message.includes('[basemind] Binary not found')) return;
+      throw err;
     }
     expect(result).toContain('basemind');
     expect(existsSync(result)).toBe(true);
@@ -34,8 +35,9 @@ describe('resolveBasemindBinary', () => {
     let result: string;
     try {
       result = resolveBasemindBinary();
-    } catch {
-      return;
+    } catch (err) {
+      if (err instanceof Error && err.message.includes('[basemind] Binary not found')) return;
+      throw err;
     }
     expect(result).not.toBe('');
   });

@@ -21,8 +21,9 @@ function runCmd(binary: string, args: string[], timeoutMs = 5000): Promise<{ cod
 function tryResolveBinary(): string {
   try {
     return resolveBasemindBinary();
-  } catch {
-    return '';
+  } catch (err) {
+    if (err instanceof Error && err.message.includes('[basemind] Binary not found')) return '';
+    throw err;
   }
 }
 

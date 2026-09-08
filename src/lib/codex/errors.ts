@@ -1069,7 +1069,7 @@ function resolveUsageLimitProviderLabel(
   if (matchesProviderPrefix(modelProvider, "groq")) return "Groq";
   if (matchesProviderPrefix(modelProvider, "xai")) return "xAI";
   if (matchesProviderPrefix(modelProvider, "fireworks")) return "Fireworks AI";
-  if (matchesProviderPrefix(modelProvider, "interpreter")) return "Interpreter";
+  if (matchesProviderPrefix(modelProvider, "interpreter")) return "Hacienda";
 
   return null;
 }
