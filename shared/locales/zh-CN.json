@@ -38,7 +38,7 @@
   "errors.turn.insufficientTokens": "Hacienda 令牌不足。请在账单设置中添加令牌。",
   "errors.turn.internalServerError": "Internal server error. Try again later.",
   "errors.turn.invalidEncryptedContent": "Conversation encrypted content is invalid (organization mismatch). This conversation is unrecoverable.",
-  "errors.turn.lmStudioToolUnsupported": "The selected model from LM Studio doesn't support Hacienda tools.\nChoose a tool-capable model in LM Studio, or switch to an Hacienda hosted model, then retry.",
+  "errors.turn.lmStudioToolUnsupported": "The selected model from LM Studio doesn't support Hacienda tools.\nChoose a tool-capable model in LM Studio, or switch to a Hacienda-hosted model, then retry.",
   "errors.turn.localRuntimeUpdateLmStudio": "Your LM Studio version{{version}} does not support the required message format (developer role). Update LM Studio to the latest version.",
   "errors.turn.localRuntimeUpdateOllama": "Your Ollama version{{version}} does not support the required message format (developer role). Update Ollama to v{{minimumVersion}} or newer.",
   "errors.turn.modelNotSupported": "Model \"{{model}}\" is not available on your current plan. Change your model in profile settings.",

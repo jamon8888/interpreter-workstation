@@ -1,6 +1,7 @@
-import { existsSync } from 'node:fs';
-import { basemindScan, basemindRescan, resolveBasemindBinary, isDaemonRunning } from '../utils/basemindManager';
+import { existsSync, readdirSync } from 'node:fs';
+import { basemindScan, basemindRescan } from '../utils/basemindManager';
 import { resolveXbergPipelineBinary } from '../utils/xbergPipelineBinary';
+import { resolveBasemindBinary } from '../utils/basemindManager';
 import path from 'node:path';
 
 export interface WorkspaceScanRequest {
@@ -50,15 +51,33 @@ export function setIndexingState(inProgress: boolean, count: number = 0) {
   }
 }
 
-const GLOBAL_RESOURCES_DIR = path.join(process.env.HOME ?? process.env.USERPROFILE ?? '', '.local', 'share', 'basemind');
+function hubCacheDir(): string {
+  if (process.env.HF_HUB_CACHE) return process.env.HF_HUB_CACHE;
+  if (process.env.HUGGINGFACE_HUB_CACHE) return process.env.HUGGINGFACE_HUB_CACHE;
+  if (process.env.HF_HOME) return path.join(process.env.HF_HOME, 'hub');
+  const home = process.env.HOME ?? process.env.USERPROFILE ?? '';
+  if (process.env.XDG_CACHE_HOME) return path.join(process.env.XDG_CACHE_HOME, 'huggingface', 'hub');
+  return path.join(home, '.cache', 'huggingface', 'hub');
+}
 
 function resourceReady(resource: 'nerModel' | 'embeddings' | 'reranker'): boolean {
-  const markers: Record<typeof resource, string> = {
-    nerModel: 'ner-model.ready',
-    embeddings: 'embeddings.ready',
-    reranker: 'reranker.ready',
+  // Mirror repos backing each lane (hf-hub layout: models--org--repo/snapshots/).
+  // Presence of any artifact file — snapshots are usually symlinks into blobs,
+  // so symbolic links count — means the backend really has a pack cached.
+  const repos: Record<typeof resource, string> = {
+    nerModel: 'models--xberg-io--gliner-models',
+    embeddings: 'models--xberg-io--embedding-models',
+    reranker: 'models--xberg-io--reranker-models',
   };
-  return existsSync(path.join(GLOBAL_RESOURCES_DIR, markers[resource]));
+  const snapshotsDir = path.join(hubCacheDir(), repos[resource], 'snapshots');
+  if (!existsSync(snapshotsDir)) return false;
+  try {
+    return readdirSync(snapshotsDir, { recursive: true, withFileTypes: true }).some(
+      (e) => e.isFile() || e.isSymbolicLink(),
+    );
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -74,7 +93,13 @@ export function getWorkspaceScanStatus(): WorkspaceScanStatus {
     xbergAvailable = false;
   }
 
-  const basemindAvailable = isDaemonRunning();
+  let basemindAvailable = false;
+  try {
+    resolveBasemindBinary();
+    basemindAvailable = true;
+  } catch {
+    basemindAvailable = false;
+  }
 
   return {
     redactionActive: xbergAvailable,
@@ -84,9 +109,9 @@ export function getWorkspaceScanStatus(): WorkspaceScanStatus {
     xbergAvailable,
     basemindAvailable,
     resourcesReady: {
-      nerModel: basemindAvailable,
-      embeddings: basemindAvailable,
-      reranker: basemindAvailable,
+      nerModel: resourceReady('nerModel'),
+      embeddings: resourceReady('embeddings'),
+      reranker: resourceReady('reranker'),
     },
   };
 }

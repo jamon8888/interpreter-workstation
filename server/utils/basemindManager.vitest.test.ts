@@ -8,12 +8,7 @@ describe('resolveBasemindBinary', () => {
 
   // Smoke-style: cold import of the manager chain can exceed the 5s default.
   it('returns the local debug binary path when it exists', { timeout: 30_000 }, async () => {
-    let resolveBasemindBinary: () => string;
-    try {
-      ({ resolveBasemindBinary } = await import('./basemindManager'));
-    } catch {
-      return;
-    }
+    const { resolveBasemindBinary } = await import('./basemindManager');
     let result: string;
     try {
       result = resolveBasemindBinary();
@@ -26,12 +21,7 @@ describe('resolveBasemindBinary', () => {
   });
 
   it('returns non-empty string on this machine', { timeout: 30_000 }, async () => {
-    let resolveBasemindBinary: () => string;
-    try {
-      ({ resolveBasemindBinary } = await import('./basemindManager'));
-    } catch {
-      return;
-    }
+    const { resolveBasemindBinary } = await import('./basemindManager');
     let result: string;
     try {
       result = resolveBasemindBinary();

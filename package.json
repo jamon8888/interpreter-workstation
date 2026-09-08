@@ -194,7 +194,7 @@
     "@vitejs/plugin-react": "6.0.5",
     "autoprefixer": "10.4.23",
     "babel-plugin-react-compiler": "1.0.0",
-    "@eslint/js": "9.39.5",
+    "@eslint/js": "10.0.1",
     "builder-util-runtime": "9.7.0",
     "concurrently": "9.2.1",
     "cross-env": "10.1.0",

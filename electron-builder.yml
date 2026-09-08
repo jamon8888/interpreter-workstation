@@ -1,4 +1,4 @@
-appId: hacienda
+appId: interpreter
 productName: Hacienda
 protocols:
   - name: Hacienda

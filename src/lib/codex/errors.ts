@@ -30,7 +30,7 @@ const TRY_AGAIN_AT_RE = /\btry again at\s+([^.]+)(?:\.|$)/i;
 const REQUEST_TOO_LARGE_RE =
   /\b(?:payload too large|request too large|tokens per minute|TPM)\b/i;
 const CHATGPT_USAGE_LIMIT_CLARIFIER =
-  "This limit is set by your ChatGPT account and is separate from Interpreter plan usage shown in Settings.";
+  "This limit is set by your ChatGPT account and is separate from Hacienda plan usage shown in Settings.";
 const OPENAI_API_USAGE_LIMIT_CLARIFIER =
   "ChatGPT Pro and Plus do not include OpenAI API usage.";
 const GENERIC_PROVIDER_LABELS = new Set([
@@ -446,13 +446,13 @@ function formatResponsesToolCallingContractMessage(
       : null;
 
   if (providerPrefix && modelId) {
-    return `${modelId} on ${providerPrefix} does not support Interpreter's Responses/tool-calling contract.`;
+    return `${modelId} on ${providerPrefix} does not support Hacienda's Responses/tool-calling contract.`;
   }
   if (providerPrefix) {
-    return `The selected model on ${providerPrefix} does not support Interpreter's Responses/tool-calling contract.`;
+    return `The selected model on ${providerPrefix} does not support Hacienda's Responses/tool-calling contract.`;
   }
   if (modelId) {
-    return `${modelId} does not support Interpreter's Responses/tool-calling contract.`;
+    return `${modelId} does not support Hacienda's Responses/tool-calling contract.`;
   }
   return RESPONSES_TOOL_CALLING_CONTRACT_MESSAGE;
 }

@@ -1647,7 +1647,7 @@
   "threadError.unsupportedResponsesEndpoint.messageWithHost": "L'URL du profil personnalisé pointe vers {{hostname}}, qui ne prend pas en charge le format Responses d'OpenAI.",
   "threadError.unsupportedResponsesEndpoint.messageGeneric": "L'URL de profil personnalisé saisie ne prend pas en charge le format Responses d'OpenAI.",
   "threadError.responsesContract.localTitle": "Le serveur API local ne peut pas exécuter d'agents Hacienda",
-  "threadError.responsesContract.localMessage": "Le serveur API local ou auto-hébergé{{hostname}} a rejeté le format d'outils d'agent d'Hacienda. Il semble n'accepter que les outils fonction, alors que les agents Hacienda exigent les outils personnalisés de l'API Responses.",
+  "threadError.responsesContract.localMessage": "Le serveur API local ou auto-hébergé{{hostname}} a rejeté le format d'outils d'agent d'Hacienda. Il semble n'accepter que les outils de fonction, alors que les agents Hacienda exigent les outils personnalisés de l'API Responses.",
   "threadError.responsesContract.localSuggestion": "Pour les modèles locaux, utilisez le profil Local (Ollama / LM Studio) dans Réglages > Profils. C'est le chemin local le mieux pris en charge. Les serveurs personnalisés comme llama.cpp doivent prendre en charge les outils personnalisés Responses avant d'exécuter des agents Hacienda.",
   "threadError.responsesContract.customTitle": "Le point de terminaison personnalisé ne peut pas exécuter d'agents Hacienda",
   "threadError.responsesContract.customMessage": "Le serveur API personnalisé à {{hostname}} ne prend pas en charge le format d'outils Responses exigé par les agents Hacienda.",

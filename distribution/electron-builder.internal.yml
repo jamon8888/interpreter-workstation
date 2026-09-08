@@ -1,6 +1,6 @@
 extends: ./electron-builder.yml
 
-appId: hacienda-internal
+appId: interpreter-internal
 productName: Hacienda Internal
 
 mac:
