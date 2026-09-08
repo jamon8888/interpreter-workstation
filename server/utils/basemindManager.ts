@@ -2,7 +2,7 @@ import path from 'path';
 import { existsSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import { ToolManager } from '../tools/toolManager';
-import { getMcpService } from '../mcpService';
+import { getMcpService } from './mcpServiceBridge';
 import { resolveBundledResourceCandidates } from './bundledRuntimePaths';
 
 import os from 'node:os';
