@@ -18,7 +18,7 @@ const LMSTUDIO_SINGLE_TOOL_CALL_TEMPLATE_ERROR =
 const EXPECTED_LMSTUDIO_TOOL_SUPPORT_GUIDANCE = [
   LMSTUDIO_SINGLE_TOOL_CALL_TEMPLATE_ERROR,
   "",
-  "The selected model from LM Studio doesn't support Interpreter tools.",
+  "The selected model from LM Studio doesn't support Hacienda tools.",
   "Choose a tool-capable model in LM Studio, or switch to an Interpreter hosted model, then retry.",
 ].join("\n");
 
@@ -862,7 +862,7 @@ describe("applyChatEvent", () => {
 
       assert.equal(
         state.error,
-        "This endpoint/model does not support Interpreter's Responses/tool-calling contract.",
+        "This endpoint/model does not support Hacienda's Responses/tool-calling contract.",
       );
       assert.equal(textContent(state.draft!), "");
     });

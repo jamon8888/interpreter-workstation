@@ -13,7 +13,7 @@ const LMSTUDIO_SINGLE_TOOL_CALL_TEMPLATE_ERROR =
 const EXPECTED_LMSTUDIO_TOOL_SUPPORT_GUIDANCE = [
   LMSTUDIO_SINGLE_TOOL_CALL_TEMPLATE_ERROR,
   "",
-  "The selected model from LM Studio doesn't support Interpreter tools.",
+  "The selected model from LM Studio doesn't support Hacienda tools.",
   "Choose a tool-capable model in LM Studio, or switch to an Interpreter hosted model, then retry.",
 ].join("\n");
 const IMAGE_INPUT_ROUTE_UNAVAILABLE_MESSAGE =
@@ -660,7 +660,7 @@ describe("mapNotificationToUiEvents", () => {
     if (events[0]?.event === "error") {
       assert.equal(
         eventPayloadMessage(events[0]),
-        "The selected model on OpenRouter does not support Interpreter's Responses/tool-calling contract.",
+        "The selected model on OpenRouter does not support Hacienda's Responses/tool-calling contract.",
       );
     }
   });

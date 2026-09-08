@@ -645,8 +645,8 @@ function providerDisplayName(provider?: string): string {
   switch (provider) {
     case 'openai-oauth': return 'ChatGPT';
     case 'claude-oauth': return 'Claude';
-    case 'hosted': return 'Interpreter';
-    case 'interpreter': return 'Interpreter';
+    case 'hosted': return 'Hacienda';
+    case 'interpreter': return 'Hacienda';
     case 'groq': return 'Groq';
     case 'lmstudio': return 'LM Studio';
     case 'ollama': return 'Ollama';

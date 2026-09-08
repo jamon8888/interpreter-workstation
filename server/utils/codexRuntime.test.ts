@@ -442,7 +442,7 @@ describe('selectAgentRuntimeLogEvent', () => {
       'formattedMessagePreview="stream disconnected before completion: Error rendering prompt with jinja template:',
     );
     expect(lmStudioTemplateErrorLogLine?.message).toContain(
-      "The selected model from LM Studio doesn't support Interpreter tools.",
+      "The selected model from LM Studio doesn't support Hacienda tools.",
     );
     expect(lmStudioTemplateErrorLogLine?.message).toContain('formattedChanged=true');
 

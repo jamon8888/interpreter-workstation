@@ -446,13 +446,13 @@ function formatResponsesToolCallingContractMessage(
       : null;
 
   if (providerPrefix && modelId) {
-    return `${modelId} on ${providerPrefix} does not support Interpreter's Responses/tool-calling contract.`;
+    return `${modelId} on ${providerPrefix} does not support Hacienda's Responses/tool-calling contract.`;
   }
   if (providerPrefix) {
-    return `The selected model on ${providerPrefix} does not support Interpreter's Responses/tool-calling contract.`;
+    return `The selected model on ${providerPrefix} does not support Hacienda's Responses/tool-calling contract.`;
   }
   if (modelId) {
-    return `${modelId} does not support Interpreter's Responses/tool-calling contract.`;
+    return `${modelId} does not support Hacienda's Responses/tool-calling contract.`;
   }
   return RESPONSES_TOOL_CALLING_CONTRACT_MESSAGE;
 }
