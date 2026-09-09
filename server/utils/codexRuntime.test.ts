@@ -442,7 +442,7 @@ describe('selectAgentRuntimeLogEvent', () => {
       'formattedMessagePreview="stream disconnected before completion: Error rendering prompt with jinja template:',
     );
     expect(lmStudioTemplateErrorLogLine?.message).toContain(
-      "The selected model from LM Studio doesn't support Interpreter tools.",
+      "The selected model from LM Studio doesn't support Hacienda tools.",
     );
     expect(lmStudioTemplateErrorLogLine?.message).toContain('formattedChanged=true');
 
@@ -506,7 +506,7 @@ describe('selectAgentRuntimeLogEvent', () => {
       `rawMessagePreview="Error running remote compact task: You've hit your usage limit."`,
     );
     expect(turnCompletedLogLine?.message).toContain(
-      `formattedMessagePreview="You've hit your ChatGPT usage limit. This limit is set by your ChatGPT account and is separate from Interpreter plan usage shown in Settings."`,
+      `formattedMessagePreview="You've hit your ChatGPT usage limit. This limit is set by your ChatGPT account and is separate from Hacienda plan usage shown in Settings."`,
     );
     expect(turnCompletedLogLine?.message).toContain('formattedChanged=true');
   });
