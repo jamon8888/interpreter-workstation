@@ -50,7 +50,7 @@ function logInterpreterCliError(
 ): void {
   const log = status >= 500 ? console.error : console.warn;
   log(
-    `[Interpreter CLI] ${req.method} ${req.originalUrl} failed (${status}): ${message}`,
+    `[Hacienda CLI] ${req.method} ${req.originalUrl} failed (${status}): ${message}`,
     error instanceof Error ? error.stack ?? error.message : error,
   );
 }
@@ -326,7 +326,7 @@ router.post('/config/restart-runtime', async (req: Request, res: Response) => {
       reason: typeof req.body.reason === 'string' ? req.body.reason : undefined,
     }));
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to restart Interpreter runtime.';
+    const message = error instanceof Error ? error.message : 'Failed to restart Hacienda runtime.';
     const status = message === 'Unknown interpreter caller token.' ? 401 : 500;
     return res.status(status).json({ error: message });
   }

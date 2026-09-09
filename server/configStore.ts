@@ -231,7 +231,7 @@ export interface AppConfig {
   skillFolders?: string[]; // Custom skill folder paths (in addition to default locations)
   allowModelSkillEditing?: boolean; // Allow model to write to the skills folder (default: false)
 
-  // Interpreter Overlay settings
+  // Hacienda Overlay settings
   interpreterOverlay?: InterpreterOverlaySettings;
 
   // i18n
@@ -2345,7 +2345,7 @@ export function getBooleanUISettingSync(id: BooleanUISettingId): boolean {
 }
 
 /**
- * Get the Interpreter Overlay settings.
+ * Get the Hacienda Overlay settings.
  */
 export async function getInterpreterOverlaySettings(): Promise<InterpreterOverlaySettings> {
   const config = await loadConfig();
@@ -2353,7 +2353,7 @@ export async function getInterpreterOverlaySettings(): Promise<InterpreterOverla
 }
 
 /**
- * Set the Interpreter Overlay settings.
+ * Set the Hacienda Overlay settings.
  */
 export async function setInterpreterOverlaySettings(
   settings: InterpreterOverlaySettings,

@@ -174,7 +174,7 @@ export const ONBOARDING_MODEL_PACKS = {
     profiles: [
       {
         id: 'onboarding:interpreter-smart',
-        name: 'Interpreter Smart',
+        name: 'Hacienda Smart',
         provider: 'hosted',
         providerId: BUILTIN_PROVIDER_IDS.HOSTED,
         modelId: PROVIDER_MODEL_DEFAULTS.hosted.main,
@@ -182,7 +182,7 @@ export const ONBOARDING_MODEL_PACKS = {
       },
       {
         id: 'onboarding:interpreter-fast',
-        name: 'Interpreter Fast',
+        name: 'Hacienda Fast',
         provider: 'hosted',
         providerId: BUILTIN_PROVIDER_IDS.HOSTED,
         modelId: PROVIDER_MODEL_DEFAULTS.hosted.fast,

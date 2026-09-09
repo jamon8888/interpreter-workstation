@@ -410,10 +410,10 @@ Config aliases:
   ${INTERPRETER_CONFIG_ALIAS_LIST}
 
 Behavior:
-  Runtime permission changes like sandbox, read scope, and network access take effect after Interpreter restarts.
+  Runtime permission changes like sandbox, read scope, and network access take effect after Hacienda restarts.
   Approval policy changes apply immediately.
-  --restart-runtime asks whether to reset Interpreter's agent runtime now.
-  config restart-runtime asks whether to reset Interpreter's agent runtime without changing another setting.
+  --restart-runtime asks whether to reset Hacienda's agent runtime now.
+  config restart-runtime asks whether to reset Hacienda's agent runtime without changing another setting.
   Restarting stops running conversations for every agent.
 
 Underlying tools:
@@ -685,7 +685,7 @@ file_bridge_request() {
 
   while [ ! -f "$response_status_path" ]; do
     if [ ! -d "$bridge_dir" ]; then
-      echo "Interpreter CLI bridge disconnected while waiting for response." >&2
+      echo "Hacienda CLI bridge disconnected while waiting for response." >&2
       rm -rf "$request_dir" "$response_dir"
       exit 1
     fi
@@ -802,7 +802,7 @@ stream_tool_call_request() {
   fi
 
   rm -rf "$stream_dir"
-  echo "Interpreter CLI stream ended without a result." >&2
+  echo "Hacienda CLI stream ended without a result." >&2
   return 1
 }
 
@@ -910,7 +910,7 @@ request_json() {
   if [ -n "$body" ]; then
     printf '%s\n' "$body" >&2
   else
-    printf 'Interpreter CLI request failed with HTTP %s.\n' "$response_status" >&2
+    printf 'Hacienda CLI request failed with HTTP %s.\n' "$response_status" >&2
   fi
   return 1
 }
@@ -1675,7 +1675,7 @@ function showConfigUsage() {
   process.stderr.write('Current Settings tabs: ${INTERPRETER_SETTINGS_TAB_LIST}\\n');
   process.stderr.write(${JSON.stringify(INTERPRETER_CONFIG_COMMON_SETTINGS_HELP)});
   process.stderr.write('Config aliases: ${INTERPRETER_CONFIG_ALIAS_LIST}\\n');
-  process.stderr.write('Behavior: Runtime permission changes like sandbox, read scope, and network access take effect after Interpreter restarts. Approval policy changes apply immediately. --restart-runtime asks whether to reset Interpreter\\'s agent runtime now. config restart-runtime asks without changing another setting. Restarting stops running conversations for every agent.\\n');
+  process.stderr.write('Behavior: Runtime permission changes like sandbox, read scope, and network access take effect after Hacienda restarts. Approval policy changes apply immediately. --restart-runtime asks whether to reset Interpreter\\'s agent runtime now. config restart-runtime asks without changing another setting. Restarting stops running conversations for every agent.\\n');
   process.stderr.write('Underlying tools:\\n');
   process.stderr.write('  interpreter-app tools builtin-interpreter interpreter_settings_get --help\\n');
   process.stderr.write('  interpreter-app tools builtin-interpreter interpreter_settings_set --help\\n');
@@ -1915,7 +1915,7 @@ async function streamToolRequest(url, options) {
             return;
           }
           if (finalResult === null) {
-            fail('Interpreter CLI stream ended without a result.');
+            fail('Hacienda CLI stream ended without a result.');
             return;
           }
           fs.writeSync(1, finalResult);
@@ -2420,7 +2420,7 @@ function Show-ConfigUsage {
   [Console]::Error.WriteLine('Common settings you can change:')
   [Console]::Error.WriteLine('${INTERPRETER_CONFIG_COMMON_SETTINGS_LIST}')
   [Console]::Error.WriteLine('Config aliases: ${INTERPRETER_CONFIG_ALIAS_LIST}')
-  [Console]::Error.WriteLine('Behavior: Runtime permission changes like sandbox, read scope, and network access take effect after Interpreter restarts. Approval policy changes apply immediately. --restart-runtime asks whether to reset Interpreter''s agent runtime now. config restart-runtime asks without changing another setting. Restarting stops running conversations for every agent.')
+  [Console]::Error.WriteLine('Behavior: Runtime permission changes like sandbox, read scope, and network access take effect after Hacienda restarts. Approval policy changes apply immediately. --restart-runtime asks whether to reset Interpreter''s agent runtime now. config restart-runtime asks without changing another setting. Restarting stops running conversations for every agent.')
 }
 
 function Show-LayoutUsage {
@@ -2517,7 +2517,7 @@ function Invoke-InterpreterCliFileBridgeRequest([string]$bridgeDir, [string]$req
     if (-not (Test-Path -LiteralPath $bridgeDir)) {
       Remove-Item -LiteralPath $requestDir -Recurse -Force -ErrorAction SilentlyContinue
       Remove-Item -LiteralPath $responseDir -Recurse -Force -ErrorAction SilentlyContinue
-      throw 'Interpreter CLI bridge disconnected while waiting for response.'
+      throw 'Hacienda CLI bridge disconnected while waiting for response.'
     }
 
     Flush-InterpreterCliFileBridgeProgress
@@ -2645,7 +2645,7 @@ function Invoke-InterpreterCliToolStream([string]$uri, [string]$body) {
     }
 
     if ($null -eq $finalResult) {
-      throw 'Interpreter CLI stream ended without a result.'
+      throw 'Hacienda CLI stream ended without a result.'
     }
 
     [Console]::Out.Write($finalResult)

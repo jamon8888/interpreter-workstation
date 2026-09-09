@@ -134,7 +134,7 @@ const TARGETED_GUI_TOOLS = new Set([
   'zoom',
 ]);
 
-const SELF_AUTOMATION_BLOCK_MESSAGE = 'Interpreter cannot use Computer Use to inspect or control its own app windows.';
+const SELF_AUTOMATION_BLOCK_MESSAGE = 'Hacienda cannot use Computer Use to inspect or control its own app windows.';
 
 function firstExistingPath(candidates: string[]): string | null {
   return candidates.find((candidate) => fs.existsSync(candidate)) ?? null;
@@ -567,7 +567,7 @@ function browserControlWindowSummary(status: BrowserControlStatus) {
   });
 }
 
-const BROWSER_POLICY_DENIAL_PREFIX = 'Interpreter browser settings blocked this request.';
+const BROWSER_POLICY_DENIAL_PREFIX = 'Hacienda browser settings blocked this request.';
 
 function browserReadModeIsDeny(policy: BrowserAccessPolicy, profilePolicyId: string): boolean {
   const normalizedPolicy = normalizeBrowserAccessPolicy(policy);
@@ -2648,38 +2648,38 @@ function windowsDiscoveryApprovalCopy(toolName: string): { message: string; warn
     case 'list_apps':
     case 'list_windows':
       return {
-        message: 'Let Interpreter list your running apps and windows?',
-        warning: 'Interpreter can see app names, window titles, and which window is currently active.',
+        message: 'Let Hacienda list your running apps and windows?',
+        warning: 'Hacienda can see app names, window titles, and which window is currently active.',
       };
     case 'list_automation_targets':
       return {
-        message: 'Let Interpreter inspect available Windows automation targets?',
-        warning: 'Interpreter can see open windows and which automation methods each one supports.',
+        message: 'Let Hacienda inspect available Windows automation targets?',
+        warning: 'Hacienda can see open windows and which automation methods each one supports.',
       };
     case 'list_com_objects':
       return {
-        message: 'Let Interpreter list Windows COM automation objects?',
-        warning: 'Interpreter will read registered automation object names from the Windows registry. It will not open or control apps.',
+        message: 'Let Hacienda list Windows COM automation objects?',
+        warning: 'Hacienda will read registered automation object names from the Windows registry. It will not open or control apps.',
       };
     case 'check_permissions':
       return {
-        message: 'Let Interpreter check desktop automation permissions?',
-        warning: 'Interpreter will check whether Windows automation is available for this session.',
+        message: 'Let Hacienda check desktop automation permissions?',
+        warning: 'Hacienda will check whether Windows automation is available for this session.',
       };
     case 'get_screen_size':
       return {
-        message: 'Let Interpreter read your screen size?',
-        warning: 'Interpreter will only read display dimensions.',
+        message: 'Let Hacienda read your screen size?',
+        warning: 'Hacienda will only read display dimensions.',
       };
     case 'get_cursor_position':
       return {
-        message: 'Let Interpreter read the mouse position?',
-        warning: 'Interpreter will only read the current cursor coordinates.',
+        message: 'Let Hacienda read the mouse position?',
+        warning: 'Hacienda will only read the current cursor coordinates.',
       };
     default:
       return {
-        message: 'Let Interpreter inspect desktop automation status?',
-        warning: 'Interpreter will read automation status for this session.',
+        message: 'Let Hacienda inspect desktop automation status?',
+        warning: 'Hacienda will read automation status for this session.',
       };
   }
 }
@@ -2696,14 +2696,14 @@ function windowsAccessApprovalCopy(kind: 'inspect' | 'control', target: string):
   const quotedTarget = quoteApprovalTarget(target);
   if (kind === 'inspect') {
     return {
-      message: `Let Interpreter inspect ${quotedTarget}?`,
-      warning: 'Interpreter can read visible text, controls, and window structure from that app.',
+      message: `Let Hacienda inspect ${quotedTarget}?`,
+      warning: 'Hacienda can read visible text, controls, and window structure from that app.',
     };
   }
 
   return {
-    message: `Let Interpreter control ${quotedTarget}?`,
-    warning: 'Interpreter may click, type, or change state in that app.',
+    message: `Let Hacienda control ${quotedTarget}?`,
+    warning: 'Hacienda may click, type, or change state in that app.',
   };
 }
 
@@ -2787,7 +2787,7 @@ async function requestWindowsForegroundApprovalForPointerIfNeeded(
 
   const quotedTarget = quoteApprovalTarget(target);
   const action = toolName === 'drag' ? 'drag' : 'click';
-  const message = `Let Interpreter bring ${quotedTarget} forward and ${action}?`;
+  const message = `Let Hacienda bring ${quotedTarget} forward and ${action}?`;
   const approvalContext = await withApprovalAppIcon(
     {
       toolName,
@@ -2843,13 +2843,13 @@ async function requestMacForegroundApprovalIfNeeded(
   const pid = integerArg(args, 'pid');
   const target = pid !== null ? await describePidTarget(pid) : 'the requested app';
   const quotedTarget = quoteApprovalTarget(target);
-  const message = `Let Interpreter bring ${quotedTarget} forward if required?`;
+  const message = `Let Hacienda bring ${quotedTarget} forward if required?`;
   const approvalContext = await withApprovalAppIcon(
     {
       toolName,
       target,
       message,
-      warning: 'Interpreter may need to focus or bring the app forward to send a native mouse action.',
+      warning: 'Hacienda may need to focus or bring the app forward to send a native mouse action.',
       recommendation: 'If you do not allow this, the agent should use background-safe actions such as AXPress element clicks, set_value, type_text, or press_key with a focused element.',
     },
     toolName,
@@ -3137,8 +3137,8 @@ async function ensureMacComputerUsePermissionsBeforeDaemon(): Promise<void> {
   }
 
   throw new Error(
-    'Interpreter needs Accessibility and Screen Recording permission before Computer Use can start. '
-    + 'Open Computer Use Setup in Interpreter and grant both macOS permissions.',
+    'Hacienda needs Accessibility and Screen Recording permission before Computer Use can start. '
+    + 'Open Computer Use Setup in Hacienda and grant both macOS permissions.',
   );
 }
 
@@ -3261,8 +3261,8 @@ async function requestApproval(
     const copy = process.platform === 'win32'
       ? windowsDiscoveryApprovalCopy(toolName)
       : {
-          message: 'Let Interpreter list your running apps and windows?',
-          warning: 'Interpreter can see app names, window titles, and which window is currently active.',
+          message: 'Let Hacienda list your running apps and windows?',
+          warning: 'Hacienda can see app names, window titles, and which window is currently active.',
         };
     const approval = await approvalManager.createSessionAwareApproval(
       process.platform === 'win32' ? `cua_driver:discover:${toolName}` : 'cua_driver:discover_apps',
@@ -3317,12 +3317,12 @@ async function requestApproval(
     ? windowsAccessApprovalCopy(kind, displayTarget)
     : kind === 'inspect'
       ? {
-          message: `Let Interpreter inspect "${displayTarget}"?`,
-          warning: 'Interpreter can read visible text, controls, and window structure from that app.',
+          message: `Let Hacienda inspect "${displayTarget}"?`,
+          warning: 'Hacienda can read visible text, controls, and window structure from that app.',
         }
       : {
-          message: `Let Interpreter control "${displayTarget}"?`,
-          warning: 'Interpreter may click, type, or change state in that app.',
+          message: `Let Hacienda control "${displayTarget}"?`,
+          warning: 'Hacienda may click, type, or change state in that app.',
         };
   const approvalContext = await withApprovalAppIcon(
     { toolName, target: displayTarget, rawTarget: target, app: displayTarget, message: copy.message },
