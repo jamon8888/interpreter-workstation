@@ -253,6 +253,18 @@ export async function getBasemindServerStatus() {
   return toolManager.getServerStatus(BASEMIND_SERVER_ID);
 }
 
+export function isDaemonRunning(): boolean {
+  const binary = resolveBasemindBinary();
+  if (!binary) return false;
+  try {
+    const { execFileSync } = require('node:child_process') as typeof import('node:child_process');
+    execFileSync(binary, ['statusline', '-q'], { timeout: 3000 });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Check for missing models and download them in the background.
  * Non-blocking: call with .catch(() => {}) after server registration.
