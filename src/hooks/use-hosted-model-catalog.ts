@@ -17,7 +17,7 @@ export interface HostedModelCatalogState {
 }
 
 /**
- * Fetch the hosted OpenRouter model catalog from the Interpreter runtime.
+ * Fetch the hosted OpenRouter model catalog from the Hacienda runtime.
  *
  * Replaces the baked-in `GENERATED_OPENROUTER_CATALOG` snapshot so the picker
  * reflects whatever the bundled runtime can serve. On failure the catalog stays

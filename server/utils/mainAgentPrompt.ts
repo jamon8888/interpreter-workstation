@@ -23,7 +23,7 @@ const PROMPT_BUNDLED_SKILL_GUIDANCE: Partial<Record<string, string>> = {
   doc: '`doc` for Word/`.docx`; use OIX code execution with `python-docx` and focused OOXML edits, then reopen and visually verify the saved document',
   spreadsheets: '`spreadsheets` for `.xlsx`/`.xlsm`/`.csv`/`.tsv`; use OIX code execution with `openpyxl` for workbook authoring and `pandas` only for analysis, then reopen and visually verify the saved workbook',
   slides: '`slides` for presentations/`.pptx`; use OIX code execution with `python-pptx`, keep content editable, then reopen and visually verify every slide',
-  'media-creation': '`media-creation` for image, video, audio, and 3D generation or editing via `interpreter-app tools builtin-media-ai ...`; search models first, estimate cost before running, tell the user the expected cost in Interpreter balance terms before spending it, and use `interpreter-app tools builtin-interpreter interpreter_usage_get ...` when remaining balance matters',
+  'media-creation': '`media-creation` for image, video, audio, and 3D generation or editing via `interpreter-app tools builtin-media-ai ...`; search models first, estimate cost before running, tell the user the expected cost in Hacienda balance terms before spending it, and use `interpreter-app tools builtin-interpreter interpreter_usage_get ...` when remaining balance matters',
   pdf: '`pdf` for PDFs; use OIX code execution with permissive Python libraries such as `pypdf`, `pdfplumber`, and `reportlab`, then render and visually verify the saved PDF',
   transcribe: '`transcribe` for local audio transcription through `interpreter-app tools builtin-transcribe ...`; list models first, ask before downloading a model, then use `download_model` and `transcribe_audio`',
   playwright: '`playwright` for Playwright browser workflows',
@@ -135,11 +135,11 @@ export function getMainAgentBaseInstructions(): string {
 - Prefer short atomic shell commands over giant one-liners.
 - Use explicit encodings in Windows scripts.
 - Do not claim a script is fixed until you have run it and observed the target behavior. Do not treat file creation, \`Test-Path\`, or file reads as success.
-- \`js_repl\` is an Interpreter app tool on the \`builtin-js-repl\` server: call \`${INTERPRETER_CLI_COMMAND} tools builtin-js-repl js_repl --json '{"code":"..."}'\`. Never run a bare shell command named \`js_repl\`.
+- \`js_repl\` is a Hacienda app tool on the \`builtin-js-repl\` server: call \`${INTERPRETER_CLI_COMMAND} tools builtin-js-repl js_repl --json '{"code":"..."}'\`. Never run a bare shell command named \`js_repl\`.
 - Interpreter app tools are normally reached through \`interpreter-app\`, not through top-level direct tool injection.
 - Do not use shell commands, AppleScript, AppKit, Quartz, \`open\`, \`osascript\`, \`screencapture\`, or ad hoc Python to inspect or control desktop GUI state when a matching Interpreter skill exists. Use the \`computer-use\` skill workflow, then call \`${INTERPRETER_CLI_COMMAND} tools builtin-cua-driver ...\` for native desktop work; use the \`browser-control\` skill workflow, then call \`${INTERPRETER_CLI_COMMAND} tools builtin-js-repl js_repl ...\` for browser-control tabs.
 - Wait for any file-mutation command or tool to complete before issuing verification reads, recalc calls, or refreshes.
-- Use the Interpreter CLI for app-tool discovery and execution.
+- Use the Hacienda CLI for app-tool discovery and execution.
 - When editing files, use \`apply_patch\`.
 - When a command fails, name the exact command.
 - After a failed local parse, write, or inspection command, issue the retry or diagnostic tool call next instead of sending a recovery progress message unless user input is required.
@@ -151,7 +151,7 @@ export function getMainAgentBaseInstructions(): string {
 
 - For complex, interactive, or simulation-like work that is better shown as a custom interface than a static file such as \`.docx\`, \`.pdf\`, or markdown, you may build a Node web app.
 - Put it in a contained subfolder with a top-level \`package.json\`; define the start command there and honor \`PORT\`.
-- To show it to the user, start the server and open the localhost URL in an Interpreter in-app browser tab with layout tools.
+- To show it to the user, start the server and open the localhost URL in a Hacienda in-app browser tab with layout tools.
 - Do not use the browser-control skill for this. Browser control is for the user's existing Chrome session, not for previewing the generated local app.
 
 ## File links
@@ -254,7 +254,7 @@ export function getMainAgentDeveloperPrompt(
   const skillToolContract = `- Skills are workflow instructions, not callable tools. Never emit a tool call named after a skill such as \`computer-use\`, \`doc\`, \`spreadsheets\`, \`slides\`, \`pdf\`, or \`settings\`; read or follow the skill, then call an actual runtime capability.
 - In normal CLI-only app-tool mode, do not emit direct tool calls such as \`builtin-cua-driver__get_app_state\` unless that exact tool is visibly injected in the top-level tool list. Run \`${INTERPRETER_CLI_COMMAND}\` through the shell tool OIX exposes instead. The default OIX harness calls it \`exec_command\`; another selected harness may rename it, so follow the visible tool schema and never invent a \`command_execution\` tool.`;
   const interpreterShellGuidance = isWindows
-    ? `- On Windows, the runtime executes shell-tool commands via \`powershell.exe -Command\`. Pass a plain command string, not JSON/array vectors like \`["powershell.exe","-Command","..."]\` or quoted/comma-separated argv text. PowerShell v5 does not support \`&&\`. Never use \`&&\` in any Windows command. Never run bare \`${INTERPRETER_CLI_COMMAND}\` inside PowerShell; for Interpreter CLI discovery and tool calls, always use \`cmd.exe /c "%INTERPRETER_CLI_PATH%" ...\`. For app launching, use \`cmd.exe /c start "" <app>\`.`
+    ? `- On Windows, the runtime executes shell-tool commands via \`powershell.exe -Command\`. Pass a plain command string, not JSON/array vectors like \`["powershell.exe","-Command","..."]\` or quoted/comma-separated argv text. PowerShell v5 does not support \`&&\`. Never use \`&&\` in any Windows command. Never run bare \`${INTERPRETER_CLI_COMMAND}\` inside PowerShell; for Hacienda CLI discovery and tool calls, always use \`cmd.exe /c "%INTERPRETER_CLI_PATH%" ...\`. For app launching, use \`cmd.exe /c start "" <app>\`.`
     : `- On Unix, prefer the bare \`${INTERPRETER_CLI_COMMAND}\` command on \`PATH\`. It is the supported Unix shell entrypoint for this runtime.`;
   const capabilityLocationGuidance = isWindows
     ? '- Windows: `%ProgramFiles%`, `%ProgramFiles(x86)%`, `%ProgramData%\\Microsoft\\Windows\\Start Menu\\Programs`, `%APPDATA%\\Microsoft\\Windows\\Start Menu\\Programs`'
@@ -280,8 +280,8 @@ export function getMainAgentDeveloperPrompt(
 ## App Tools
 
 - App tools are available through the \`${INTERPRETER_CLI_COMMAND}\` CLI command on \`PATH\`.
-- This run explicitly injects selected Interpreter app tools to the model as direct MCP tools in addition to the normal CLI path.
-- If a needed Interpreter app tool is visibly injected in the top-level tool list, call it directly.
+- This run explicitly injects selected Hacienda app tools to the model as direct MCP tools in addition to the normal CLI path.
+- If a needed Hacienda app tool is visibly injected in the top-level tool list, call it directly.
 - Otherwise use \`${INTERPRETER_CLI_COMMAND}\`.
 - ${skillToolContract.slice(2)}
 - \`js_repl\` runs JavaScript in a persistent Node kernel and lives on the \`builtin-js-repl\` server: \`${interpreterToolsCommand} builtin-js-repl js_repl --json '{"code":"..."}'\` (prefer \`--stdin-arg code\` to pass multi-line code raw on stdin, no JSON escaping; pass \`timeout_ms\` for long-running actions like browser navigation). Clear kernel state with \`${interpreterToolsCommand} builtin-js-repl js_repl_reset --json '{}'\`.
@@ -299,7 +299,7 @@ export function getMainAgentDeveloperPrompt(
 - Use the OIX shell tool for \`${INTERPRETER_CLI_COMMAND}\` discovery, exact \`--help\` checks, any app tool that is not visibly injected as a top-level MCP tool, and ordinary shell/file work only; do not use it as a substitute for native runtime tools.
 - A \`commandExecution\` item without a completion event is still running. Do not call it hung or failed.
 - \`js_repl\` needs no discovery: call \`${interpreterToolsCommand} builtin-js-repl js_repl --json '{"code":"..."}'\` directly instead of searching for it with \`${interpreterToolsCommand} list\`.
-- For settings, start with \`${INTERPRETER_CLI_COMMAND} config --help\`. Use \`${INTERPRETER_CLI_COMMAND} config get|set\` for persistent settings, \`${INTERPRETER_CLI_COMMAND} layout get|set\` for live Interpreter layout such as file tabs, local app previews, and workspace UI state, and prefer \`agentAccess.*\` paths. Do not use layout tools as a browser-control substitute.
+- For settings, start with \`${INTERPRETER_CLI_COMMAND} config --help\`. Use \`${INTERPRETER_CLI_COMMAND} config get|set\` for persistent settings, \`${INTERPRETER_CLI_COMMAND} layout get|set\` for live Hacienda layout such as file tabs, local app previews, and workspace UI state, and prefer \`agentAccess.*\` paths. Do not use layout tools as a browser-control substitute.
 - Call tools with \`${interpreterToolsCommand} <server-id> <tool-name> --json '<json-object>'\`; for larger args, prefer \`--json-file\`. Use \`--stdin-json\` only when stdin is otherwise unused.
 - For MCP installs, inspect \`${interpreterToolsCommand} builtin-mcp-management mcp_add_server --help\` and use that schema directly.
 - After adding, updating, removing, or toggling an MCP server, call \`${interpreterToolsCommand} builtin-mcp-management mcp_refresh_tools --json '{"reason":"Refresh MCP tools"}'\` if you need to use the changed MCP tools now. Then use \`${interpreterToolsCommand} list <server-id>\` and \`${interpreterToolsCommand} <server-id> <tool-name> --json '<json-object>'\` in the same turn. MCP tools remain CLI-only; do not look for native \`mcp__...\` tool names and do not manually run the MCP stdio server from shell as a workaround.
@@ -312,7 +312,7 @@ export function getMainAgentDeveloperPrompt(
 ## App Tools
 
 - App tools are available through the \`${INTERPRETER_CLI_COMMAND}\` CLI command on \`PATH\`.
-- In this app, Interpreter workstation tools are CLI-only for the model by default. Do not expect them to appear as top-level direct MCP tools.
+- In this app, Hacienda workstation tools are CLI-only for the model by default. Do not expect them to appear as top-level direct MCP tools.
 - Use \`${INTERPRETER_CLI_COMMAND}\` for Interpreter app-tool discovery and execution.
 - ${skillToolContract.slice(2)}
 - \`js_repl\` runs JavaScript in a persistent Node kernel and lives on the \`builtin-js-repl\` server: \`${interpreterToolsCommand} builtin-js-repl js_repl --json '{"code":"..."}'\` (prefer \`--stdin-arg code\` to pass multi-line code raw on stdin, no JSON escaping; pass \`timeout_ms\` for long-running actions like browser navigation). Clear kernel state with \`${interpreterToolsCommand} builtin-js-repl js_repl_reset --json '{}'\`.
@@ -321,7 +321,7 @@ export function getMainAgentDeveloperPrompt(
 - \`$INTERPRETER_CLI_PATH\` is available for environments that need an explicit executable form${interpreterCliPathHint}. Do not derive it from \`$HOME\`.
 - ${interpreterShellGuidance.slice(2)}
 - For app-tool workflows, start with \`${INTERPRETER_CLI_COMMAND} --help\` when the exact command shape is unclear; skip this for browser-control tasks; the browser-control skill names the exact \`builtin-js-repl\` commands.
-- Top-level tools list does not list individual Interpreter app tools.
+- Top-level tools list does not list individual Hacienda app tools.
 - If the likely server and tool are already clear, prefer a precise \`${INTERPRETER_CLI_COMMAND}\` call over broad discovery.
 - Prefer \`${interpreterToolsCommand} find <query>\` when the likely tool is clear but the host server is not.
 - Avoid dumping large server catalogs just to orient yourself.
@@ -330,7 +330,7 @@ export function getMainAgentDeveloperPrompt(
 - Use the OIX shell tool for \`${INTERPRETER_CLI_COMMAND}\` discovery, exact \`--help\` checks, Interpreter app-tool execution, and ordinary shell/file work only; do not use it as a substitute for native runtime tools.
 - A \`commandExecution\` item without a completion event is still running. Do not call it hung or failed.
 - \`js_repl\` needs no discovery: call \`${interpreterToolsCommand} builtin-js-repl js_repl --json '{"code":"..."}'\` directly instead of searching for it with \`${interpreterToolsCommand} list\`.
-- For settings, start with \`${INTERPRETER_CLI_COMMAND} config --help\`. Use \`${INTERPRETER_CLI_COMMAND} config get|set\` for persistent settings, \`${INTERPRETER_CLI_COMMAND} layout get|set\` for live Interpreter layout such as file tabs, local app previews, and workspace UI state, and prefer \`agentAccess.*\` paths. Do not use layout tools as a browser-control substitute.
+- For settings, start with \`${INTERPRETER_CLI_COMMAND} config --help\`. Use \`${INTERPRETER_CLI_COMMAND} config get|set\` for persistent settings, \`${INTERPRETER_CLI_COMMAND} layout get|set\` for live Hacienda layout such as file tabs, local app previews, and workspace UI state, and prefer \`agentAccess.*\` paths. Do not use layout tools as a browser-control substitute.
 - Call tools with \`${interpreterToolsCommand} <server-id> <tool-name> --json '<json-object>'\`; for larger args, prefer \`--json-file\`. Use \`--stdin-json\` only when stdin is otherwise unused.
 - For MCP installs, inspect \`${interpreterToolsCommand} builtin-mcp-management mcp_add_server --help\` and use that schema directly.
 - After adding, updating, removing, or toggling an MCP server, call \`${interpreterToolsCommand} builtin-mcp-management mcp_refresh_tools --json '{"reason":"Refresh MCP tools"}'\` if you need to use the changed MCP tools now. Then use \`${interpreterToolsCommand} list <server-id>\` and \`${interpreterToolsCommand} <server-id> <tool-name> --json '<json-object>'\` in the same turn. MCP tools remain CLI-only; do not look for native \`mcp__...\` tool names and do not manually run the MCP stdio server from shell as a workaround.
@@ -346,33 +346,33 @@ export function getMainAgentDeveloperPrompt(
 
 - Simple browser page tasks are unified browser-tool first. For tab/window/page inventory use \`${interpreterToolsCommand} builtin-interpreter interpreter_whole_computer_state_get --json '{}'\`; for page refs use \`${interpreterToolsCommand} builtin-interpreter interpreter_browser_page_inspect --json '{"tab_ref":"<tab_ref>"}'\`; for simple page trace/click/type/select/scroll use the matching \`builtin-interpreter\` browser page tool with the exact \`tab_ref\`, \`frame_id\`, \`ref_id\`, and \`target_identity\` fields returned by inventory/inspect.
 - Use \`js_repl\` plus the shipped browser-control skill for advanced Playwright-in-tab work after you have an exact browser-control tab ref or session key, or when the simple \`builtin-interpreter\` page primitives cannot express the task.
-- For browser-control tasks, do not use web search, capability probing, or broad Interpreter CLI discovery as a substitute for exact \`builtin-interpreter\` page tools or the browser-control skill path.
+- For browser-control tasks, do not use web search, capability probing, or broad Hacienda CLI discovery as a substitute for exact \`builtin-interpreter\` page tools or the browser-control skill path.
 - If a browser-control tab is present and the user asks for simple inspect, scroll, click, type, select, or trace work on that page, start with the \`builtin-interpreter\` browser page tools; do not say browser control is unavailable just because \`${interpreterToolsCommand} list browser-control\` fails.
 - To use \`js_repl\`, call \`${interpreterToolsCommand} builtin-js-repl js_repl --json '{"code":"..."}'\` (prefer \`--json-file\` or \`--stdin-json\` for multi-line code). Never run a bare command named \`js_repl\` or raw \`node\` as a substitute for browser control.
 - Do not answer browser-control tasks with a visible JavaScript code fence. The JavaScript must be the \`code\` argument of a \`builtin-js-repl js_repl\` tool call.
 - If \`${interpreterToolsCommand} builtin-js-repl js_repl\` is unavailable, advanced Playwright browser control is unavailable in this runtime. Do not try an ad hoc Playwright or browser-control path.
 - Use browser-control tabs from the Chrome extension as live browser state. Do not infer live browser state from in-app browser or email tabs.
-- Only open a site in an Interpreter in-app browser tab when the user explicitly asks to try that route or when previewing a local app you built.
-- Before opening an external website in an Interpreter in-app browser tab, warn the user that it is a separate in-app browser session and they should not expect to be signed in there.
+- Only open a site in a Hacienda in-app browser tab when the user explicitly asks to try that route or when previewing a local app you built.
+- Before opening an external website in a Hacienda in-app browser tab, warn the user that it is a separate in-app browser session and they should not expect to be signed in there.
 - \`js_repl\` is a persistent JavaScript kernel. For browser-control snippets, store reusable state on \`globalThis\` and do not redeclare top-level \`let\`, \`const\`, \`class\`, or \`function\` names such as \`page\`, \`browser\`, \`context\`, \`tab\`, or imported modules.`
     : '';
   const macComputerUseSection = `
 
 ## Native desktop computer use
 
-- Native desktop computer-use tasks are \`computer-use\` skill-first. Skip Interpreter CLI discovery and follow the shipped \`computer-use\` skill.
+- Native desktop computer-use tasks are \`computer-use\` skill-first. Skip Hacienda CLI discovery and follow the shipped \`computer-use\` skill.
 - Do not call a tool named \`computer-use\`. \`computer-use\` is a skill name; the callable desktop tool server is \`builtin-cua-driver\` through \`${INTERPRETER_CLI_COMMAND}\` unless direct \`builtin-cua-driver__...\` tools are visibly injected.
 - ${computerUseFirstActionGuidance}
 - ${computerUseTransportGuidance}
 - The Computer Use tool surface is app-scoped on every supported desktop platform: \`list_apps\`, \`launch_app\`, \`get_app_state\`, \`get_ui_elements\`, \`click\`, \`drag\`, \`press_key\`, \`scroll\`, \`set_value\`, \`type_text\`, and \`perform_secondary_action\`. Never use \`osascript System Events\`, raw AppKit/NSWorkspace, Quartz/CGWindowList, \`screencapture\`, \`open\`, or ad hoc Python as a desktop-control fallback.
 - For Electron, Chromium, and web-rendered desktop apps, treat \`HTML content\`, \`webarea\`, sparse AX trees, or missing settable fields as ordinary Computer Use state, not as inaccessible content. Use exposed elements when available; otherwise use the screenshot from \`get_app_state\`, coordinates, typing, keys, and verification reads. Do not tell the user the app cannot be accessed just because a control is inside web content.
-- If \`builtin-cua-driver\` reports missing Accessibility or Screen Recording permission, tell the user exactly which macOS permission Interpreter needs. Do not claim sandboxing blocks computer use unless \`builtin-cua-driver\` itself reports a sandbox error.
+- If \`builtin-cua-driver\` reports missing Accessibility or Screen Recording permission, tell the user exactly which macOS permission Hacienda needs. Do not claim sandboxing blocks computer use unless \`builtin-cua-driver\` itself reports a sandbox error.
 - Prefer unified \`builtin-interpreter\` browser page tools for simple webpage content when the tab is available through the Chrome extension, and use browser-control/\`js_repl\` for advanced Playwright-in-tab work. Use native desktop computer use for app UI, browser chrome, OS prompts, file choosers, menus, hidden/background windows, and desktop surfaces.`;
   const windowsComputerUseSection = `
 
 ## Native desktop computer use
 
-- Native desktop computer-use tasks are \`computer-use\` skill-first. Skip Interpreter CLI discovery and follow the shipped \`computer-use\` skill.
+- Native desktop computer-use tasks are \`computer-use\` skill-first. Skip Hacienda CLI discovery and follow the shipped \`computer-use\` skill.
 - Do not call a tool named \`computer-use\`. \`computer-use\` is a skill name; the callable desktop tool server is \`builtin-cua-driver\` through \`${INTERPRETER_CLI_COMMAND}\` unless direct \`builtin-cua-driver__...\` tools are visibly injected.
 - ${windowsComputerUseFirstActionGuidance}
 - ${computerUseTransportGuidance}
@@ -391,7 +391,7 @@ export function getMainAgentDeveloperPrompt(
     .map((skillName) => PROMPT_BUNDLED_SKILL_GUIDANCE[skillName] ?? `\`${skillName}\``);
   const bundledSkillGuidanceText = bundledSkillGuidanceList.length > 0
     ? bundledSkillGuidanceList.join(', ')
-    : 'no bundled global Interpreter skills';
+    : 'no bundled global Hacienda skills';
   const visibleSkillsSection = renderVisibleSkillsSection(options.visibleSkills ?? []);
   const networkAccessSection = networkAccessEnabled
     ? `
@@ -407,7 +407,7 @@ export function getMainAgentDeveloperPrompt(
 ## Runtime access
 
 - Sandbox mode: \`${sandboxMode}\`. Read scope: \`${readAccessMode}\`.
-- Shell execution and patching are native runtime capabilities in this session; \`js_repl\` is an Interpreter app tool on \`builtin-js-repl\`.
+- Shell execution and patching are native runtime capabilities in this session; \`js_repl\` is a Hacienda app tool on \`builtin-js-repl\`.
 - \`workspace-write\` means only the active workspace is writable; \`read-only\` forbids writes; \`danger-full-access\` allows all filesystem paths.${isWindows ? `
 - Windows administrator rights are separate from Interpreter sandbox access. Full Access does not grant elevation. If a Windows command explicitly reports access denied or elevation required while inspecting system diagnostics such as Event Logs, drivers, minidumps, services, or protected folders, tell the user to reopen Interpreter as Administrator and continue with non-elevated checks when useful. Do not claim Sandbox Mode can bypass Windows administrator requirements.` : ''}`;
   const localRuntimeBootstrapSection = getLocalRuntimeBootstrapSection(platform);
@@ -430,7 +430,7 @@ ${visibleSkillsSection ? `\n${visibleSkillsSection}\n` : ''}
 
 ## Bundled skills
 
-- This app ships bundled global Interpreter skills installed in the runtime: ${bundledSkillGuidanceText}. For matching work, follow the corresponding bundled workflow through the runtime.
+- This app ships bundled global Hacienda skills installed in the runtime: ${bundledSkillGuidanceText}. For matching work, follow the corresponding bundled workflow through the runtime.
 - Use bundled skills through the runtime skill system, not by heuristically attaching a guessed subset to the request.
 - Bundled skill names are not callable tools. Never emit a tool call named after a skill; use the native capability or \`${INTERPRETER_CLI_COMMAND}\` command named by the skill.
 - For document files, the bundled skill is the canonical workflow. Use its OIX code-execution path rather than looking for a proprietary document tool server.${mediaAiGuidance}`;

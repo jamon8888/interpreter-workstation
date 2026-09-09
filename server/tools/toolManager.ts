@@ -1120,7 +1120,7 @@ export class ToolManager {
         approvalToolName,
         serverId,
         {
-          message: 'Interpreter wants to use an MCP tool.',
+          message: 'Hacienda wants to use an MCP tool.',
           description: 'Review this action before continuing.',
           serverId,
           toolName,

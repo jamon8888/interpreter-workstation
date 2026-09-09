@@ -1,7 +1,7 @@
 /**
  * Get Layout Tool
  *
- * Reads the Interpreter layout (or a sub-path of it) as an agent-friendly JSON object.
+ * Reads the Hacienda layout (or a sub-path of it) as an agent-friendly JSON object.
  * Replaces getContextTool and listTabsTool with a single, path-addressable tool.
  */
 
@@ -11,7 +11,7 @@ import { workstationService } from '../../../../electron/services/workstation';
 export const getLayoutTool: BuiltinToolDefinition = {
   name: 'interpreter_get',
   description:
-    'Read the Interpreter layout. Returns the full layout tree with panes, tabs, sidebars, and workspace path. ' +
+    'Read the Hacienda layout. Returns the full layout tree with panes, tabs, sidebars, and workspace path. ' +
     'Use the `path` parameter with lodash-style syntax to read a specific part (e.g. "tree", "tree.children[0].tabs", "sidebars.left", "active_pane_id"). ' +
     'Empty path returns the entire layout object. The response includes a `you_are` field with your own tab_id so you can identify yourself in the tree.\n\n' +
     'Spatial layout of the tree:\n' +
@@ -49,7 +49,7 @@ export const getLayoutTool: BuiltinToolDefinition = {
               type: 'text',
               text: path
                 ? `No value found at path "${path}". The layout or window may not be ready.`
-                : 'Interpreter layout is not available. The window may not be ready.',
+                : 'Hacienda layout is not available. The window may not be ready.',
             },
           ],
           isError: true,
@@ -84,7 +84,7 @@ export const getLayoutTool: BuiltinToolDefinition = {
         content: [
           {
             type: 'text',
-            text: `Failed to get Interpreter layout: ${error.message}`,
+            text: `Failed to get Hacienda layout: ${error.message}`,
           },
         ],
         isError: true,

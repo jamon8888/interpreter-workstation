@@ -1,7 +1,7 @@
 /**
  * Settings Get Tool
  *
- * Get Interpreter settings using JS-style path syntax.
+ * Get Hacienda settings using JS-style path syntax.
  * Examples: "theme", "profiles[0].name", "mcpServers.nylas", "" (entire config)
  */
 
@@ -15,7 +15,7 @@ const { get } = lodash;
 export const settingsGetTool: BuiltinToolDefinition = {
   name: 'interpreter_settings_get',
   description:
-    `Get Interpreter settings using JS path syntax. Start with \`${INTERPRETER_CLI_COMMAND} config --help\` to see common settings paths. Examples: "theme", "profiles[0].name", "mcpServers.nylas", "" (empty = entire config).`,
+    `Get Hacienda settings using JS path syntax. Start with \`${INTERPRETER_CLI_COMMAND} config --help\` to see common settings paths. Examples: "theme", "profiles[0].name", "mcpServers.nylas", "" (empty = entire config).`,
   inputSchema: {
     type: 'object',
     properties: {
@@ -47,7 +47,7 @@ export const settingsGetTool: BuiltinToolDefinition = {
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
       return {
-        content: [{ type: 'text', text: `Failed to get Interpreter settings: ${message}` }],
+        content: [{ type: 'text', text: `Failed to get Hacienda settings: ${message}` }],
         isError: true,
       };
     }

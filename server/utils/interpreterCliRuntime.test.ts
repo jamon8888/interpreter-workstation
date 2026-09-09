@@ -233,7 +233,7 @@ describe('interpreterCliRuntime', () => {
       expect(script).toContain('mktemp -d "$staging_root/req-XXXXXX"');
       expect(script).toContain('query="saveToDisk=$save_to_disk"');
       expect(script).toContain('saveToDiskPath=$(url_encode "$save_to_disk_path")');
-      expect(script).toContain('Interpreter CLI bridge disconnected while waiting for response.');
+      expect(script).toContain('Hacienda CLI bridge disconnected while waiting for response.');
       expect(script).not.toContain("printf 'req-$$-");
       expect(script).not.toContain('Timed out waiting for interpreter CLI response.');
     } finally {

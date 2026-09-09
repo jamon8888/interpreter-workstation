@@ -760,7 +760,7 @@ export async function resolveOrInstallOixRuntime(
   if (explicitBinary) {
     if (!existsSync(explicitBinary) || !(await probeBinary(explicitBinary))) {
       throw new Error(
-        `[oix-runtime] INTERPRETER_OIX_PATH is not a valid Open Interpreter runtime: ${explicitBinary}`,
+        `[oix-runtime] INTERPRETER_OIX_PATH is not a valid Open Hacienda runtime: ${explicitBinary}`,
       );
     }
     const packageResolution = packageForBinary(explicitBinary, platform);
@@ -818,6 +818,6 @@ export async function resolveOrInstallOixRuntime(
   }
 
   throw new Error(
-    `[oix-runtime] No valid bundled Open Interpreter runtime was found. Checked packages: ${bundledCandidates.join(", ")}`,
+    `[oix-runtime] No valid bundled Open Hacienda runtime was found. Checked packages: ${bundledCandidates.join(", ")}`,
   );
 }

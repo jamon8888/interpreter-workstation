@@ -11,7 +11,7 @@ import { workstationService } from '../../../../electron/services/workstation';
 export const getSelectionTool: BuiltinToolDefinition = {
   name: 'interpreter_get_selection',
   description:
-    'Get the current selection in Interpreter. Returns text, file, or Office document selection details as JSON. Returns null if nothing is selected.',
+    'Get the current selection in Hacienda. Returns text, file, or Office document selection details as JSON. Returns null if nothing is selected.',
   inputSchema: {
     type: 'object',
     properties: {},
