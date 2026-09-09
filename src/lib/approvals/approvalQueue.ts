@@ -65,7 +65,7 @@ function ownerDisplayName(approval: QuestionRequest, ownerAgentId: string | unde
     return tabs[ownerAgentId].label.trim();
   }
 
-  return 'Hacienda';
+  return 'Interpreter';
 }
 
 function ownerGroupKey(owner: ApprovalQueueOwner): string {

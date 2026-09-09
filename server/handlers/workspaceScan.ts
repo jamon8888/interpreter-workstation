@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs';
-import { basemindScan, basemindRescan, resolveBasemindBinary, isDaemonRunning } from '../utils/basemindManager';
+import { basemindScan, basemindRescan } from '../utils/basemindManager';
 import { resolveXbergPipelineBinary } from '../utils/xbergPipelineBinary';
+import { resolveBasemindBinary } from '../utils/basemindManager';
 import path from 'node:path';
 
 export interface WorkspaceScanRequest {
@@ -50,7 +51,7 @@ export function setIndexingState(inProgress: boolean, count: number = 0) {
   }
 }
 
-const GLOBAL_RESOURCES_DIR = path.join(process.env.HOME ?? process.env.USERPROFILE ?? '', '.local', 'share', 'basemind');
+const GLOBAL_RESOURCES_DIR = path.join(process.env.HOME ?? process.env.USERPROFILE ?? '', '.cache', 'basemind');
 
 function resourceReady(resource: 'nerModel' | 'embeddings' | 'reranker'): boolean {
   const markers: Record<typeof resource, string> = {
@@ -74,7 +75,13 @@ export function getWorkspaceScanStatus(): WorkspaceScanStatus {
     xbergAvailable = false;
   }
 
-  const basemindAvailable = isDaemonRunning();
+  let basemindAvailable = false;
+  try {
+    resolveBasemindBinary();
+    basemindAvailable = true;
+  } catch {
+    basemindAvailable = false;
+  }
 
   return {
     redactionActive: xbergAvailable,
@@ -84,9 +91,9 @@ export function getWorkspaceScanStatus(): WorkspaceScanStatus {
     xbergAvailable,
     basemindAvailable,
     resourcesReady: {
-      nerModel: basemindAvailable,
-      embeddings: basemindAvailable,
-      reranker: basemindAvailable,
+      nerModel: resourceReady('nerModel'),
+      embeddings: resourceReady('embeddings'),
+      reranker: resourceReady('reranker'),
     },
   };
 }

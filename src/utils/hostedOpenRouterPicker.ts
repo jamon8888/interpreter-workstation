@@ -137,12 +137,12 @@ export function buildHostedModelPickerGroups(
   return [
     {
       id: 'interpreter',
-      label: 'Hacienda',
+      label: 'Interpreter',
       items: interpreterModels.map((model) => ({
         id: model.id,
         name: model.name,
         secondaryLabel: model.id,
-        provider: 'Hacienda',
+        provider: 'Interpreter',
         description: '',
       })),
     },

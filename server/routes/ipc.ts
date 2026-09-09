@@ -182,10 +182,8 @@ const handlers: Record<string, Record<string, HandlerFn>> = {
   // ========== Basemind MCP Server Lifecycle ==========
   basemind: {
     register: async () => {
-      const { registerBasemindServer, checkAndDownloadMissingModels } = await import('../utils/basemindManager');
+      const { registerBasemindServer } = await import('../utils/basemindManager');
       const serverId = await registerBasemindServer();
-      // Background model check - non-blocking, fire-and-forget
-      checkAndDownloadMissingModels().catch(() => {});
       return { serverId };
     },
     unregister: async () => {
@@ -203,23 +201,17 @@ const handlers: Record<string, Record<string, HandlerFn>> = {
     },
     download: async () => {
       const { basemindDownload } = await import('../handlers/basemindDownload');
-      const results: Array<{ stage: string; success: boolean; skipped?: boolean; skipReason?: string; error?: string }> = [];
+      const results: Array<{ stage: string; success: boolean; error?: string }> = [];
       for await (const update of basemindDownload()) {
         if (update.done || update.error) {
           results.push({
             stage: update.stage,
-            success: update.done && !update.skipped,
-            skipped: update.skipped,
-            skipReason: update.skipReason,
+            success: update.done,
             error: update.error,
           });
         }
       }
-      return { stages: results, success: results.every(r => r.success || r.skipped) };
-    },
-    cpuFeatures: async () => {
-      const { cpuFeatures } = await import('../handlers/cpuFeatures');
-      return cpuFeatures();
+      return { stages: results, success: results.every(r => r.success) };
     },
   },
 

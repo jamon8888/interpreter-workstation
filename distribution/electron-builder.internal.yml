@@ -1,7 +1,7 @@
 extends: ./electron-builder.yml
 
 appId: interpreter-internal
-productName: Hacienda Internal
+productName: Interpreter Internal
 
 mac:
   sign: null

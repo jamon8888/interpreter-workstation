@@ -351,9 +351,9 @@ class ElectronInstanceManager {
           }
         : {}),
       NODE_ENV: "test",
-      INTERPRETER_APP_NAME: process.env.INTERPRETER_APP_NAME || "Hacienda",
+      INTERPRETER_APP_NAME: process.env.INTERPRETER_APP_NAME || "Interpreter",
       INTERPRETER_DEV_APP_NAME:
-        process.env.INTERPRETER_DEV_APP_NAME || "Hacienda",
+        process.env.INTERPRETER_DEV_APP_NAME || "Interpreter",
       PLAYWRIGHT_ELECTRON_REPL: "1",
       ELECTRON_ENABLE_LOGGING: "1",
       NODE_V8_COVERAGE: path.join(testRunDir, "coverage-backend"),

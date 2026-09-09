@@ -33,8 +33,8 @@ import { readImageTool } from './readImageTool';
 
 export const interpreterServerDefinition: BuiltinServerDefinition = {
   id: 'builtin-interpreter',
-  name: 'Hacienda',
-  description: 'Query and control the Hacienda app UI',
+  name: 'Interpreter',
+  description: 'Query and control the Interpreter app UI',
   isBuiltin: true,
   tools: [
     getContextTool,

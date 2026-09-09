@@ -1499,7 +1499,7 @@ describe('interpreterCliRuntime', () => {
     const server = createServer((req, res) => {
       if (req.method === 'GET' && req.url === '/api/interpreter-cli/tools') {
         res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end('[{"id":"builtin-interpreter","name":"Hacienda"}]');
+        res.end('[{"id":"builtin-interpreter","name":"Interpreter"}]');
         return;
       }
       res.writeHead(404, { 'Content-Type': 'text/plain' });

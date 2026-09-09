@@ -1,6 +1,6 @@
 export const ACTIVE_BRAND = {
-  id: 'hacienda',
-  appName: 'Hacienda',
+  id: 'interpreter',
+  appName: 'Interpreter',
   accent: '#111111',
   accentForeground: '#ffffff',
   logoColor: '#202123',

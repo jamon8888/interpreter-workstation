@@ -62,20 +62,20 @@ describe('buildHostedModelPickerGroups', () => {
     expect(buildHostedModelPickerGroups(interpreterModels, openRouterModels)).toEqual([
       {
         id: 'interpreter',
-        label: 'Hacienda',
+        label: 'Interpreter',
         items: [
           {
             id: 'interpreter-smart',
             name: 'Interpreter Smart',
             secondaryLabel: 'interpreter-smart',
-            provider: 'Hacienda',
+            provider: 'Interpreter',
             description: '',
           },
           {
             id: 'interpreter-fast',
             name: 'Interpreter Fast',
             secondaryLabel: 'interpreter-fast',
-            provider: 'Hacienda',
+            provider: 'Interpreter',
             description: '',
           },
         ],

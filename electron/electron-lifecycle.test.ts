@@ -12,7 +12,7 @@ import {
 class FakeApp extends EventEmitter {
   public packaged = false;
   public ready = false;
-  public name = 'Hacienda';
+  public name = 'Interpreter';
   public version = '1.2.3';
   public quitCalls = 0;
   public exitCodes: number[] = [];
