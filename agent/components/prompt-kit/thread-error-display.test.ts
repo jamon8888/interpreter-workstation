@@ -231,7 +231,7 @@ describe("parseError / structured objects", () => {
   test("type_payment_required_with_explicit_user_credit_signal_returns_interpreter_credits_exhausted", () => {
     const r = parseError({
       type: "payment_required",
-      message: "[not_enough_tokens]: User has insufficient interpreter tokens. Please buy more interpreter tokens",
+      message: "[not_enough_tokens]: User has insufficient hacienda tokens. Please buy more interpreter tokens",
     }, undefined, undefined, false);
     assertInterpreterCreditsExhausted(r, "free");
   });
@@ -1255,7 +1255,7 @@ describe("parseError / string patterns", () => {
 
   test("payment_required_openrouter_with_explicit_user_credit_signal_returns_interpreter_credits_exhausted", () => {
     const r = parseError(
-      "unexpected status 402 Payment Required: [not_enough_tokens]: User has insufficient interpreter tokens, url: https://hosted.example.test/v0/openrouter/responses",
+      "unexpected status 402 Payment Required: [not_enough_tokens]: User has insufficient hacienda tokens, url: https://hosted.example.test/v0/openrouter/responses",
       undefined,
       undefined,
       true,
@@ -1264,7 +1264,7 @@ describe("parseError / string patterns", () => {
   });
 
   test("formatted_insufficient_interpreter_tokens_message_returns_interpreter_credits_exhausted", () => {
-    const r = parseError("Insufficient interpreter tokens. Add tokens in billing settings.");
+    const r = parseError("Insufficient Hacienda tokens. Add tokens in billing settings.");
     assertInterpreterCreditsExhausted(r);
   });
 
@@ -1799,7 +1799,7 @@ describe("parseError / edge cases", () => {
 });
 
 // ---------------------------------------------------------------------------
-// 4. Interpreter token exhaustion copy
+// 4. Hacienda token exhaustion copy
 // ---------------------------------------------------------------------------
 
 describe("interpreter token exhaustion copy", () => {
@@ -1839,7 +1839,7 @@ describe("interpreter token exhaustion copy", () => {
     await i18n.changeLanguage("ru");
 
     try {
-      const result = parseError("Insufficient interpreter tokens. Add tokens in billing settings.");
+      const result = parseError("Insufficient Hacienda tokens. Add tokens in billing settings.");
 
       assert.equal(result.type, "interpreter_credits_exhausted");
       assert.equal(result.title, "Токены Hacienda исчерпаны");
@@ -1875,7 +1875,7 @@ describe("parseError / return value structure", () => {
     { label: "auth (unauthorized)", input: "unauthorized" },
     { label: "session_expired", input: "session expired" },
     { label: "provider_usage_limit", input: "usage limit reached" },
-    { label: "interpreter_credits_exhausted", input: "[not_enough_tokens]: User has insufficient interpreter tokens" },
+    { label: "interpreter_credits_exhausted", input: "[not_enough_tokens]: User has insufficient hacienda tokens" },
     { label: "content_filter", input: "Output blocked by content filtering policy" },
     { label: "rate_limit (string)", input: "rate limit exceeded" },
     { label: "network", input: "failed to fetch" },

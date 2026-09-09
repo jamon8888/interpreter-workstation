@@ -395,6 +395,7 @@ function isContentFilterError(errorStr: string): boolean {
 function hasExplicitUserCreditsExhaustedSignal(errorStr: string): boolean {
   return errorStr.includes('user_credits_exhausted')
     || errorStr.includes('[not_enough_tokens]')
+    || errorStr.includes('insufficient hacienda token')
     || errorStr.includes('insufficient interpreter token');
 }
 

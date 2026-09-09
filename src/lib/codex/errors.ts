@@ -20,7 +20,7 @@ const HTTP_401_UNAUTHORIZED_RE = /\b401\b[^\n]*\bUnauthorized\b/i;
 const MISSING_AUTHORIZATION_HEADER_RE =
   /"loc"\s*:\s*\[\s*"header"\s*,\s*"authorization"\s*\]/i;
 const NOT_ENOUGH_TOKENS_RE =
-  /\[not_enough_tokens\]|\bInsufficient interpreter tokens\b/i;
+  /\[not_enough_tokens\]|\bInsufficient (?:Hacienda|interpreter) tokens\b/i;
 const INVALID_ENCRYPTED_CONTENT_RE = /\binvalid_encrypted_content\b/i;
 const ORG_MISMATCH_RE = /\borganization_id did not match\b/i;
 const RESPONSES_ENDPOINT_PATH_RE = /\/responses(?:\b|[/?#])/i;
@@ -1380,7 +1380,7 @@ const EXACT_TURN_ERROR_KEYS = new Map<string, LocaleKey>([
 
 function describeResponsesContractMessage(message: string): TurnErrorDescriptor | null {
   const providerModel = message.match(
-    /^(.+) on (.+) does not support Interpreter's Responses\/tool-calling contract\.$/,
+    /^(.+) on (.+) does not support (?:Hacienda|Interpreter)'s Responses\/tool-calling contract\.$/,
   );
   if (providerModel) {
     return key("errors.turn.responsesContract.providerModel", {
@@ -1390,7 +1390,7 @@ function describeResponsesContractMessage(message: string): TurnErrorDescriptor 
   }
 
   const provider = message.match(
-    /^The selected model on (.+) does not support Interpreter's Responses\/tool-calling contract\.$/,
+    /^The selected model on (.+) does not support (?:Hacienda|Interpreter)'s Responses\/tool-calling contract\.$/,
   );
   if (provider) {
     return key("errors.turn.responsesContract.provider", {
@@ -1399,7 +1399,7 @@ function describeResponsesContractMessage(message: string): TurnErrorDescriptor 
   }
 
   const model = message.match(
-    /^(.+) does not support Interpreter's Responses\/tool-calling contract\.$/,
+    /^(.+) does not support (?:Hacienda|Interpreter)'s Responses\/tool-calling contract\.$/,
   );
   if (model) {
     return key("errors.turn.responsesContract.model", {
@@ -1486,8 +1486,8 @@ function describeUsageLimitMessage(message: string): TurnErrorDescriptor | null 
 
 function describeLmStudioPromptTemplateMessage(message: string): TurnErrorDescriptor | null {
   const guidance = [
-    "The selected model from LM Studio doesn't support Interpreter tools.",
-    "Choose a tool-capable model in LM Studio, or switch to an Interpreter hosted model, then retry.",
+    "The selected model from LM Studio doesn't support Hacienda tools.",
+    "Choose a tool-capable model in LM Studio, or switch to a Hacienda-hosted model, then retry.",
   ].join("\n");
   if (message === guidance) {
     return key("errors.turn.lmStudioToolUnsupported");
