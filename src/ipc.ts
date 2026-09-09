@@ -629,8 +629,17 @@ interface WorkspaceScanIpc {
 }
 
 interface BasemindDownloadResult {
-  stages: Array<{ stage: string; success: boolean; error?: string }>;
+  stages: Array<{ stage: string; success: boolean; skipped?: boolean; skipReason?: string; error?: string }>;
   success: boolean;
+}
+
+interface CpuFeatures {
+  arch: string;
+  avx2: boolean;
+  avx: boolean;
+  sse4_1: boolean;
+  sse4_2: boolean;
+  neon: boolean;
 }
 
 interface BasemindIpc {
@@ -638,6 +647,7 @@ interface BasemindIpc {
   unregister(): Promise<{ success: boolean }>;
   status(): Promise<{ status: string }>;
   download(): Promise<BasemindDownloadResult>;
+  cpuFeatures(): Promise<CpuFeatures>;
 }
 
 interface ProjectRunnerIpc {
@@ -696,7 +706,7 @@ export const workspaceScan: WorkspaceScanIpc = isMarketingDemoMode()
   ? { status: async () => { throw new Error('Not available in demo mode'); } }
   : (client.workspaceScan as WorkspaceScanIpc);
 export const basemind: BasemindIpc = isMarketingDemoMode()
-  ? { register: async () => { throw new Error('Not available in demo mode'); }, unregister: async () => { throw new Error('Not available in demo mode'); }, status: async () => { throw new Error('Not available in demo mode'); }, download: async () => { throw new Error('Not available in demo mode'); } }
+  ? { register: async () => { throw new Error('Not available in demo mode'); }, unregister: async () => { throw new Error('Not available in demo mode'); }, status: async () => { throw new Error('Not available in demo mode'); }, download: async () => { throw new Error('Not available in demo mode'); }, cpuFeatures: async () => ({ arch: 'unknown', avx2: false, avx: false, sse4_1: false, sse4_2: false, neon: false }) }
   : (client.basemind as BasemindIpc);
 export const setup = client.setup;
 export const computerUseSetup: ComputerUseSetupIpc = {

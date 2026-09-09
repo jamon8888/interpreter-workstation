@@ -607,7 +607,7 @@ export function PlanSectionContent() {
             onToggle={() => setAdvancedUsageExpanded((expanded) => !expanded)}
           >
             <UsageBreakdownRow
-              label="Interpreter"
+              label="Hacienda"
               percentage={percentLeft}
               summary={`${Math.round(percentLeft)}% ${t('settings.plan.remaining')}`}
               icon={(
