@@ -130,7 +130,7 @@ jobs:
       - name: Build exact-identity unsigned official package
         run: pnpm run package:official:candidate:mac-x64
       - name: Verify official identity, hosted profile, and packaged resources
-        run: pnpm run release:verify:official-candidate
+        run: pnpm run release:verify:official-candidate -- mac-x64
       - name: Write checksums and release notes
         working-directory: dist
         run: |

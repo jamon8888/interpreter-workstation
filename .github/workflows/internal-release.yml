@@ -43,7 +43,7 @@ jobs:
       - name: Build unsigned official internal package
         run: pnpm run package:internal:mac-arm64
       - name: Verify official overlay and packaged resources
-        run: pnpm run release:verify:internal
+        run: pnpm run release:verify:internal -- mac-arm64
       - name: Write checksums and release notes
         working-directory: dist
         run: |
@@ -132,7 +132,7 @@ jobs:
       - name: Build unsigned official internal package
         run: pnpm run package:internal:mac-x64
       - name: Verify official overlay and packaged resources
-        run: pnpm run release:verify:internal
+        run: pnpm run release:verify:internal -- mac-x64
       - name: Write checksums and release notes
         working-directory: dist
         run: |
@@ -180,23 +180,6 @@ jobs:
             dist/Interpreter.Internal*.dmg \
             dist/Interpreter.Internal*.zip \
             dist/SHA256SUMS \
-            --repo "$GITHUB_REPOSITORY" \
-            --target "$GITHUB_SHA" \
-            --title "Interpreter Internal v${version} (Intel x64)" \
-            --notes-file dist/INTERNAL_RELEASE.md \
-            --prerelease
-      - name: Publish prerelease to private artifact repository after OSS publication
-        if: ${{ !github.event.repository.private && vars.INTERNAL_RELEASE_REPOSITORY != '' }}
-        env:
-          GH_TOKEN: ${{ secrets.INTERNAL_RELEASE_TOKEN }}
-          INTERNAL_RELEASE_REPOSITORY: ${{ vars.INTERNAL_RELEASE_REPOSITORY }}
-        run: |
-          version=$(node -p "require('./package.json').internalVersion")
-          tag="internal-v${version}-build.${GITHUB_RUN_NUMBER}"
-          gh release create "$tag" \
-            dist/Interpreter.Internal*.dmg \
-            dist/Interpreter.Internal*.zip \
-            dist/SHA256SUMS \
             --repo "$INTERNAL_RELEASE_REPOSITORY" \
             --target "$GITHUB_SHA" \
             --title "Interpreter Internal v${version} (Intel x64)" \
@@ -215,6 +198,7 @@ jobs:
             dist/Interpreter.Internal*.zip \
             dist/SHA256SUMS \
             --repo "$INTERNAL_RELEASE_REPOSITORY" \
-            --title "Interpreter Internal v${version}" \
+            --target "$GITHUB_SHA" \
+            --title "Interpreter Internal v${version} (Intel x64)" \
             --notes-file dist/INTERNAL_RELEASE.md \
             --prerelease

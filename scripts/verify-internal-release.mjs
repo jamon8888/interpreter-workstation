@@ -7,7 +7,8 @@ import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const distRoot = path.join(root, 'dist');
-const appBundle = path.join(distRoot, 'mac-arm64', 'Interpreter Internal.app');
+const arch = process.argv[2] || process.env.BUILD_ARCH || 'mac-arm64';
+const appBundle = path.join(distRoot, arch, 'Interpreter Internal.app');
 const resources = path.join(appBundle, 'Contents', 'Resources');
 const appAsar = path.join(resources, 'app.asar');
 const requireFromApp = createRequire(path.join(root, 'package.json'));
