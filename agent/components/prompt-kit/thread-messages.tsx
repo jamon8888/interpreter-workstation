@@ -851,7 +851,7 @@ export function isMountedUserMessageFullyOutOfView({
 }
 
 export function mountedMessageRowSelector(index: number): string {
-  return `[data-index="${index}"]`;
+  return `.oa-thread-virtual-block > [data-index="${index}"]`;
 }
 
 export function observeStickyUserMessageLayout({
@@ -872,9 +872,11 @@ export function observeStickyUserMessageLayout({
 
   const resizeObserver = new ResizeObserver(scheduleLayoutChange);
   const observeMountedRows = () => {
-    scrollContainer.querySelectorAll<HTMLElement>('[data-index]').forEach((row) => {
-      resizeObserver.observe(row);
-    });
+    scrollContainer
+      .querySelectorAll<HTMLElement>('.oa-thread-virtual-block > [data-index]')
+      .forEach((row) => {
+        resizeObserver.observe(row);
+      });
   };
 
   observeMountedRows();
@@ -927,12 +929,18 @@ function useStickyUserMessageHeader({
   // scrollTop against an absolute item offset, not the virtualizer-local one.
   virtualBlockTop: number;
 }) {
-  // Kept as a no-op shim so per-message register/unregister calls in MessageBubble
-  // remain valid. Position-based sticky no longer depends on DOM refs.
+  const mountedMessageElementsRef = useRef(new Map<string, HTMLElement>());
+  const computePinnedRef = useRef<() => void>(() => {});
   const contextValue = useMemo<StickyUserMessageContextValue>(
     () => ({
-      registerMessage: () => {},
-      unregisterMessage: () => {},
+      registerMessage: (id, _content, element) => {
+        mountedMessageElementsRef.current.set(id, element);
+        requestAnimationFrame(() => computePinnedRef.current());
+      },
+      unregisterMessage: (id) => {
+        mountedMessageElementsRef.current.delete(id);
+        requestAnimationFrame(() => computePinnedRef.current());
+      },
     }),
     [],
   );
@@ -975,9 +983,14 @@ function useStickyUserMessageHeader({
       // The virtualizer's internal element cache can briefly lag the actual
       // mounted rows during measurement/scroll updates. Query the rendered
       // row first so a visible long prompt can never also appear as sticky.
-      const mountedElement = scrollContainer.querySelector<HTMLElement>(
+      // MessageBubble registers the exact element for this logical message.
+      // Prefer it over selector lookup so nested components that happen to use
+      // data-index can never impersonate the virtualized source row.
+      const registeredElement = mountedMessageElementsRef.current.get(entry.id);
+      const mountedRow = scrollContainer.querySelector<HTMLElement>(
         mountedMessageRowSelector(entry.index),
       ) ?? virtualizer.elementsCache.get(entry.id);
+      const mountedElement = registeredElement ?? mountedRow;
       const mountedRect = mountedElement?.getBoundingClientRect();
       const measuredSize = resolveMeasuredUserMessageSize({
         mountedSize: mountedRect?.height,
@@ -1019,6 +1032,7 @@ function useStickyUserMessageHeader({
       setPinnedContent(candidate.content);
     }
   }, [pinnedContent, scrollContainer, userMessageEntries, virtualBlockTop, virtualizer]);
+  computePinnedRef.current = computePinned;
 
   useEffect(() => {
     if (!scrollContainer) return;
