@@ -13,6 +13,7 @@ import { homedir } from 'node:os';
 
 import { ToolManager } from '../tools/toolManager';
 import { getOrCreateVaultPassphrase } from './vaultKey';
+import { getAppMcpOwnerThreadId } from './appMcpThread';
 
 export function sanitizeVaultDocId(docId: string): string {
   if (!/^[A-Za-z0-9_-]{1,128}$/.test(docId)) {
@@ -91,11 +92,14 @@ async function decrypt(docId: string, explicitPassphrase?: string): Promise<Reco
   }
   if (!encryptedBlob) throw new Error('[vault] Stored rehydration map is empty');
   const manager = new ToolManager();
-  const raw = await manager.callTool('basemind', 'vault', {
-    mode: 'decrypt',
-    encrypted_blob: encryptedBlob,
-    passphrase,
-  });
+  const raw = await manager.callTool(
+    'basemind',
+    'vault',
+    { mode: 'decrypt', encrypted_blob: encryptedBlob, passphrase },
+    undefined,
+    undefined,
+    { threadId: await getAppMcpOwnerThreadId() },
+  );
   const map = extractRehydrationMap(raw);
   if (Object.keys(map).length === 0) {
     throw new Error('[vault] Decryption returned no entries; check the passphrase');
@@ -142,11 +146,14 @@ async function encrypt(
   const passphrase = options.passphrase ?? getOrCreateVaultPassphrase();
   if (!passphrase) throw new Error('[vault] Passphrase is required to encrypt a rehydration map');
   const manager = options.toolManager ?? new ToolManager();
-  const raw = await manager.callTool('basemind', 'vault', {
-    mode: 'encrypt',
-    map,
-    passphrase,
-  });
+  const raw = await manager.callTool(
+    'basemind',
+    'vault',
+    { mode: 'encrypt', map, passphrase },
+    undefined,
+    undefined,
+    { threadId: await getAppMcpOwnerThreadId() },
+  );
   const blob = extractEncryptedBlob(raw);
   if (!blob) throw new Error('[vault] Encryption returned no blob');
   return blob;
