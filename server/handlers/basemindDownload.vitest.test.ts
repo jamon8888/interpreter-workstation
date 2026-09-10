@@ -18,34 +18,27 @@ function runCmd(binary: string, args: string[], timeoutMs = 5000): Promise<{ cod
   });
 }
 
-describe('basemindDownload — smoke tests against real binary', () => {
-  const binary = resolveBasemindBinary();
+// The binary ships only with packaged builds and local dev checkouts. Skipping
+// on CI keeps the absence visible in the report instead of passing vacuously.
+const binary = resolveBasemindBinary();
 
-  it('resolveBasemindBinary returns a non-empty path on this machine', () => {
-    expect(binary).not.toBe('');
-    expect(binary).toContain('basemind');
-  });
-
+describe.skipIf(!binary)('basemindDownload — smoke tests against real binary', () => {
   it('basemind lang list succeeds', async () => {
-    if (!binary) return;
     const result = await runCmd(binary, ['lang', 'list']);
     expect(result.code).toBe(0);
   });
 
   it('basemind serve --help exits cleanly', async () => {
-    if (!binary) return;
     const result = await runCmd(binary, ['serve', '--help']);
     expect(result.code).toBe(0);
   });
 
   it('basemind statusline exits 0 when no daemon running', async () => {
-    if (!binary) return;
     const result = await runCmd(binary, ['statusline', '-q']);
     expect(result.code).toBe(0);
   });
 
   it('basemind lang install exits 0 (grammars download)', async () => {
-    if (!binary) return;
     // Allow up to 30s for grammar download (first-run network fetch)
     const result = await runCmd(binary, ['lang', 'install', '-q'], 30_000);
     expect(result.code).toBe(0);
