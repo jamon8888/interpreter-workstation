@@ -338,14 +338,14 @@ describe('shouldTrackOoEditorsMainRendererGone', () => {
   test('tracks non-clean exits for trusted app renderer URLs', () => {
     expect(shouldTrackOoEditorsMainRendererGone({
       reason: 'crashed',
-      rendererUrl: 'file:///Applications/Interpreter/dist/index.html',
+      rendererUrl: 'file:///Applications/Hacienda/dist/index.html',
     })).toBe(true);
   });
 
   test('ignores clean exits and non-app renderer URLs', () => {
     expect(shouldTrackOoEditorsMainRendererGone({
       reason: 'clean-exit',
-      rendererUrl: 'file:///Applications/Interpreter/dist/index.html',
+      rendererUrl: 'file:///Applications/Hacienda/dist/index.html',
     })).toBe(false);
 
     expect(shouldTrackOoEditorsMainRendererGone({

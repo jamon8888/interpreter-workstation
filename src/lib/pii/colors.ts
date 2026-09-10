@@ -44,8 +44,13 @@ const PII_COLORS: Record<string, { light: string; dark: string; label: string }>
 export { PII_COLORS };
 
 export function getPiiColor(category: string): { light: string; dark: string } {
-  const color = PII_COLORS[category];
-  return color || { light: '#6b7280', dark: '#4b5563' };
+  // `category` reaches here from detector output, so it can name an inherited
+  // member such as `toString` or `constructor`. Those read back truthy and
+  // would skip the fallback, handing the caller a function instead of a colour.
+  if (!Object.prototype.hasOwnProperty.call(PII_COLORS, category)) {
+    return { light: '#6b7280', dark: '#4b5563' };
+  }
+  return PII_COLORS[category];
 }
 
 export function getAllPiiCategories(): string[] {

@@ -506,7 +506,7 @@ describe('selectAgentRuntimeLogEvent', () => {
       `rawMessagePreview="Error running remote compact task: You've hit your usage limit."`,
     );
     expect(turnCompletedLogLine?.message).toContain(
-      `formattedMessagePreview="You've hit your ChatGPT usage limit. This limit is set by your ChatGPT account and is separate from Interpreter plan usage shown in Settings."`,
+      `formattedMessagePreview="You've hit your ChatGPT usage limit. This limit is set by your ChatGPT account and is separate from Hacienda plan usage shown in Settings."`,
     );
     expect(turnCompletedLogLine?.message).toContain('formattedChanged=true');
   });

@@ -2014,7 +2014,7 @@ export async function resolveGitHubCliPath(): Promise<string | null> {
 type GitHubAuthSource = 'gh-cli' | 'env';
 
 export function getGitHubMcpAuthSetupErrorMessage(installed: boolean): string {
-  const setupStep = 'Run "gh auth login" in a terminal, or set GH_TOKEN/GITHUB_TOKEN before starting Interpreter.';
+  const setupStep = 'Run "gh auth login" in a terminal, or set GH_TOKEN/GITHUB_TOKEN before starting Hacienda.';
   if (installed) {
     return `GitHub CLI is installed but not authenticated. ${setupStep}`;
   }

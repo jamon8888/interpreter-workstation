@@ -98,16 +98,16 @@ describe('bundledRuntimePaths', () => {
 
   test('resolves macOS Electron app contents root for packaged app Electron-as-Node', () => {
     expect(resolveElectronRunAsNodeSandboxReadableRoots(
-      '/Applications/Interpreter.app/Contents/MacOS/Interpreter',
+      '/Applications/Hacienda.app/Contents/MacOS/Interpreter',
       { platform: 'darwin' },
     )).toEqual([
-      '/Applications/Interpreter.app/Contents',
+      '/Applications/Hacienda.app/Contents',
     ]);
   });
 
   test('does not add Electron app contents roots on non-macOS platforms', () => {
     expect(resolveElectronRunAsNodeSandboxReadableRoots(
-      '/Applications/Interpreter.app/Contents/MacOS/Interpreter',
+      '/Applications/Hacienda.app/Contents/MacOS/Interpreter',
       { platform: 'linux' },
     )).toEqual([]);
   });

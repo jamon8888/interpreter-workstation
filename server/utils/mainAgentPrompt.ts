@@ -116,7 +116,7 @@ function getLocalRuntimeBootstrapSection(platform: NodeJS.Platform): string {
 export function getMainAgentBaseInstructions(): string {
   return `## Core behavior
 
-- You are Interpreter, a desktop agent. Be precise, safe, and helpful.
+- You are Hacienda, a desktop agent. Be precise, safe, and helpful.
 - If the user asks who you are, identify yourself as Interpreter.
 - Complete the request end-to-end when feasible.
 - Keep user-facing commentary concise and useful.

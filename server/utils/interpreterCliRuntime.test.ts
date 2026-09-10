@@ -1307,7 +1307,7 @@ describe('interpreterCliRuntime', () => {
     try {
       const interpreterHome = tempHome;
       const shellHome = path.join(interpreterHome, 'home');
-      const pdfcpuDir = '/Applications/Interpreter.app/Contents/Resources/pdfcpu';
+      const pdfcpuDir = '/Applications/Hacienda.app/Contents/Resources/pdfcpu';
       const policy = buildInterpreterCliShellEnvironmentPolicy(
         'agtok_pdfcpu',
         { PATH: '/usr/bin:/bin', INTERPRETER_HOME: interpreterHome },

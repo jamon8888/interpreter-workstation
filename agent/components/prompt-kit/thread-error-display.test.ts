@@ -1188,7 +1188,7 @@ describe("parseError / string patterns", () => {
         codexErrorInfo: { responseStreamDisconnected: { httpStatusCode: null } },
         additionalDetails: "stream disconnected before completion: Your account is not active, please check your billing details on our website.",
       },
-      { modelProvider: "interpreter", providerLabel: "Interpreter Smart" },
+      { modelProvider: "interpreter", providerLabel: "Hacienda Smart" },
     );
     const r = parseError(formatted, "hosted");
     assertShape(r);
