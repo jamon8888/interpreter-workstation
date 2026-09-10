@@ -1378,36 +1378,46 @@ const EXACT_TURN_ERROR_KEYS = new Map<string, LocaleKey>([
   ],
 ]);
 
+const RESPONSES_CONTRACT_SUFFIXES = [
+  " does not support Hacienda's Responses/tool-calling contract.",
+  " does not support Interpreter's Responses/tool-calling contract.",
+];
+const SELECTED_MODEL_PREFIX = "The selected model on ";
+const PROVIDER_SEPARATOR = " on ";
+
 function describeResponsesContractMessage(message: string): TurnErrorDescriptor | null {
-  const providerModel = message.match(
-    /^(.+) on (.+) does not support (?:Hacienda|Interpreter)'s Responses\/tool-calling contract\.$/,
-  );
-  if (providerModel) {
+  // Two greedy `.+` groups either side of " on " backtrack quadratically on
+  // input shaped like "a on a on a on …", and this message is provider-supplied.
+  // The suffix is fixed, so strip it once and split the remainder rather than
+  // letting the engine search for the separator.
+  const suffix = RESPONSES_CONTRACT_SUFFIXES.find((candidate) => message.endsWith(candidate));
+  if (!suffix) return null;
+
+  const head = message.slice(0, -suffix.length);
+  if (!head) return null;
+
+  // `errors.turn.responsesContract.provider` renders exactly this prefix, but
+  // the providerModel pattern ran first and claimed it, reporting "The selected
+  // model" as the model name. Checking it ahead of the split makes that branch
+  // reachable again.
+  if (head.startsWith(SELECTED_MODEL_PREFIX)) {
+    const provider = head.slice(SELECTED_MODEL_PREFIX.length);
+    if (provider) {
+      return key("errors.turn.responsesContract.provider", { provider });
+    }
+  }
+
+  // The greedy first group bound the model to everything before the *last*
+  // " on ", so the split stays there to keep the same captures.
+  const separator = head.lastIndexOf(PROVIDER_SEPARATOR);
+  if (separator > 0 && separator + PROVIDER_SEPARATOR.length < head.length) {
     return key("errors.turn.responsesContract.providerModel", {
-      model: providerModel[1]!,
-      provider: providerModel[2]!,
+      model: head.slice(0, separator),
+      provider: head.slice(separator + PROVIDER_SEPARATOR.length),
     });
   }
 
-  const provider = message.match(
-    /^The selected model on (.+) does not support (?:Hacienda|Interpreter)'s Responses\/tool-calling contract\.$/,
-  );
-  if (provider) {
-    return key("errors.turn.responsesContract.provider", {
-      provider: provider[1]!,
-    });
-  }
-
-  const model = message.match(
-    /^(.+) does not support (?:Hacienda|Interpreter)'s Responses\/tool-calling contract\.$/,
-  );
-  if (model) {
-    return key("errors.turn.responsesContract.model", {
-      model: model[1]!,
-    });
-  }
-
-  return null;
+  return key("errors.turn.responsesContract.model", { model: head });
 }
 
 function describeLocalRuntimeUpdateMessage(message: string): TurnErrorDescriptor | null {
