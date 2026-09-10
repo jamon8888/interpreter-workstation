@@ -5,6 +5,7 @@ reviews:
   auto_review:
     # Disable auto-pause to prevent reviews being paused on active branches
     auto_pause_after_reviewed_commits: 0
+    # DCO sign-off update
     # Skip reviews on protected branches by not listing them in base_branches
     # base_branches is empty by default (reviews default branch only)
     # To explicitly limit branches, add patterns here
