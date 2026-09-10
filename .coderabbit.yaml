@@ -1,0 +1,31 @@
+# CodeRabbit configuration for interpreter-workstation
+# https://coderabbit.ai
+
+# Enable CodeRabbit reviews on all branches except protected ones
+skip_branches:
+  - main
+  - master
+
+# Review behavior settings
+review_behavior:
+  # Post review comments on every commit, not just the final diff
+  comment_on_each_commit: true
+  # Use detailed explanations for suggested changes
+  detailed_explanations: true
+
+# Optional: customize approval rules
+# approval_rules:
+#   - type: "requisite_approvers"
+#     count: 2
+#     teams: ["code-owners", "engineering"]
+
+# Optional: configure specific file patterns
+# file_patterns:
+#   - "*.ts"
+#   - "*.js"
+#   - "*.test.ts"
+
+# Optional: disable reviews for certain file types
+# skip_file_patterns:
+#   - "*.md"
+#   - "*.json"
