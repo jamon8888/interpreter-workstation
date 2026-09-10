@@ -123,7 +123,7 @@ export function getMainAgentBaseInstructions(): string {
 - Reply in the same language as the user's latest message unless they ask for another language.
 - Plan explicitly for substantial multi-step work. For straightforward tasks, act directly.
 - For substantial deliverables, call \`update_plan\` before the main authoring pass with an explicit requirement checklist from the user's request and visible source materials. Before answering, compare the produced artifact against every checklist item. If any item is unmet, fix it or state the limitation clearly. File existence, openability, render checks, and spot checks are necessary but not sufficient.
-- Interpreter app tools are reached through \`${INTERPRETER_CLI_COMMAND}\`.
+- Hacienda app tools are reached through \`${INTERPRETER_CLI_COMMAND}\`.
 - Use \`${INTERPRETER_CLI_COMMAND}\` for Interpreter app-tool discovery and execution.
 - When the task names a concrete file or output path, start with that exact file or tool call. Do not begin with broad workspace sweeps such as \`pwd\`, \`ls\`, \`find\`, or \`rg --files\` unless the path is genuinely unclear.
 - Treat \`@mentions\` as concrete file references; use them before any filesystem search.
@@ -136,7 +136,7 @@ export function getMainAgentBaseInstructions(): string {
 - Use explicit encodings in Windows scripts.
 - Do not claim a script is fixed until you have run it and observed the target behavior. Do not treat file creation, \`Test-Path\`, or file reads as success.
 - \`js_repl\` is a Hacienda app tool on the \`builtin-js-repl\` server: call \`${INTERPRETER_CLI_COMMAND} tools builtin-js-repl js_repl --json '{"code":"..."}'\`. Never run a bare shell command named \`js_repl\`.
-- Interpreter app tools are normally reached through \`interpreter-app\`, not through top-level direct tool injection.
+- Hacienda app tools are normally reached through \`interpreter-app\`, not through top-level direct tool injection.
 - Do not use shell commands, AppleScript, AppKit, Quartz, \`open\`, \`osascript\`, \`screencapture\`, or ad hoc Python to inspect or control desktop GUI state when a matching Interpreter skill exists. Use the \`computer-use\` skill workflow, then call \`${INTERPRETER_CLI_COMMAND} tools builtin-cua-driver ...\` for native desktop work; use the \`browser-control\` skill workflow, then call \`${INTERPRETER_CLI_COMMAND} tools builtin-js-repl js_repl ...\` for browser-control tabs.
 - Wait for any file-mutation command or tool to complete before issuing verification reads, recalc calls, or refreshes.
 - Use the Hacienda CLI for app-tool discovery and execution.

@@ -30,7 +30,7 @@ describe('mainAgentPrompt', () => {
     expect(baseInstructions).not.toContain('If the exact builtin or MCP tool is present, call it directly');
   });
 
-  test('developer prompt is CLI-only by default for Interpreter app tools', () => {
+  test('developer prompt is CLI-only by default for Hacienda app tools', () => {
     const developerPrompt = getMainAgentDeveloperPrompt(
       'gpt-5.4-nano',
       true,
@@ -50,7 +50,7 @@ describe('mainAgentPrompt', () => {
     expect(developerPrompt).toContain('(/tmp/headless-cli/interpreter-app)');
     expect(developerPrompt).toContain('For app-tool workflows, start with `interpreter-app --help` when the exact command shape is unclear; skip this for browser-control tasks; the browser-control skill names the exact `builtin-js-repl` commands.');
     expect(developerPrompt).toContain('For settings, start with `interpreter-app config --help`');
-    expect(developerPrompt).toContain('Top-level tools list does not list individual Interpreter app tools.');
+    expect(developerPrompt).toContain('Top-level tools list does not list individual Hacienda app tools.');
     expect(developerPrompt).toContain('Prefer `interpreter-app tools find <query>` when the likely tool is clear but the host server is not.');
     expect(developerPrompt).toContain('Many built-in tools live on shared servers such as `builtin-interpreter`.');
     expect(developerPrompt).toContain('For workspace/UI/vault tools, inspect `builtin-interpreter` first.');
@@ -65,7 +65,7 @@ describe('mainAgentPrompt', () => {
     expect(developerPrompt).toContain('Do not run bare commands named `js_repl`, `apply_patch`, or other non-command capabilities.');
     expect(developerPrompt).toContain('`js_repl` runs JavaScript in a persistent Node kernel and lives on the `builtin-js-repl` server');
     expect(developerPrompt).toContain('To reveal a path in Finder/File Explorer/file manager, use `interpreter-app tools builtin-interpreter interpreter_show_in_folder --json');
-    expect(developerPrompt).toContain('Use `interpreter-app config get|set` for persistent settings, `interpreter-app layout get|set` for live Interpreter layout such as file tabs, local app previews, and workspace UI state');
+    expect(developerPrompt).toContain('Use `interpreter-app config get|set` for persistent settings, `interpreter-app layout get|set` for live Hacienda layout such as file tabs, local app previews, and workspace UI state');
     expect(developerPrompt).toContain('Do not use layout tools as a browser-control substitute.');
     expect(developerPrompt).toContain('Do not use app-tool discovery for native runtime capabilities such as `apply_patch` or shell execution.');
     expect(developerPrompt).not.toContain('Skills describe preferred workflows, not proof that a tool is callable in the current session.');
@@ -118,7 +118,7 @@ describe('mainAgentPrompt', () => {
     expect(developerPrompt).toContain('## Local runtimes');
     expect(developerPrompt).toContain('Prefer built-in tools and already-available runtimes. Install Python, `uv`, Bun, or Node only when the task actually needs them.');
     expect(developerPrompt).toContain('Before installing anything, check existing runtimes once: `python --version`, `python3 --version`, `bun --version`, and `node --version`.');
-    expect(developerPrompt).not.toContain('This run explicitly injects selected Interpreter app tools to the model as direct MCP tools');
+    expect(developerPrompt).not.toContain('This run explicitly injects selected Hacienda app tools to the model as direct MCP tools');
   });
 
   test('developer prompt can explicitly describe the direct MCP injection experiment', () => {
@@ -132,8 +132,8 @@ describe('mainAgentPrompt', () => {
       },
     );
 
-    expect(developerPrompt).toContain('This run explicitly injects selected Interpreter app tools to the model as direct MCP tools in addition to the normal CLI path.');
-    expect(developerPrompt).toContain('If a needed Interpreter app tool is visibly injected in the top-level tool list, call it directly.');
+    expect(developerPrompt).toContain('This run explicitly injects selected Hacienda app tools to the model as direct MCP tools in addition to the normal CLI path.');
+    expect(developerPrompt).toContain('If a needed Hacienda app tool is visibly injected in the top-level tool list, call it directly.');
     expect(developerPrompt).toContain('Otherwise use `interpreter-app`.');
     expect(developerPrompt).toContain('When `builtin-cua-driver__...` tools are visible as top-level tools, use those direct tools for Computer Use.');
     expect(developerPrompt).toContain('direct `get_app_state` calls deliver screenshots as structured image content.');
@@ -175,7 +175,7 @@ describe('mainAgentPrompt', () => {
     expect(unixPrompt).toContain('Do not answer browser-control tasks with a visible JavaScript code fence.');
     expect(unixPrompt).toContain('Never run a bare command named `js_repl` or raw `node` as a substitute for browser control.');
     expect(unixPrompt).toContain('If `interpreter-app tools builtin-js-repl js_repl` is unavailable, advanced Playwright browser control is unavailable in this runtime.');
-    expect(unixPrompt).toContain('Only open a site in an Interpreter in-app browser tab when the user explicitly asks to try that route or when previewing a local app you built.');
+    expect(unixPrompt).toContain('Only open a site in a Hacienda in-app browser tab when the user explicitly asks to try that route or when previewing a local app you built.');
     expect(unixPrompt).toContain('warn the user that it is a separate in-app browser session and they should not expect to be signed in there.');
     expect(unixPrompt).toContain('`js_repl` is a persistent JavaScript kernel.');
     expect(unixPrompt).toContain('do not redeclare top-level `let`, `const`, `class`, or `function` names');
@@ -275,7 +275,7 @@ describe('mainAgentPrompt', () => {
       },
     );
 
-    expect(developerPrompt).toContain('This app ships bundled global Interpreter skills installed in the runtime: `slides` for presentations/`.pptx`');
+    expect(developerPrompt).toContain('This app ships bundled global Hacienda skills installed in the runtime: `slides` for presentations/`.pptx`');
     expect(developerPrompt).not.toContain('Treat skills as workflow guidance, not as proof that a native tool exists.');
     expect(developerPrompt).toContain('`slides` for presentations/`.pptx`; use OIX code execution with `python-pptx`');
   });
