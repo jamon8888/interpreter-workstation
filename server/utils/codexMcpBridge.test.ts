@@ -582,7 +582,7 @@ describe('resolveAndExecuteCodexTool', () => {
     expect(result).toEqual({
       content: [{
         type: 'text',
-        text: 'MCP tool calls require an active Interpreter thread before approval can be shown.',
+        text: 'MCP tool calls require an active Hacienda thread before approval can be shown.',
       }],
       isError: true,
     });
