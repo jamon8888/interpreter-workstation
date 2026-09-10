@@ -135,12 +135,41 @@ export async function basemindRescan(opts: { root: string; paths?: string[]; jso
   }
 }
 
+/**
+ * PII redaction runs at every send, and `resolveMcpToolApprovalMode` falls back
+ * to `prompt` for any tool with no recorded mode. That would put an approval
+ * dialog in front of each message and make the redaction path unusable.
+ *
+ * The exemption is scoped to `redact_text` alone: basemind also exposes `vault`
+ * and code-search tools, which keep the default. An explicit choice already on
+ * file wins — this only fills the gap.
+ */
+export async function ensureRedactTextAutoApproval(serverId: string): Promise<void> {
+  try {
+    const configStore = await import('../configStore');
+    const existing = await configStore.getMcpServer(serverId);
+    if (existing?.tools?.redact_text?.approvalMode) return;
+    await configStore.updateMcpServer(serverId, {
+      // updateMcpServer merges one level deep, so the rest of the tools map has
+      // to be carried forward or other tools' settings would be dropped.
+      tools: {
+        ...(existing?.tools ?? {}),
+        redact_text: { ...(existing?.tools?.redact_text ?? {}), approvalMode: 'auto' },
+      },
+    });
+  } catch {
+    // A missing entry or an unwritable config must not fail registration; the
+    // mode stays settable from MCP settings.
+  }
+}
+
 export async function registerBasemindServer(): Promise<string> {
   const { getToolManager } = await import('../tools/toolManagerAccessor');
   const binary = resolveBasemindBinary();
   if (!binary) return '';
+  let serverId: string;
   try {
-    const serverId = await getToolManager().addServer({
+    serverId = await getToolManager().addServer({
       name: 'Basemind',
       description: 'Local code search and semantic graph engine',
       transport: 'stdio',
@@ -148,11 +177,14 @@ export async function registerBasemindServer(): Promise<string> {
       args: ['serve', '--no-watch'],
       enabled: true,
     });
-    return serverId;
   } catch (err) {
-    if (err instanceof Error && err.message.includes('already exists')) return 'basemind';
-    return '';
+    if (!(err instanceof Error && err.message.includes('already exists'))) return '';
+    // An existing registration still needs the approval mode applied: a server
+    // added before this ran has no entry for `redact_text`.
+    serverId = 'basemind';
   }
+  await ensureRedactTextAutoApproval(serverId);
+  return serverId;
 }
 
 export async function unregisterBasemindServer(): Promise<void> {
