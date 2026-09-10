@@ -2,7 +2,7 @@
  * Composer Attachment Types
  *
  * Shared attachment records for rich-text composer surfaces. Text chips are
- * used by both the desktop composer and the Interpreter Overlay input. Image
+ * used by both the desktop composer and the Hacienda Overlay input. Image
  * payload attachments are currently emitted by the overlay input only; the
  * desktop agent composer converts pasted or dropped images into file mentions
  * instead of producing these image payloads.

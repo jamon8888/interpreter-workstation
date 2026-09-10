@@ -53,6 +53,18 @@ describe('buildRedactedText', () => {
     ]);
     expect(result.redactedText).toBe('[EMAIL_0]');
   });
+
+  test('skips token indices the source text already uses', () => {
+    const source = 'Ticket [EMAIL_0] belongs to john@example.com';
+    const result = buildRedactedText(source, [
+      { category: 'email', start: 28, end: 44, text: 'john@example.com', confidence: 1 },
+    ]);
+
+    // Reusing [EMAIL_0] would leave two identical tokens for one map entry, and
+    // rehydration would replace the pre-existing literal with the detected value.
+    expect(result.redactedText).toBe('Ticket [EMAIL_0] belongs to [EMAIL_1]');
+    expect(result.rehydrationMap).toEqual({ '[EMAIL_1]': 'john@example.com' });
+  });
 });
 
 describe('mergeDetections', () => {

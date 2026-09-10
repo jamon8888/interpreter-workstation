@@ -13,8 +13,8 @@ export type GeneratedModelOption = {
 };
 
 export const INTERPRETER_MODEL_OPTIONS = [
-  { id: "interpreter-smart", name: "Interpreter Smart" },
-  { id: "interpreter-fast", name: "Interpreter Fast" },
+  { id: "interpreter-smart", name: "Hacienda Smart" },
+  { id: "interpreter-fast", name: "Hacienda Fast" },
 ];
 
 export const ANTHROPIC_MODEL_OPTIONS = [

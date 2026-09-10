@@ -84,15 +84,27 @@ export function buildRedactedText(
   }
   accepted.sort((a, b) => a.start - b.start);
 
+  // The source can already contain something shaped like a placeholder. Emitting
+  // that same literal as a generated token would leave two indistinguishable
+  // tokens in the output for a single rehydration entry, and rehydration would
+  // then overwrite the pre-existing literal with the detected value.
+  const taken = new Set(findRedactedTokens(text).map((existing) => existing.token));
+
   const counters = new Map<string, number>();
   const rehydrationMap: Record<string, string> = {};
   let redactedText = '';
   let cursor = 0;
   for (const detection of accepted) {
     const category = normalizePiiCategory(detection.category);
-    const index = counters.get(category) ?? 0;
+    const label = tokenLabelForCategory(category);
+    let index = counters.get(category) ?? 0;
+    let token = `[${label}_${index}]`;
+    while (taken.has(token)) {
+      index += 1;
+      token = `[${label}_${index}]`;
+    }
     counters.set(category, index + 1);
-    const token = `[${tokenLabelForCategory(category)}_${index}]`;
+    taken.add(token);
     redactedText += text.slice(cursor, detection.start) + token;
     cursor = detection.end;
     rehydrationMap[token] = detection.text;

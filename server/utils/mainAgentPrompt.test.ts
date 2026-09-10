@@ -11,7 +11,7 @@ describe('mainAgentPrompt', () => {
 
     expect(baseInstructions.length).toBeLessThan(18000);
     expect(baseInstructions).toContain('## Core behavior');
-    expect(baseInstructions).toContain('You are Interpreter, a desktop agent.');
+    expect(baseInstructions).toContain('You are Hacienda, a desktop agent.');
     expect(baseInstructions).toContain('Plan explicitly for substantial multi-step work. For straightforward tasks, act directly.');
     expect(baseInstructions).toContain('For substantial deliverables, call `update_plan` before the main authoring pass');
     expect(baseInstructions).toContain('Before answering, compare the produced artifact against every checklist item.');
@@ -40,7 +40,7 @@ describe('mainAgentPrompt', () => {
 
     expect(developerPrompt.length).toBeLessThan(24000);
     expect(developerPrompt).toContain('Current selected model ID: "gpt-5.4-nano"');
-    expect(developerPrompt).not.toContain('You are Interpreter, a desktop agent.');
+    expect(developerPrompt).not.toContain('You are Hacienda, a desktop agent.');
     expect(developerPrompt).not.toContain('Plan explicitly for substantial multi-step work. For straightforward tasks, act directly.');
     expect(developerPrompt).not.toContain('Before grouped tool actions or large edits');
     expect(developerPrompt).not.toContain('For single-file office edits, do not send a plan or tool-choice message first');

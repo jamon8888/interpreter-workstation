@@ -576,7 +576,7 @@ export function NativeToolsSection() {
 
       <SettingsRow
         label="Change files"
-        description="Choose when Interpreter can edit files on its own."
+        description="Choose when Hacienda can edit files on its own."
         contentClassName="sm:justify-end"
       >
         <RuntimeSelect
@@ -639,7 +639,7 @@ export function NativeToolsSection() {
 
       <SettingsRow
         label="Control apps"
-        description="Choose when Interpreter can click, type, move windows, or change native apps."
+        description="Choose when Hacienda can click, type, move windows, or change native apps."
         contentClassName="sm:justify-end"
       >
         <RuntimeSelect
@@ -758,7 +758,7 @@ export function NativeToolsSection() {
 
       <SettingsRow
         label="Network"
-        description="Allow Interpreter to connect to websites and services."
+        description="Allow Hacienda to connect to websites and services."
       >
         <Switch
           checked={codexNetworkAccess}
@@ -857,7 +857,7 @@ export function NativeToolsSection() {
             <AlertDialogMedia className="bg-yellow-500/10 text-yellow-600 dark:text-yellow-400">
               <AlertTriangle />
             </AlertDialogMedia>
-            <AlertDialogTitle>Restart Interpreter?</AlertDialogTitle>
+            <AlertDialogTitle>Restart Hacienda?</AlertDialogTitle>
             <AlertDialogDescription>
               {pendingChange
                 ? `${runningConversationCount} conversation${runningConversationCount === 1 ? ' is' : 's are'} still running. To update ${getRuntimeChangeLabel(pendingChange)}, Interpreter needs to restart. This will stop ${runningConversationCount === 1 ? 'that conversation' : 'those conversations'} for every agent.`

@@ -367,7 +367,7 @@ export function formatBrowserExtensionRelayStartupFailureMessage(error: unknown)
   }
 
   lines.push('');
-  lines.push('Restart Interpreter. If this keeps happening, reinstall the app.');
+  lines.push('Restart Hacienda. If this keeps happening, reinstall the app.');
   return lines.join('\n');
 }
 

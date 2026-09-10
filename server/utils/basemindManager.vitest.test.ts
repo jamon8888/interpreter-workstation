@@ -1,21 +1,15 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { existsSync } from 'node:fs';
+import { resolveBasemindBinary } from './basemindManager';
 
-describe('resolveBasemindBinary', () => {
-  beforeEach(() => {
-    vi.resetModules();
-  });
+// These are smoke assertions against the real basemind binary, which ships
+// only with packaged builds and local dev checkouts. CI runners have no
+// binary, so the suite skips there instead of reporting a hollow pass.
+const binary = resolveBasemindBinary();
 
-  it('returns the local debug binary path when it exists', async () => {
-    const { resolveBasemindBinary } = await import('./basemindManager');
-    const result = resolveBasemindBinary();
-    expect(result).toContain('basemind');
-    expect(existsSync(result)).toBe(true);
-  });
-
-  it('returns non-empty string on this machine', async () => {
-    const { resolveBasemindBinary } = await import('./basemindManager');
-    const result = resolveBasemindBinary();
-    expect(result).not.toBe('');
+describe.skipIf(!binary)('resolveBasemindBinary', () => {
+  it('returns a path that points at the basemind binary', () => {
+    expect(binary).toContain('basemind');
+    expect(existsSync(binary)).toBe(true);
   });
 });

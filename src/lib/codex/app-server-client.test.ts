@@ -801,7 +801,7 @@ describe("CodexAppServerClient", () => {
         HOMEPATH: "\\Users\\Alice",
       },
       codeHome: "C:\\Users\\Alice\\AppData\\Roaming\\interpreter\\codex-home",
-      codexBinary: "C:\\Program Files\\Interpreter\\resources\\codex.exe",
+      codexBinary: "C:\\Program Files\Hacienda\\resources\\codex.exe",
       platform: "win32",
       pathExists: (candidatePath) => candidatePath.includes("converter"),
     });
@@ -824,7 +824,7 @@ describe("CodexAppServerClient", () => {
     const env = buildCodexSpawnEnv({
       baseEnv: { Path: "C:\\Windows\\System32" },
       codeHome: "C:\\Users\\Alice\\AppData\\Roaming\\interpreter\\codex-home",
-      codexBinary: "C:\\Program Files\\Interpreter\\resources\\codex.exe",
+      codexBinary: "C:\\Program Files\Hacienda\\resources\\codex.exe",
       platform: "win32",
       pathExists: () => false,
     });
@@ -841,16 +841,16 @@ describe("CodexAppServerClient", () => {
         PATH: "C:\\Windows\\System32",
       },
       codeHome: "C:\\Users\\Alice\\AppData\\Roaming\\interpreter\\codex-home",
-      codexBinary: "C:\\Program Files\\Interpreter\\resources\\codex.exe",
+      codexBinary: "C:\\Program Files\Hacienda\\resources\\codex.exe",
       platform: "win32",
       pathExists: (candidatePath) => candidatePath.includes("converter")
-        || candidatePath.includes("Program Files\\Interpreter\\resources"),
+        || candidatePath.includes("Program Files\Hacienda\\resources"),
     });
 
     assert.equal(env.PATH, undefined);
     assert.equal(
       env.Path,
-      "C:\\Program Files\\Interpreter\\resources;C:\\Users\\Alice\\AppData\\Roaming\\interpreter\\oo-editors\\converter;C:\\Users\\Alice\\bin;C:\\Windows\\System32",
+      "C:\\Program Files\Hacienda\\resources;C:\\Users\\Alice\\AppData\\Roaming\\interpreter\\oo-editors\\converter;C:\\Users\\Alice\\bin;C:\\Windows\\System32",
     );
   });
 
@@ -860,7 +860,7 @@ describe("CodexAppServerClient", () => {
         PATH: "C:\\Windows\\System32",
       },
       codeHome: "C:\\Users\\Alice\\AppData\\Roaming\\interpreter\\codex-home",
-      codexBinary: "C:\\Program Files\\Interpreter\\resources\\codex.exe",
+      codexBinary: "C:\\Program Files\Hacienda\\resources\\codex.exe",
       platform: "win32",
       pathExists: () => false,
     });
@@ -873,7 +873,7 @@ describe("CodexAppServerClient", () => {
     const env = buildCodexSpawnEnv({
       baseEnv: { PATH: "/usr/bin:/bin", NODE_V8_COVERAGE: "/tmp/cov" },
       codeHome: "/Users/alice/Library/Application Support/interpreter/codex-home",
-      codexBinary: "/Applications/Interpreter.app/Contents/Resources/codex",
+      codexBinary: "/Applications/Hacienda.app/Contents/Resources/codex",
       platform: "darwin",
       pathExists: () => true,
     });
@@ -1422,7 +1422,7 @@ describe("CodexAppServerClient", () => {
       "gpt-5.3-codex",
       "/workspace/project",
       null,
-      "You are Interpreter.",
+      "You are Hacienda.",
       null,
     );
 
@@ -1435,7 +1435,7 @@ describe("CodexAppServerClient", () => {
       2,
       CLIENT_METHOD.threadResume,
     );
-    assert.equal(threadReq.params.baseInstructions, "You are Interpreter.");
+    assert.equal(threadReq.params.baseInstructions, "You are Hacienda.");
 
     transport.respond(threadReq, makeThreadResumeResponse("thr_existing"));
 
