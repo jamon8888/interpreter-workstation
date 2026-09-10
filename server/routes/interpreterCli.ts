@@ -50,7 +50,11 @@ function logInterpreterCliError(
 ): void {
   const log = status >= 500 ? console.error : console.warn;
   log(
-    `[Hacienda CLI] ${req.method} ${req.originalUrl} failed (${status}): ${message}`,
+    '[Hacienda CLI] %s %s failed (%d): %s',
+    req.method,
+    req.originalUrl,
+    status,
+    message,
     error instanceof Error ? error.stack ?? error.message : error,
   );
 }
