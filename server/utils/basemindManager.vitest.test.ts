@@ -1,44 +1,15 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { existsSync } from 'node:fs';
+import { resolveBasemindBinary } from './basemindManager';
 
-describe('resolveBasemindBinary', () => {
-  beforeEach(() => {
-    vi.resetModules();
-  });
+// These are smoke assertions against the real basemind binary, which ships
+// only with packaged builds and local dev checkouts. CI runners have no
+// binary, so the suite skips there instead of reporting a hollow pass.
+const binary = resolveBasemindBinary();
 
-  // Smoke-style: cold import of the manager chain can exceed the 5s default.
-  it('returns the local debug binary path when it exists', { timeout: 30_000 }, async () => {
-    let resolveBasemindBinary: () => string;
-    try {
-      ({ resolveBasemindBinary } = await import('./basemindManager'));
-    } catch {
-      return;
-    }
-    let result: string;
-    try {
-      result = resolveBasemindBinary();
-    } catch (err) {
-      if (err instanceof Error && err.message.includes('[basemind] Binary not found')) return;
-      throw err;
-    }
-    expect(result).toContain('basemind');
-    expect(existsSync(result)).toBe(true);
-  });
-
-  it('returns non-empty string on this machine', { timeout: 30_000 }, async () => {
-    let resolveBasemindBinary: () => string;
-    try {
-      ({ resolveBasemindBinary } = await import('./basemindManager'));
-    } catch {
-      return;
-    }
-    let result: string;
-    try {
-      result = resolveBasemindBinary();
-    } catch (err) {
-      if (err instanceof Error && err.message.includes('[basemind] Binary not found')) return;
-      throw err;
-    }
-    expect(result).not.toBe('');
+describe.skipIf(!binary)('resolveBasemindBinary', () => {
+  it('returns a path that points at the basemind binary', () => {
+    expect(binary).toContain('basemind');
+    expect(existsSync(binary)).toBe(true);
   });
 });

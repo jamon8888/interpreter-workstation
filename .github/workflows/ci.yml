@@ -45,9 +45,7 @@ jobs:
       - run: pnpm run test:unit
       - run: pnpm run test:vitest
       - run: pnpm run test:qwen-download-contract
-      # high-severity advisories are pre-existing tiptap vulns tracked by
-      # dependabot; block only on critical until they are upgraded.
-      - run: pnpm audit --audit-level=critical
+      - run: pnpm audit --audit-level=high
       - name: Verify the standalone shadcn preset
         run: |
           pnpm --dir shadcn-preset/preset-app install --frozen-lockfile

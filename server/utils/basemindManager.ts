@@ -1,28 +1,36 @@
 import { resolve } from 'node:path';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { Socket } from 'node:net';
+import { createRequire } from 'node:module';
+
+// Cargo emits `basemind.exe` on Windows, so every candidate path below has to
+// carry the platform suffix, not just the ones that go through PATH or npm.
+const BINARY_NAME = process.platform === 'win32' ? 'basemind.exe' : 'basemind';
 
 function findBasemindBinary(): string {
   const projectRoot = process.cwd();
 
   const pathBin = process.env.PATH?.split(process.platform === 'win32' ? ';' : ':')
-    .map(p => resolve(p, process.platform === 'win32' ? 'basemind.exe' : 'basemind'))
+    .map(p => resolve(p, BINARY_NAME))
     .find(p => { try { return existsSync(p); } catch { return false; } }) ?? '';
   if (pathBin) return pathBin;
 
-  const localDebug = resolve(projectRoot, 'basemind', 'target', 'debug', 'basemind');
+  const localDebug = resolve(projectRoot, 'basemind', 'target', 'debug', BINARY_NAME);
   if (existsSync(localDebug)) return localDebug;
 
-  const localRelease = resolve(projectRoot, 'basemind', 'target', 'release', 'basemind');
+  const localRelease = resolve(projectRoot, 'basemind', 'target', 'release', BINARY_NAME);
   if (existsSync(localRelease)) return localRelease;
 
-  const cargoBin = resolve(homedir(), '.cargo', 'bin', 'basemind');
+  const cargoBin = resolve(homedir(), '.cargo', 'bin', BINARY_NAME);
   if (existsSync(cargoBin)) return cargoBin;
 
   try {
-    const npmPackageJson = require.resolve('basemind/package.json');
-    const npmBin = resolve(npmPackageJson, '..', 'bin', process.platform === 'win32' ? 'basemind.exe' : 'basemind');
+    // The server entrypoints run as ESM, where the CommonJS `require` binding
+    // does not exist. Calling it here threw a ReferenceError that this catch
+    // swallowed, so npm-installed binaries were never discovered.
+    const npmPackageJson = createRequire(import.meta.url).resolve('basemind/package.json');
+    const npmBin = resolve(npmPackageJson, '..', 'bin', BINARY_NAME);
     if (existsSync(npmBin)) return npmBin;
   } catch {}
 
@@ -39,7 +47,7 @@ export function isDaemonRunning(): boolean {
   const pidFile = resolve(basemindCommsDir(), 'daemon.pid');
   if (!existsSync(pidFile)) return false;
   try {
-    const content = require('node:fs').readFileSync(pidFile, 'utf8').trim();
+    const content = readFileSync(pidFile, 'utf8').trim();
     const parsed = JSON.parse(content);
     const pid = typeof parsed === 'object' && parsed !== null && 'pid' in parsed ? Number(parsed.pid) : Number(parsed);
     if (!Number.isFinite(pid)) return false;
@@ -74,14 +82,24 @@ function mcpRequest(method: string, params: Record<string, unknown> = {}): Promi
     });
     sock.on('data', (chunk) => {
       data += chunk.toString();
+      let resp: { result?: unknown; error?: { code?: number; message?: string } };
       try {
-        const resp = JSON.parse(data);
-        clearTimeout(timer);
-        sock.destroy();
-        resolve(resp.result ?? resp);
+        resp = JSON.parse(data);
       } catch {
-        // wait for more data
+        return; // Partial frame; wait for the rest.
       }
+      clearTimeout(timer);
+      sock.destroy();
+      // A JSON-RPC rejection is a well-formed response with `error` and no
+      // `result`. Resolving it handed callers the error envelope, which they
+      // then reported as a successful scan.
+      if (resp.error) {
+        const { code, message } = resp.error;
+        const suffix = code === undefined ? '' : ` (${code})`;
+        reject(new Error(`MCP request failed: ${method}${suffix}: ${message ?? 'unknown error'}`));
+        return;
+      }
+      resolve(resp.result ?? resp);
     });
     sock.on('error', (err) => {
       clearTimeout(timer);
