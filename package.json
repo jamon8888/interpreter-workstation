@@ -1,5 +1,5 @@
 {
-  "name": "interpreter",
+  "name": "hacienda",
   "version": "0.1.24",
   "internalVersion": "0.2.171",
   "publicVersion": "0.2.184",
@@ -194,6 +194,7 @@
     "@vitejs/plugin-react": "6.0.5",
     "autoprefixer": "10.4.23",
     "babel-plugin-react-compiler": "1.0.0",
+    "@eslint/js": "10.0.1",
     "builder-util-runtime": "9.7.0",
     "concurrently": "9.2.1",
     "cross-env": "10.1.0",
@@ -216,6 +217,7 @@
     "tailwindcss": "4.1.18",
     "tsx": "4.20.6",
     "typescript": "5.9.3",
+    "typescript-eslint": "8.69.0",
     "vite": "8.2.0",
     "vitest": "4.1.10",
     "zod-to-json-schema": "3.25.1"

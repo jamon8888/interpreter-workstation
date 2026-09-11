@@ -20,7 +20,7 @@ const HTTP_401_UNAUTHORIZED_RE = /\b401\b[^\n]*\bUnauthorized\b/i;
 const MISSING_AUTHORIZATION_HEADER_RE =
   /"loc"\s*:\s*\[\s*"header"\s*,\s*"authorization"\s*\]/i;
 const NOT_ENOUGH_TOKENS_RE =
-  /\[not_enough_tokens\]|\bInsufficient interpreter tokens\b/i;
+  /\[not_enough_tokens\]|\bInsufficient (?:Hacienda|interpreter) tokens\b/i;
 const INVALID_ENCRYPTED_CONTENT_RE = /\binvalid_encrypted_content\b/i;
 const ORG_MISMATCH_RE = /\borganization_id did not match\b/i;
 const RESPONSES_ENDPOINT_PATH_RE = /\/responses(?:\b|[/?#])/i;
@@ -30,7 +30,7 @@ const TRY_AGAIN_AT_RE = /\btry again at\s+([^.]+)(?:\.|$)/i;
 const REQUEST_TOO_LARGE_RE =
   /\b(?:payload too large|request too large|tokens per minute|TPM)\b/i;
 const CHATGPT_USAGE_LIMIT_CLARIFIER =
-  "This limit is set by your ChatGPT account and is separate from Interpreter plan usage shown in Settings.";
+  "This limit is set by your ChatGPT account and is separate from Hacienda plan usage shown in Settings.";
 const OPENAI_API_USAGE_LIMIT_CLARIFIER =
   "ChatGPT Pro and Plus do not include OpenAI API usage.";
 const GENERIC_PROVIDER_LABELS = new Set([
@@ -446,13 +446,13 @@ function formatResponsesToolCallingContractMessage(
       : null;
 
   if (providerPrefix && modelId) {
-    return `${modelId} on ${providerPrefix} does not support Interpreter's Responses/tool-calling contract.`;
+    return `${modelId} on ${providerPrefix} does not support Hacienda's Responses/tool-calling contract.`;
   }
   if (providerPrefix) {
-    return `The selected model on ${providerPrefix} does not support Interpreter's Responses/tool-calling contract.`;
+    return `The selected model on ${providerPrefix} does not support Hacienda's Responses/tool-calling contract.`;
   }
   if (modelId) {
-    return `${modelId} does not support Interpreter's Responses/tool-calling contract.`;
+    return `${modelId} does not support Hacienda's Responses/tool-calling contract.`;
   }
   return RESPONSES_TOOL_CALLING_CONTRACT_MESSAGE;
 }
@@ -1069,7 +1069,7 @@ function resolveUsageLimitProviderLabel(
   if (matchesProviderPrefix(modelProvider, "groq")) return "Groq";
   if (matchesProviderPrefix(modelProvider, "xai")) return "xAI";
   if (matchesProviderPrefix(modelProvider, "fireworks")) return "Fireworks AI";
-  if (matchesProviderPrefix(modelProvider, "interpreter")) return "Interpreter";
+  if (matchesProviderPrefix(modelProvider, "interpreter")) return "Hacienda";
 
   return null;
 }
@@ -1378,36 +1378,46 @@ const EXACT_TURN_ERROR_KEYS = new Map<string, LocaleKey>([
   ],
 ]);
 
+const RESPONSES_CONTRACT_SUFFIXES = [
+  " does not support Hacienda's Responses/tool-calling contract.",
+  " does not support Interpreter's Responses/tool-calling contract.",
+];
+const SELECTED_MODEL_PREFIX = "The selected model on ";
+const PROVIDER_SEPARATOR = " on ";
+
 function describeResponsesContractMessage(message: string): TurnErrorDescriptor | null {
-  const providerModel = message.match(
-    /^(.+) on (.+) does not support Interpreter's Responses\/tool-calling contract\.$/,
-  );
-  if (providerModel) {
+  // Two greedy `.+` groups either side of " on " backtrack quadratically on
+  // input shaped like "a on a on a on …", and this message is provider-supplied.
+  // The suffix is fixed, so strip it once and split the remainder rather than
+  // letting the engine search for the separator.
+  const suffix = RESPONSES_CONTRACT_SUFFIXES.find((candidate) => message.endsWith(candidate));
+  if (!suffix) return null;
+
+  const head = message.slice(0, -suffix.length);
+  if (!head) return null;
+
+  // `errors.turn.responsesContract.provider` renders exactly this prefix, but
+  // the providerModel pattern ran first and claimed it, reporting "The selected
+  // model" as the model name. Checking it ahead of the split makes that branch
+  // reachable again.
+  if (head.startsWith(SELECTED_MODEL_PREFIX)) {
+    const provider = head.slice(SELECTED_MODEL_PREFIX.length);
+    if (provider) {
+      return key("errors.turn.responsesContract.provider", { provider });
+    }
+  }
+
+  // The greedy first group bound the model to everything before the *last*
+  // " on ", so the split stays there to keep the same captures.
+  const separator = head.lastIndexOf(PROVIDER_SEPARATOR);
+  if (separator > 0 && separator + PROVIDER_SEPARATOR.length < head.length) {
     return key("errors.turn.responsesContract.providerModel", {
-      model: providerModel[1]!,
-      provider: providerModel[2]!,
+      model: head.slice(0, separator),
+      provider: head.slice(separator + PROVIDER_SEPARATOR.length),
     });
   }
 
-  const provider = message.match(
-    /^The selected model on (.+) does not support Interpreter's Responses\/tool-calling contract\.$/,
-  );
-  if (provider) {
-    return key("errors.turn.responsesContract.provider", {
-      provider: provider[1]!,
-    });
-  }
-
-  const model = message.match(
-    /^(.+) does not support Interpreter's Responses\/tool-calling contract\.$/,
-  );
-  if (model) {
-    return key("errors.turn.responsesContract.model", {
-      model: model[1]!,
-    });
-  }
-
-  return null;
+  return key("errors.turn.responsesContract.model", { model: head });
 }
 
 function describeLocalRuntimeUpdateMessage(message: string): TurnErrorDescriptor | null {
@@ -1486,8 +1496,8 @@ function describeUsageLimitMessage(message: string): TurnErrorDescriptor | null 
 
 function describeLmStudioPromptTemplateMessage(message: string): TurnErrorDescriptor | null {
   const guidance = [
-    "The selected model from LM Studio doesn't support Interpreter tools.",
-    "Choose a tool-capable model in LM Studio, or switch to an Interpreter hosted model, then retry.",
+    "The selected model from LM Studio doesn't support Hacienda tools.",
+    "Choose a tool-capable model in LM Studio, or switch to a Hacienda-hosted model, then retry.",
   ].join("\n");
   if (message === guidance) {
     return key("errors.turn.lmStudioToolUnsupported");

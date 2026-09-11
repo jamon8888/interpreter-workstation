@@ -11,7 +11,7 @@ import {
 
 describe('ensureOfficeExtensionInstalledInBackground', () => {
   test('builds oo-editors env with workstation sentry dsn and packaged-aware node env', () => {
-    const appPath = '/Applications/Interpreter.app/Contents/Resources/app.asar';
+    const appPath = '/Applications/Hacienda.app/Contents/Resources/app.asar';
 
     expect(buildOoEditorsServerEnv(
       {
@@ -26,7 +26,7 @@ describe('ensureOfficeExtensionInstalledInBackground', () => {
     )).toEqual({
       PATH: '/usr/bin',
       ELECTRON_RUN_AS_NODE: '1',
-      NODE_PATH: '/Applications/Interpreter.app/Contents/Resources/app.asar/node_modules',
+      NODE_PATH: '/Applications/Hacienda.app/Contents/Resources/app.asar/node_modules',
       NODE_ENV: 'development',
       PORT: '38123',
       FONT_DATA_DIR: '/tmp/fontdata',
@@ -45,7 +45,7 @@ describe('ensureOfficeExtensionInstalledInBackground', () => {
   });
 
   test('always sets ELECTRON_RUN_AS_NODE for oo-editors', () => {
-    const appPath = '/Applications/Interpreter.app/Contents/Resources/app.asar';
+    const appPath = '/Applications/Hacienda.app/Contents/Resources/app.asar';
 
     expect(buildOoEditorsServerEnv(
       {
@@ -60,7 +60,7 @@ describe('ensureOfficeExtensionInstalledInBackground', () => {
     )).toEqual({
       ELECTRON_RUN_AS_NODE: '1',
       PATH: '/usr/bin',
-      NODE_PATH: '/Applications/Interpreter.app/Contents/Resources/app.asar/node_modules',
+      NODE_PATH: '/Applications/Hacienda.app/Contents/Resources/app.asar/node_modules',
       NODE_ENV: 'production',
       PORT: '38123',
       FONT_DATA_DIR: '/tmp/fontdata',
@@ -70,17 +70,17 @@ describe('ensureOfficeExtensionInstalledInBackground', () => {
 
   test('points oo-editors NODE_PATH at the app Sentry dependency node_modules directory', () => {
     expect(getOoEditorsAppNodeModulesPath(
-      '/Applications/Interpreter.app/Contents/Resources/app.asar',
+      '/Applications/Hacienda.app/Contents/Resources/app.asar',
     )).toBe(
-      '/Applications/Interpreter.app/Contents/Resources/app.asar/node_modules',
+      '/Applications/Hacienda.app/Contents/Resources/app.asar/node_modules',
     );
   });
 
   test('resolves Windows packaged Sentry dependency paths without mixed separators', () => {
     expect(getOoEditorsAppNodeModulesPath(
-      'C:\\Program Files\\Interpreter\\resources\\app.asar',
+      'C:\\Program Files\Hacienda\\resources\\app.asar',
     )).toBe(
-      'C:\\Program Files\\Interpreter\\resources\\app.asar\\node_modules',
+      'C:\\Program Files\Hacienda\\resources\\app.asar\\node_modules',
     );
   });
 
@@ -90,20 +90,20 @@ describe('ensureOfficeExtensionInstalledInBackground', () => {
         NODE_PATH: '/tmp/old-node-path',
       },
       {
-        appPath: '/Applications/Interpreter.app/Contents/Resources/app.asar',
+        appPath: '/Applications/Hacienda.app/Contents/Resources/app.asar',
         isPackaged: true,
         port: 38123,
         fontDataDir: '/tmp/fontdata',
       },
-    ).NODE_PATH).toBe('/Applications/Interpreter.app/Contents/Resources/app.asar/node_modules');
+    ).NODE_PATH).toBe('/Applications/Hacienda.app/Contents/Resources/app.asar/node_modules');
   });
 
   test('runs Electron-as-Node from the executable directory', () => {
     expect(resolveOoEditorsNodeRuntime({
-      processExecPath: 'C:\\Program Files\\Interpreter\\Interpreter.exe',
+      processExecPath: 'C:\\Program Files\Hacienda\\Interpreter.exe',
     })).toEqual({
-      binaryPath: 'C:\\Program Files\\Interpreter\\Interpreter.exe',
-      cwd: 'C:\\Program Files\\Interpreter',
+      binaryPath: 'C:\\Program Files\Hacienda\\Interpreter.exe',
+      cwd: 'C:\\Program Files\Hacienda',
     });
   });
 
@@ -112,10 +112,10 @@ describe('ensureOfficeExtensionInstalledInBackground', () => {
     process.env.INTERPRETER_NODE_BIN = 'C:\\node\\node.exe';
     try {
       expect(resolveOoEditorsNodeRuntime({
-        processExecPath: 'C:\\Program Files\\Interpreter\\Interpreter.exe',
+        processExecPath: 'C:\\Program Files\Hacienda\\Interpreter.exe',
       })).toEqual({
-        binaryPath: 'C:\\Program Files\\Interpreter\\Interpreter.exe',
-        cwd: 'C:\\Program Files\\Interpreter',
+        binaryPath: 'C:\\Program Files\Hacienda\\Interpreter.exe',
+        cwd: 'C:\\Program Files\Hacienda',
       });
     } finally {
       if (originalNodeOverride === undefined) {
@@ -129,7 +129,7 @@ describe('ensureOfficeExtensionInstalledInBackground', () => {
   for (const code of ['EACCES', 'EPERM'] as const) {
     test(`identifies Windows ${code} oo-editors spawn permission errors`, () => {
       const error = Object.assign(
-        new Error(`spawn C:\\Program Files\\Interpreter\\Interpreter.exe ${code}`),
+        new Error(`spawn C:\\Program Files\Hacienda\\Interpreter.exe ${code}`),
         { code },
       );
 
@@ -139,7 +139,7 @@ describe('ensureOfficeExtensionInstalledInBackground', () => {
 
   test('identifies support issue 2030 Windows oo-editors EACCES spawn errors', () => {
     const error = Object.assign(
-      new Error('spawn C:\\Program Files\\Interpreter\\Interpreter.exe EACCES'),
+      new Error('spawn C:\\Program Files\Hacienda\\Interpreter.exe EACCES'),
       { code: 'EACCES' },
     );
 
@@ -148,7 +148,7 @@ describe('ensureOfficeExtensionInstalledInBackground', () => {
 
   test('does not treat other process errors as Windows spawn permission errors', () => {
     const error = Object.assign(
-      new Error('spawn C:\\Program Files\\Interpreter\\Interpreter.exe ENOENT'),
+      new Error('spawn C:\\Program Files\Hacienda\\Interpreter.exe ENOENT'),
       { code: 'ENOENT' },
     );
 
