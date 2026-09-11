@@ -2693,7 +2693,7 @@ export class CodexAppServerClient {
     await this.rpcRequest(CLIENT_METHOD.initialize, {
       clientInfo: {
         name: "codex_ui",
-        title: "Interpreter",
+        title: "Hacienda",
         version: "0.1.0",
       },
       capabilities: {
@@ -2706,7 +2706,7 @@ export class CodexAppServerClient {
     this.notify(CLIENT_NOTIFICATION_METHOD.initialized);
     console.log(`[interpreter-server] connectAndInitialize initializedSent requestId=${requestId}`);
 
-    // Startup API-key login is opt-in. The shared Interpreter runtime must not
+    // Startup API-key login is opt-in. The shared Hacienda runtime must not
     // infer account auth from process.env because profile selection already
     // determines how Codex should authenticate for each request.
     if (this.apiKey) {

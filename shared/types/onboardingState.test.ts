@@ -129,7 +129,7 @@ describe('onboarding state', () => {
       ],
       summary: [
         'Provider markers: OpenAI API key marker, Ollama, Claude CLI.',
-        'Detected tools: Claude CLI, Interpreter CLI command marker, Cursor.',
+        'Detected tools: Claude CLI, Hacienda CLI command marker, Cursor.',
         'Local config markers: Claude CLI config marker, Cursor config marker, Hugging Face model cache marker.',
         'Detected apps: LM Studio app.',
       ].join(' '),

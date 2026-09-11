@@ -94,12 +94,12 @@ const TEMP_ACCESS_OPTIONS: RuntimeSelectOption[] = [
   {
     value: 'off',
     label: 'Off',
-    description: 'Interpreter cannot use /tmp screenshots, so pasted overlay images and Interpreter Overlay are unavailable.',
+    description: 'Hacienda cannot use /tmp screenshots, so pasted overlay images and Hacienda Overlay are unavailable.',
   },
   {
     value: 'on',
     label: 'On',
-    description: 'Allow /tmp working files for screenshots, pasted overlay images, and Interpreter Overlay.',
+    description: 'Allow /tmp working files for screenshots, pasted overlay images, and Hacienda Overlay.',
   },
 ];
 
@@ -440,7 +440,7 @@ export function NativeToolsSection() {
       setStatusMessage(null);
       setErrorMessage(
         didPersist
-          ? `Saved ${changeLabel}, but Interpreter could not restart cleanly.`
+          ? `Saved ${changeLabel}, but Hacienda could not restart cleanly.`
           : `Could not update ${changeLabel}.`,
       );
     } finally {
@@ -576,7 +576,7 @@ export function NativeToolsSection() {
 
       <SettingsRow
         label="Change files"
-        description="Choose when Interpreter can edit files on its own."
+        description="Choose when Hacienda can edit files on its own."
         contentClassName="sm:justify-end"
       >
         <RuntimeSelect
@@ -598,8 +598,8 @@ export function NativeToolsSection() {
           label="Temporary files"
           description={
             tempAccess === 'off'
-              ? 'Interpreter cannot see saved screenshots in /tmp, so pasted overlay images and Interpreter Overlay are unavailable.'
-              : 'Allow Interpreter to use temporary working files on your Mac, including saved screenshots for pasted overlay images and Interpreter Overlay.'
+              ? 'Hacienda cannot see saved screenshots in /tmp, so pasted overlay images and Hacienda Overlay are unavailable.'
+              : 'Allow Hacienda to use temporary working files on your Mac, including saved screenshots for pasted overlay images and Hacienda Overlay.'
           }
           contentClassName="sm:justify-end"
         >
@@ -620,7 +620,7 @@ export function NativeToolsSection() {
 
       <SettingsRow
         label="Inspect apps"
-        description="Choose when Interpreter can read visible text, controls, and window structure from native apps."
+        description="Choose when Hacienda can read visible text, controls, and window structure from native apps."
         contentClassName="sm:justify-end"
       >
         <RuntimeSelect
@@ -639,7 +639,7 @@ export function NativeToolsSection() {
 
       <SettingsRow
         label="Control apps"
-        description="Choose when Interpreter can click, type, move windows, or change native apps."
+        description="Choose when Hacienda can click, type, move windows, or change native apps."
         contentClassName="sm:justify-end"
       >
         <RuntimeSelect
@@ -758,7 +758,7 @@ export function NativeToolsSection() {
 
       <SettingsRow
         label="Network"
-        description="Allow Interpreter to connect to websites and services."
+        description="Allow Hacienda to connect to websites and services."
       >
         <Switch
           checked={codexNetworkAccess}
@@ -857,7 +857,7 @@ export function NativeToolsSection() {
             <AlertDialogMedia className="bg-yellow-500/10 text-yellow-600 dark:text-yellow-400">
               <AlertTriangle />
             </AlertDialogMedia>
-            <AlertDialogTitle>Restart Interpreter?</AlertDialogTitle>
+            <AlertDialogTitle>Restart Hacienda?</AlertDialogTitle>
             <AlertDialogDescription>
               {pendingChange
                 ? `${runningConversationCount} conversation${runningConversationCount === 1 ? ' is' : 's are'} still running. To update ${getRuntimeChangeLabel(pendingChange)}, Interpreter needs to restart. This will stop ${runningConversationCount === 1 ? 'that conversation' : 'those conversations'} for every agent.`

@@ -275,7 +275,7 @@ export function ComputerUseSetupModalHost() {
             <PermissionCard
               icon={<MousePointer2 className="size-4" />}
               title="Accessibility"
-              description="Lets Interpreter inspect app controls, then click and type only when you approve computer use."
+              description="Lets Hacienda inspect app controls, then click and type only when you approve computer use."
               detail={status?.accessibilityGranted ? "Status: Granted" : "Status: Not granted"}
               completed={Boolean(status?.accessibilityGranted)}
               active={activeStep === "accessibility"}
@@ -283,7 +283,7 @@ export function ComputerUseSetupModalHost() {
             <PermissionCard
               icon={<Monitor className="size-4" />}
               title="Screen Recording"
-              description="Lets Interpreter verify what is visible on screen while it works in native apps."
+              description="Lets Hacienda verify what is visible on screen while it works in native apps."
               detail={`Status: ${status?.screenRecordingGranted ? "Granted" : screenRecordingDetail(status?.screenRecordingStatus)}`}
               completed={Boolean(status?.screenRecordingGranted)}
               active={activeStep === "screen-recording"}

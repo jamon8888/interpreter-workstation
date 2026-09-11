@@ -203,7 +203,7 @@ describe('initializeCreatedWindow integration', () => {
 
   test('keeps non-teardown load failures loud and cleans listeners', async () => {
     const loadFailure = new Error(
-      "ERR_FAILED (-2) loading 'file:///Applications/Interpreter.app/Contents/Resources/app.asar/dist/index.html'",
+      "ERR_FAILED (-2) loading 'file:///Applications/Hacienda.app/Contents/Resources/app.asar/dist/index.html'",
     );
     const window = createWindow();
     const abortInitialization = mock(async () => {});

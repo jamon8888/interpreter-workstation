@@ -342,7 +342,7 @@ describe('sanitizeCodexSentryEvent', () => {
       type: undefined,
       debug_meta: {
         images: [{
-          code_file: '/Applications/Interpreter.app/Contents/MacOS/Interpreter',
+          code_file: '/Applications/Hacienda.app/Contents/MacOS/Interpreter',
           debug_id: 'interpreter',
           type: 'sourcemap',
         }],
@@ -854,7 +854,7 @@ describe('sanitizeCodexSentryEvent', () => {
       },
       debug_meta: {
         images: [{
-          code_file: '/Applications/Interpreter.app/Contents/MacOS/Interpreter',
+          code_file: '/Applications/Hacienda.app/Contents/MacOS/Interpreter',
           debug_id: 'interpreter',
           type: 'macho',
         }],
@@ -912,7 +912,7 @@ describe('sanitizeCodexSentryEvent', () => {
 
   test('keeps unrelated unknown-process dyld minidumps', () => {
     const event = unknownProcessDyldMinidumpEvent(
-      'Library not loaded: /Applications/Interpreter.app/Contents/Frameworks/Example.framework/Example',
+      'Library not loaded: /Applications/Hacienda.app/Contents/Frameworks/Example.framework/Example',
     );
 
     expect(sanitizeCodexSentryEvent(event, undefined)).toBe(event);

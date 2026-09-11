@@ -399,7 +399,7 @@ app.commandLine.appendSwitch('enable-features', [
   'DocumentPolicyIncludeJSCallStacksInCrashReports',
 ].join(','));
 
-// The Interpreter Overlay window hides by dropping to opacity 0 while staying
+// The Hacienda Overlay window hides by dropping to opacity 0 while staying
 // "visible", so macOS reports it occluded. Chromium then suspends that
 // renderer (timers, rAF, IPC-driven rendering) even with
 // backgroundThrottling: false, and the next hotkey open shows a wedged,
@@ -2510,7 +2510,7 @@ async function cleanup() {
     interpreterOverlayService = null;
     cleanupResults['interpreterOverlay'] = { success: true, timedOut: false };
   } catch (error) {
-    console.error('Error shutting down Interpreter Overlay:', error);
+    console.error('Error shutting down Hacienda Overlay:', error);
     cleanupResults['interpreterOverlay'] = { success: false, timedOut: false };
   }
 
@@ -2779,7 +2779,7 @@ app.whenReady().then(async () => {
     Sentry.captureException(error);
     await Sentry.flush(2000);
     dialog.showErrorBox(
-      'Interpreter',
+      'Hacienda',
       'The application failed to start.\n\nOur team has been notified. If this persists, please contact help@openinterpreter.com'
     );
     app.quit();

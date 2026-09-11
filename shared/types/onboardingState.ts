@@ -110,7 +110,7 @@ const DETECTED_PROVIDER_LABELS: Record<string, string> = {
 const DETECTED_TOOL_LABELS: Record<string, string> = {
   claude: 'Claude CLI',
   'claude-cli': 'Claude CLI',
-  codex: 'Interpreter CLI command marker',
+  codex: 'Hacienda CLI command marker',
   aider: 'Aider',
   cursor: 'Cursor',
   ollama: 'Ollama',

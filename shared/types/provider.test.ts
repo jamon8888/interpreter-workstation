@@ -108,7 +108,7 @@ describe('supported responses API base URLs', () => {
 
   test('keeps generic guidance for non-NVIDIA unsupported endpoints', () => {
     expect(getUnsupportedResponsesApiBaseUrlMessage('https://api.example.com/v1')).toBe(
-      'This base URL does not support the OpenAI Responses API (/responses). Use Interpreter-hosted models or OpenRouter instead.',
+      'This base URL does not support the OpenAI Responses API (/responses). Use Hacienda-hosted models or OpenRouter instead.',
     );
   });
 
