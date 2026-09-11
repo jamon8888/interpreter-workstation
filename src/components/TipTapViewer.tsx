@@ -202,6 +202,20 @@ export const TipTapViewer = forwardRef<TipTapViewerRef, TipTapViewerProps>(
     activePiiLabelRef.current = activePiiLabel;
   }, [activePiiLabel]);
 
+  // The popover is positioned `fixed` from the rect captured when it opened, so
+  // any viewport change leaves it stranded beside unrelated content. The
+  // unlinked-mention popover resolves this the same way: dismiss it.
+  useEffect(() => {
+    if (!activePiiLabel) return;
+    const dismiss = () => setActivePiiLabel(null);
+    window.addEventListener('scroll', dismiss, true);
+    window.addEventListener('resize', dismiss);
+    return () => {
+      window.removeEventListener('scroll', dismiss, true);
+      window.removeEventListener('resize', dismiss);
+    };
+  }, [activePiiLabel]);
+
   const getUnlinkedMentionCandidates = useCallback(() => unlinkedMentionCandidatesRef.current, []);
   const getIgnoredUnlinkedMentionKeys = useCallback(() => ignoredUnlinkedMentionKeysRef.current, []);
 
