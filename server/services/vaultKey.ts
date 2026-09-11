@@ -62,12 +62,7 @@ export function getOrCreateVaultPassphrase(overrides?: {
 }): string {
   const store = requireOsSecureStore(overrides?.osStore);
   const keyPath = resolveVaultKeyPath(overrides?.userDataDir ?? resolveUserDataDir());
-  let stored: Buffer | null = null;
-  try {
-    stored = fs.readFileSync(keyPath);
-  } catch {
-    stored = null;
-  }
+  const stored = readVaultKeyFile(keyPath);
   if (stored && stored.length > 0) {
     try {
       return store.decryptString(stored);
@@ -79,8 +74,37 @@ export function getOrCreateVaultPassphrase(overrides?: {
     }
   }
   const passphrase = randomBytes(32).toString('base64');
+  const encrypted = store.encryptString(passphrase);
   fs.mkdirSync(path.dirname(keyPath), { recursive: true });
-  // ponytail: 0600 narrows file access; secrecy itself comes from OS encryption, not the mode bit.
-  fs.writeFileSync(keyPath, store.encryptString(passphrase), { mode: 0o600 });
+  // An empty file is an interrupted write holding nothing to lose, so it may be
+  // truncated. Otherwise `wx` fails rather than overwrite: a key written between
+  // the read above and this write must win, or its vaults would be orphaned.
+  const exclusive = stored === null;
+  try {
+    // ponytail: 0600 narrows file access; secrecy itself comes from OS encryption, not the mode bit.
+    fs.writeFileSync(keyPath, encrypted, { mode: 0o600, flag: exclusive ? 'wx' : 'w' });
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+    const raced = readVaultKeyFile(keyPath);
+    if (!raced || raced.length === 0) {
+      fs.writeFileSync(keyPath, encrypted, { mode: 0o600, flag: 'w' });
+      return passphrase;
+    }
+    return store.decryptString(raced);
+  }
   return passphrase;
+}
+
+/**
+ * Only a missing file means "no key yet". A permission or I/O failure read as
+ * absence would send the caller on to mint a replacement and overwrite the real
+ * key, leaving every existing vault blob undecryptable.
+ */
+function readVaultKeyFile(keyPath: string): Buffer | null {
+  try {
+    return fs.readFileSync(keyPath);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
+    throw error;
+  }
 }
