@@ -72,7 +72,7 @@ Main process (Express server)
   └── port.postMessage / port.on('message')
         ├── { type: 'smart-turn', sessionId, pcm: Float32Array }
         ├── { type: 'vad-feed', sessionId, pcm: Int16Array }
-        └── { type: 'vad-result', done: boolean, speechProb: number }
+        └── { type: 'vad-result', sessionId: string, done: boolean, speechProb: number }
 ```
 
 **IPC contract:** `MessagePortMain` for zero-copy `ArrayBuffer` transfer. Session-scoped with per-session state (ring buffers, ONNX sessions).

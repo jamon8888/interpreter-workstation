@@ -2662,11 +2662,11 @@ export function setupIpcHandlers(deps: HandlerDependencies): void {
 
   registerHandle(
     IPC_CHANNELS.OFFICE_EXTENSION_HEALTHCHECK,
-    async (): Promise<{ status: string }> => {
+    async (): Promise<{ status: string; port: string }> => {
       const port = process.env.OO_EDITORS_PORT || '38123';
       const response = await fetch(`http://localhost:${port}/healthcheck`);
       const text = await response.text();
-      return { status: text };
+      return { status: text, port };
     }
   );
 

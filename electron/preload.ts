@@ -521,7 +521,7 @@ export interface ElectronAPI {
     checkInstalled: () => Promise<import('./ipc/registry').OfficeExtensionCheckInstalledResponse>;
     install: () => Promise<import('./ipc/registry').OfficeExtensionInstallResponse>;
     uninstall: () => Promise<import('./ipc/registry').OfficeExtensionUninstallResponse>;
-    healthcheck: () => Promise<{ status: string }>;
+    healthcheck: () => Promise<{ status: string; port: string }>;
     onInstallProgress: (callback: (event: import('./ipc/registry').OfficeExtensionInstallProgressEvent) => void) => () => void;
   };
 

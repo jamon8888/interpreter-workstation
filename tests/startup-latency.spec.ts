@@ -1,9 +1,7 @@
 import { test, expect } from './fixtures';
 
 type StartupMetrics = {
-  launchMs: number;
   pageReadyMs: number;
-  totalMs: number;
   memoryMB: number;
 };
 
@@ -13,13 +11,16 @@ test.describe('Startup latency', () => {
     'Startup latency measurement is unstable on macOS CI runners.',
   );
 
-  test('measures cold-start latency and peak idle memory', async ({ page }) => {
+  test('measures page-ready latency and peak idle memory', async ({ page }) => {
     test.setTimeout(120000);
 
+    // NOTE: This measures page-ready time from the renderer's perspective,
+    // NOT full cold-start time. The ElectronInstanceManager singleton means
+    // the first test in the suite gets a fresh launch; subsequent tests
+    // reuse the instance. Full cold-start measurement requires launching
+    // an isolated Electron process outside the test framework.
     const t0 = performance.now();
 
-    // page is already available from the fixture (ElectronInstanceManager shared instance)
-    // Wait for the renderer to finish initial load
     await page.waitForLoadState('networkidle');
 
     const t1 = performance.now();
@@ -34,16 +35,13 @@ test.describe('Startup latency', () => {
     });
 
     const metrics: StartupMetrics = {
-      launchMs: 0, // not measurable from renderer; ElectronInstanceManager logs it
       pageReadyMs: Math.round(t1 - t0),
-      totalMs: Math.round(t1 - t0),
       memoryMB,
     };
 
     console.log('Startup metrics:', JSON.stringify(metrics, null, 2));
 
-    // The page-ready time from renderer perspective should be well under 1.2s
-    // (the full cold-start budget includes main process boot which is logged separately)
+    // Page-ready time should be well under 5s (generous CI budget)
     expect(metrics.pageReadyMs).toBeLessThan(5000);
     expect(metrics.memoryMB).toBeGreaterThan(0);
   });

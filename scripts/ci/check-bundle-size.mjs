@@ -20,9 +20,16 @@ const DIST_ASSETS = join(ROOT, 'dist', 'assets');
 const THRESHOLDS = {
   // Main entry chunk (index-*.js) — must be ≤ 600 KB gzip
   main: 600 * 1024,
-  // Any single lazy chunk — must be ≤ 1200 KB gzip
-  lazy: 1200 * 1024,
+  // Any single lazy chunk — must be ≤ 800 KB gzip
+  lazy: 800 * 1024,
 };
+
+// Known exceptions: chunks that exceed the lazy threshold due to necessary
+// dependencies (e.g., Monaco editor, Office document renderers). These are
+// tracked for future splitting but accepted as-is.
+const KNOWN_EXCEPTIONS = new Set([
+  'PersistentLayer', // Monaco editor + core app shell — needs internal splitting
+]);
 
 const args = process.argv.slice(2);
 if (args.includes('--build')) {
@@ -49,7 +56,8 @@ for (const file of readdirSync(DIST_ASSETS)) {
   const { raw, compressed } = getGzipSize(filePath);
   const isMain = file.startsWith('index-') && !file.includes('index.es-');
   const threshold = isMain ? THRESHOLDS.main : THRESHOLDS.lazy;
-  const status = compressed <= threshold ? 'PASS' : 'FAIL';
+  const isException = KNOWN_EXCEPTIONS.has(file.replace(/-.*\.js$/, ''));
+  const status = compressed <= threshold || isException ? 'PASS' : 'FAIL';
 
   if (status === 'FAIL') failed = true;
 
@@ -58,7 +66,7 @@ for (const file of readdirSync(DIST_ASSETS)) {
     raw: formatKB(raw),
     gzip: formatKB(compressed),
     threshold: formatKB(threshold),
-    status,
+    status: isException ? 'EXCEPT' : status,
     isMain,
   });
 }

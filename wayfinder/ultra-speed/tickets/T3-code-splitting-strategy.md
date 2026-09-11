@@ -63,5 +63,5 @@ Each wrapped in `<Suspense fallback={<LazyFallback />}>` (transparent null — s
 
 - Named list of components to lazy-load with rationale ✓
 - Named list of components to keep eager with rationale ✓
-- Chunk-size budget per lazy group ✓ (main: 28 KB, largest lazy: 1,148 KB)
+- Chunk-size budget per lazy group ✓ (main: 28 KB, largest lazy: 1,148 KB — PersistentLayer is a known exception, tracked for future internal splitting)
 - Suspense fallback strategy ✓ (transparent null, shell stays visible)

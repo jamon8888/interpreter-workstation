@@ -67,20 +67,25 @@ T7 ✓ ─┤
 - **T7** (sandbox/webSecurity) — **CLOSED** ✓ (sandbox: no-go, webSecurity: go)
 - **T8** (acceptance & CI) — **CLOSED** ✓ (all CI gates pass; runtime targets require manual measurement)
 
-**Frontier (open, unblocked):** T4, T5, T6, T7 — all takeable.
+**Frontier:** None — all tickets closed.
+
+## Resolved items
+
+<!-- items from "Not yet specified" that were resolved by closed tickets -->
+
+- **Specific manualChunks grouping**: Resolved by T2. Vite 8/Rolldown doesn't support manualChunks for chunk splitting.
+- **Specific React.lazy boundaries**: Resolved by T3. 18 components wrapped in React.lazy.
+- **utilityProcess IPC contract changes**: Resolved by T5 (plan only, not implemented).
+- **V8 snapshot feasibility**: Resolved by T6. Not recommended — built-in Node.js snapshot already active.
+- **Suspense fallback UX**: Resolved by T3. Transparent null, shell stays visible.
+- **Server import block lazy-loading**: Resolved by T3. Code-splitting moved server imports to lazy chunks.
+- **i18n code-splitting**: Partially resolved by T3. i18n is now a separate lazy chunk.
 
 ## Not yet specified
 
 <!-- in-scope fog; graduates to tickets as the frontier advances. -->
 
-- **Specific manualChunks grouping**: T1 identified candidates (i18n 1.2 MB, file-viewer chunks, React vendor). T2 can resolve this now.
-- **Specific React.lazy boundaries**: T1 identified 35 static imports with 0 lazy. Onboarding/marketing components are strongest candidates. T3 can resolve this now.
-- **utilityProcess IPC contract changes**: T1 confirmed zero utilityProcess usage. T5 can resolve this now.
-- **V8 snapshot feasibility**: T1 confirmed ~79 static imports in main.ts, server block is heaviest. T6 can resolve this now.
-- **Suspense fallback UX**: depends on which components T3 decides to lazy-load. Graduate when T3 resolves.
-- **Server import block lazy-loading**: T1 identified lines 860–919 as biggest single startup cost. T2 sub-task or separate ticket.
-- **i18n code-splitting**: 1.2 MB chunk identified as separable. T2 sub-task.
-- **Runtime measurements**: cold start time, preload execution time, memory baseline still need instrumented `pnpm dev` launch. Could be a sub-ticket of T2.
+- **Runtime measurements**: cold start time, preload execution time, memory baseline still need instrumented measurement on target hardware.
 
 ## Out of scope
 

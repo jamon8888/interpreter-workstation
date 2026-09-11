@@ -1,7 +1,7 @@
 # V8 Startup Snapshot Support in Electron 42
 
 Research date: 2026-09-11
-Electron 42 stable: v42.0.0 (May 7, 2026) through v42.11.2 (latest)
+Electron 42 stable: v42.0.0 (May 7, 2026) through v42.11.3 (latest)
 Stack: Chromium 148, V8 14.8, Node v24.15.0
 
 ---
@@ -40,8 +40,8 @@ Electron 42 has two distinct V8 snapshot mechanisms:
 
 | Package | Latest Version | Electron 42 Compat | Status |
 |---------|---------------|---------------------|--------|
-| `electron-mksnapshot` | 42.9.2 (Aug 17, 2026) | Yes, `npm i electron-mksnapshot@42.x` | Actively maintained by Electron team. Major version tracks Electron major. |
-| `@electron/fuses` | 1.6.0 (Sep 22, 2022) | Yes, FuseV1Options.LoadBrowserProcessSpecificV8Snapshot | Stable, no updates needed for Electron 42. |
+| `electron-mksnapshot` | 42.11.3 (Sep 9, 2026) | Yes, `ELECTRON_CUSTOM_VERSION=42.5.1 npm i electron-mksnapshot` | Actively maintained by Electron team. Major version tracks Electron major. |
+| `@electron/fuses` | 2.1.3 (Jun 29, 2026) | Yes, FuseV1Options.LoadBrowserProcessSpecificV8Snapshot | Stable, no updates needed for Electron 42. |
 | `electron-link` | 0.6.0 (6 years ago) | Untested with Electron 42 | **Stale.** Last published ~2020. Originally from Atom team. Community forks exist (e.g., RaisinTen/electron-snapshot-experiment uses it). |
 | `@electron/rebuild` | 4.2.0 (Jul 7, 2026) | Yes | Actively maintained. ESM-only since v4.0.0, requires Node >=22.12.0. |
 
@@ -90,14 +90,14 @@ If you need additional startup optimization beyond the built-in snapshot:
 1. **Ensure Electron >= 42.9.3** (or 43.4.1+ / 44.0.0-beta.5+)
 2. Install dependencies:
    ```bash
-   npm install --save-dev electron-mksnapshot@42.x
+   ELECTRON_CUSTOM_VERSION=42.5.1 npm install --save-dev electron-mksnapshot
    # Optionally, if using electron-link for static analysis:
    npm install --save-dev electron-link
    ```
 3. Create a snapshot entry point (`snapshot.js`) containing your snapshottable modules
 4. Run `electron-mksnapshot` to generate `v8_context_snapshot.bin` and `snapshot_blob.bin`
 5. Copy `v8_context_snapshot.bin` as `browser_v8_context_snapshot.bin` into your Electron bundle
-6. Flip the fuse:
+6. In an `afterPack` or post-package hook, before code signing, flip the fuse:
    ```js
    const { flipFuses, FuseVersion, FuseV1Options } = require('@electron/fuses')
    flipFuses(pathToElectron, {
@@ -105,6 +105,7 @@ If you need additional startup optimization beyond the built-in snapshot:
      [FuseV1Options.LoadBrowserProcessSpecificV8Snapshot]: true
    })
    ```
+   Do not call this from the packaged application's runtime.
 7. In your main process, load the snapshot and hydrate unsnapshottable modules
 
 **Trade-off**: Using a custom snapshot disables the built-in Node startup snapshot for the main process. You're trading the automatic ~80-160ms win for a potentially larger win from pre-loading your own modules.
@@ -128,7 +129,7 @@ The `loadBrowserProcessSpecificV8Snapshot` fuse is supported on:
 ARM cross-compilation for mksnapshot requires an Intel x64 host:
 ```bash
 npm config set arch arm64
-npm install --save-dev electron-mksnapshot@42.x
+ELECTRON_CUSTOM_VERSION=42.5.1 npm install --save-dev electron-mksnapshot
 ```
 
 ---

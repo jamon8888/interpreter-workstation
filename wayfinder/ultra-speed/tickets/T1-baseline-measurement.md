@@ -51,7 +51,10 @@ Research completed 2026-09-11. Full findings: [research/baseline.md](../research
 
 ## Acceptance
 
-- All 5 metrics have concrete numbers (not TBD) ✓ (static; runtime needs instrumented launch)
+### Completed (static analysis)
 - Main process require() profile shows top-10 most expensive imports ✓
 - Renderer bundle visualization shows where the 2 MB gzip goes ✓
-- Process count at idle is documented ✓ (needs runtime confirmation)
+
+### Pending (requires runtime measurement)
+- [ ] All 5 metrics have concrete numbers — cold start, preload time, memory, window creation need instrumented `pnpm dev` launch
+- [ ] Process count at idle is documented
