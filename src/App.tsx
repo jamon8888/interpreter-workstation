@@ -1,8 +1,6 @@
-import { useState, useEffect, useLayoutEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useLayoutEffect, useRef, useCallback, lazy, Suspense } from "react";
 import { AnimatePresence, MotionConfig, motion } from "motion/react";
 import { APP_DEFAULT_TRANSITION } from "@/lib/animationConfig";
-import { Sidebar } from "./components/Sidebar";
-import { AgentSidebar } from "../agent/components/AgentSidebar";
 import { LayoutProvider } from "./contexts/LayoutContext";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ToolServersProvider } from "./contexts/ToolServersContext";
@@ -10,29 +8,13 @@ import { CommandOverlayProvider } from "./contexts/CommandOverlayContext";
 import { HelpProvider } from "./contexts/HelpContext";
 import { useLayout } from "./hooks/useLayout";
 import { CustomTitleBar } from "./components/layout/CustomTitleBar";
-import { EditorLayout } from "./components/layout/EditorLayout";
-import { FileDropOverlay } from "./components/layout/FileDropOverlay";
-import { PersistentLayer } from "./components/layout/PersistentLayer";
-import { MorphOverlay } from "./components/MorphOverlay";
-import { ConnectionOverlay } from "./components/ConnectionOverlay";
-import { MentionPreviewOverlay } from "./components/MentionPreviewOverlay";
 import { windowingAPI } from "./api/windowingAPI";
 import { AuthCallback } from "./components/auth/AuthCallback";
 import { BrowserContextMenu } from "./components/BrowserContextMenu";
 import { BrowserSelect } from "./components/BrowserSelect";
 import { ResizeHandle } from "./components/ui/resize-handle";
-import { ExtensionDownloadBar } from "./components/onboarding/ExtensionDownloadBar";
-import { OnboardingFeedbackToast } from "./components/onboarding/OnboardingFeedbackToast";
-import { OnboardingOverlay } from "./components/onboarding/OnboardingOverlay";
-import { AppUpdateDialog } from "./components/AppUpdateDialog";
-import { ComputerUseSetupModalHost } from "./components/ComputerUseSetupModalHost";
-import { WindowsNativeToolsSetupNotice } from "./components/WindowsNativeToolsSetupNotice";
-import { BrowserSplitOfferNotice } from "./components/BrowserSplitOfferNotice";
 import { LowerLeftNoticeViewport } from "./components/LowerLeftNoticeViewport";
-import { WorkspaceConfirmationModalHost } from "./components/WorkspaceConfirmationModalHost";
-import { MarketingDemoShield } from "./components/MarketingDemoShield";
 import { preloadOnboardingTourVideos, disposeOnboardingTourVideos } from "./components/onboarding/tourVideos";
-import { MarketingDemoSurfaceRenderer } from "./demo/MarketingDemoSurfaceRenderer";
 import { getOnboardingState } from "./api";
 import { shouldShowOnboarding } from "./lib/onboardingGate";
 import { appToasts, backgroundOpacity as backgroundOpacityIpc, theme as themeIpc, primaryColor as primaryColorIpc, windowIpc, locale as localeIpc, profiles as profilesIpc, openPath, getRuntimeSystemInfo } from "@/ipc";
@@ -62,6 +44,30 @@ import type {
 import { getMarketingDemoSurface, isMarketingDemoMode, isMarketingDemoWindowChromeEnabled } from "./demo/marketingDemo";
 import { isWorkstationReadOnly } from "./remote/workstationConnection";
 import { WorkstationConnectionGate } from './components/WorkstationConnectionGate';
+
+// Lazy-loaded groups — deferred until first render after onboarding completes.
+// Each group is a separate chunk; the shell (title bar, layout providers) stays eager.
+const LazySidebar = lazy(() => import("./components/Sidebar").then(m => ({ default: m.Sidebar })));
+const LazyAgentSidebar = lazy(() => import("../agent/components/AgentSidebar").then(m => ({ default: m.AgentSidebar })));
+const LazyEditorLayout = lazy(() => import("./components/layout/EditorLayout").then(m => ({ default: m.EditorLayout })));
+const LazyPersistentLayer = lazy(() => import("./components/layout/PersistentLayer").then(m => ({ default: m.PersistentLayer })));
+const LazyFileDropOverlay = lazy(() => import("./components/layout/FileDropOverlay").then(m => ({ default: m.FileDropOverlay })));
+const LazyMorphOverlay = lazy(() => import("./components/MorphOverlay").then(m => ({ default: m.MorphOverlay })));
+const LazyConnectionOverlay = lazy(() => import("./components/ConnectionOverlay").then(m => ({ default: m.ConnectionOverlay })));
+const LazyMentionPreviewOverlay = lazy(() => import("./components/MentionPreviewOverlay").then(m => ({ default: m.MentionPreviewOverlay })));
+const LazyOnboardingOverlay = lazy(() => import("./components/onboarding/OnboardingOverlay").then(m => ({ default: m.OnboardingOverlay })));
+const LazyOnboardingFeedbackToast = lazy(() => import("./components/onboarding/OnboardingFeedbackToast").then(m => ({ default: m.OnboardingFeedbackToast })));
+const LazyExtensionDownloadBar = lazy(() => import("./components/onboarding/ExtensionDownloadBar").then(m => ({ default: m.ExtensionDownloadBar })));
+const LazyAppUpdateDialog = lazy(() => import("./components/AppUpdateDialog").then(m => ({ default: m.AppUpdateDialog })));
+const LazyComputerUseSetupModalHost = lazy(() => import("./components/ComputerUseSetupModalHost").then(m => ({ default: m.ComputerUseSetupModalHost })));
+const LazyWindowsNativeToolsSetupNotice = lazy(() => import("./components/WindowsNativeToolsSetupNotice").then(m => ({ default: m.WindowsNativeToolsSetupNotice })));
+const LazyBrowserSplitOfferNotice = lazy(() => import("./components/BrowserSplitOfferNotice").then(m => ({ default: m.BrowserSplitOfferNotice })));
+const LazyWorkspaceConfirmationModalHost = lazy(() => import("./components/WorkspaceConfirmationModalHost").then(m => ({ default: m.WorkspaceConfirmationModalHost })));
+const LazyMarketingDemoShield = lazy(() => import("./components/MarketingDemoShield").then(m => ({ default: m.MarketingDemoShield })));
+const LazyMarketingDemoSurfaceRenderer = lazy(() => import("./demo/MarketingDemoSurfaceRenderer").then(m => ({ default: m.MarketingDemoSurfaceRenderer })));
+
+// Transparent fallback — shell stays visible during lazy load
+const LazyFallback = () => null;
 
 const FIRST_STARTUP_NUDGE_EVENT = 'onboarding:first-startup-nudge';
 const TITLEBAR_LAYOUT_CHANGED_EVENT = 'titlebar:layout-changed';
@@ -818,7 +824,7 @@ function AppContent() {
   const marketingDemoSurface = marketingDemoMode ? getMarketingDemoSurface() : null;
 
   if (marketingDemoSurface) {
-    return <MarketingDemoSurfaceRenderer surface={marketingDemoSurface} />;
+    return <Suspense fallback={<LazyFallback />}><LazyMarketingDemoSurfaceRenderer surface={marketingDemoSurface} /></Suspense>;
   }
 
   return (
@@ -833,12 +839,18 @@ function AppContent() {
 
       {/* Extension download progress - hidden during onboarding */}
       {!isOnboarding && !marketingDemoMode && (
-        <ExtensionDownloadBar />
+        <Suspense fallback={<LazyFallback />}>
+          <LazyExtensionDownloadBar />
+        </Suspense>
       )}
       {!isOnboarding && !marketingDemoMode && (
-        <BrowserSplitOfferNotice />
+        <Suspense fallback={<LazyFallback />}>
+          <LazyBrowserSplitOfferNotice />
+        </Suspense>
       )}
-      <OnboardingFeedbackToast visible={isOnboarding === true} />
+      <Suspense fallback={<LazyFallback />}>
+        <LazyOnboardingFeedbackToast visible={isOnboarding === true} />
+      </Suspense>
 
       <LowerLeftNoticeViewport
         leftSidebarOpen={state.leftSidebar.isOpen}
@@ -873,7 +885,7 @@ function AppContent() {
               ref={leftContentRef}
               className="h-full box-border"
             >
-              {shouldRenderMainSurfaces ? <Sidebar onFileOpen={handleFileOpen} /> : null}
+              {shouldRenderMainSurfaces ? <Suspense fallback={<LazyFallback />}><LazySidebar onFileOpen={handleFileOpen} /></Suspense> : null}
             </div>
           </div>
 
@@ -888,14 +900,14 @@ function AppContent() {
           {/* Center: Editor - takes remaining space, marginRight set imperatively to avoid right sidebar */}
           <div ref={centerRef} className="relative h-full min-w-0 flex-1">
             {shouldRenderMainSurfaces ? (
-              <>
-                <EditorLayout onTopRightPaddingRef={handleTabBarRightPaddingRef} />
-                <PersistentLayer />
-                <FileDropOverlay />
-                <MorphOverlay />
-                <ConnectionOverlay />
-                <MentionPreviewOverlay />
-              </>
+              <Suspense fallback={<LazyFallback />}>
+                <LazyEditorLayout onTopRightPaddingRef={handleTabBarRightPaddingRef} />
+                <LazyPersistentLayer />
+                <LazyFileDropOverlay />
+                <LazyMorphOverlay />
+                <LazyConnectionOverlay />
+                <LazyMentionPreviewOverlay />
+              </Suspense>
             ) : null}
           </div>
 
@@ -921,7 +933,7 @@ function AppContent() {
               ref={rightContentRef}
               className="h-full ml-auto box-border"
             >
-              {shouldRenderMainSurfaces ? <AgentSidebar /> : null}
+              {shouldRenderMainSurfaces ? <Suspense fallback={<LazyFallback />}><LazyAgentSidebar /></Suspense> : null}
             </div>
           </div> : null}
         </div>
@@ -937,17 +949,29 @@ function AppContent() {
             transition={{ duration: 0.3, ease: 'easeInOut' }}
             className="fixed inset-0 z-50"
           >
-            <OnboardingOverlay onComplete={handleOnboardingComplete} />
+            <Suspense fallback={<LazyFallback />}>
+              <LazyOnboardingOverlay onComplete={handleOnboardingComplete} />
+            </Suspense>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {marketingDemoMode ? <MarketingDemoShield /> : null}
+      <Suspense fallback={<LazyFallback />}>
+        {marketingDemoMode ? <LazyMarketingDemoShield /> : null}
+      </Suspense>
 
-      {!marketingDemoMode ? <WorkspaceConfirmationModalHost /> : null}
-      {!marketingDemoMode ? <ComputerUseSetupModalHost /> : null}
-      {!marketingDemoMode ? <AppUpdateDialog /> : null}
-      {!marketingDemoMode ? <WindowsNativeToolsSetupNotice /> : null}
+      <Suspense fallback={<LazyFallback />}>
+        {!marketingDemoMode ? <LazyWorkspaceConfirmationModalHost /> : null}
+      </Suspense>
+      <Suspense fallback={<LazyFallback />}>
+        {!marketingDemoMode ? <LazyComputerUseSetupModalHost /> : null}
+      </Suspense>
+      <Suspense fallback={<LazyFallback />}>
+        {!marketingDemoMode ? <LazyAppUpdateDialog /> : null}
+      </Suspense>
+      <Suspense fallback={<LazyFallback />}>
+        {!marketingDemoMode ? <LazyWindowsNativeToolsSetupNotice /> : null}
+      </Suspense>
     </>
   );
 }

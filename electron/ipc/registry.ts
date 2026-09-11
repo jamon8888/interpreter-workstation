@@ -235,6 +235,7 @@ export const IPC_CHANNELS = {
   OFFICE_EXTENSION_INSTALL: 'office-extension:install',
   OFFICE_EXTENSION_INSTALL_PROGRESS: 'office-extension:install-progress',
   OFFICE_EXTENSION_UNINSTALL: 'office-extension:uninstall',
+  OFFICE_EXTENSION_HEALTHCHECK: 'office-extension:healthcheck',
 
   // VoiceExtension
   VOICE_EXTENSION_CHECK_INSTALLED: 'voice-extension:check-installed',
