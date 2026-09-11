@@ -1,17 +1,14 @@
 # CodeRabbit configuration for interpreter-workstation
 # https://coderabbit.ai
 
-# Enable CodeRabbit reviews on all branches except protected ones
-skip_branches:
-  - main
-  - master
-
-# Review behavior settings
-review_behavior:
-  # Post review comments on every commit, not just the final diff
-  comment_on_each_commit: true
-  # Use detailed explanations for suggested changes
-  detailed_explanations: true
+reviews:
+  auto_review:
+    # Disable auto-pause to prevent reviews being paused on active branches
+    auto_pause_after_reviewed_commits: 0
+    # DCO sign-off update
+    # Skip reviews on protected branches by not listing them in base_branches
+    # base_branches is empty by default (reviews default branch only)
+    # To explicitly limit branches, add patterns here
 
 # Optional: customize approval rules
 # approval_rules:
