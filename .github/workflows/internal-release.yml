@@ -50,13 +50,13 @@ jobs:
           # GitHub normalizes spaces in release-asset filenames to periods.
           # Rename them ourselves first so the checksum manifest names the
           # exact files users download instead of the pre-upload build names.
-          for source in "Interpreter Internal"*.dmg "Interpreter Internal"*.zip; do
+          for source in "Hacienda Internal"*.dmg "Hacienda Internal"*.zip; do
             published="${source// /.}"
             mv "$source" "$published"
           done
-          shasum -a 256 Interpreter.Internal*.dmg Interpreter.Internal*.zip > SHA256SUMS
+          shasum -a 256 Hacienda.Internal*.dmg Hacienda.Internal*.zip > SHA256SUMS
           cat > INTERNAL_RELEASE.md <<EOF
-          Internal test build of the official Interpreter distribution.
+          Internal test build of the official Hacienda distribution.
 
           Source: $GITHUB_REPOSITORY@$GITHUB_SHA
 
@@ -77,8 +77,8 @@ jobs:
         with:
           name: interpreter-internal-macos-arm64
           path: |
-            dist/Interpreter.Internal*.dmg
-            dist/Interpreter.Internal*.zip
+            dist/Hacienda.Internal*.dmg
+            dist/Hacienda.Internal*.zip
             dist/SHA256SUMS
             dist/INTERNAL_RELEASE.md
           if-no-files-found: error
@@ -91,12 +91,12 @@ jobs:
           version=$(node -p "require('./package.json').internalVersion")
           tag="internal-v${version}-build.${GITHUB_RUN_NUMBER}-arm64"
           gh release create "$tag" \
-            dist/Interpreter.Internal*.dmg \
-            dist/Interpreter.Internal*.zip \
+            dist/Hacienda.Internal*.dmg \
+            dist/Hacienda.Internal*.zip \
             dist/SHA256SUMS \
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
-            --title "Interpreter Internal v${version} (Apple Silicon arm64)" \
+            --title "Hacienda Internal v${version} (Apple Silicon arm64)" \
             --notes-file dist/INTERNAL_RELEASE.md \
             --prerelease
       - name: Publish prerelease to private artifact repository after OSS publication
@@ -108,12 +108,12 @@ jobs:
           version=$(node -p "require('./package.json').internalVersion")
           tag="internal-v${version}-build.${GITHUB_RUN_NUMBER}-arm64"
           gh release create "$tag" \
-            dist/Interpreter.Internal*.dmg \
-            dist/Interpreter.Internal*.zip \
+            dist/Hacienda.Internal*.dmg \
+            dist/Hacienda.Internal*.zip \
             dist/SHA256SUMS \
             --repo "$INTERNAL_RELEASE_REPOSITORY" \
             --target "$GITHUB_SHA" \
-            --title "Interpreter Internal v${version} (Apple Silicon arm64)" \
+            --title "Hacienda Internal v${version} (Apple Silicon arm64)" \
             --notes-file dist/INTERNAL_RELEASE.md \
             --prerelease
 
@@ -153,13 +153,13 @@ jobs:
       - name: Write checksums and release notes
         working-directory: dist
         run: |
-          for source in "Interpreter Internal"*.dmg "Interpreter Internal"*.zip; do
+          for source in "Hacienda Internal"*.dmg "Hacienda Internal"*.zip; do
             published="${source// /.}"
             mv "$source" "$published"
           done
-          shasum -a 256 Interpreter.Internal*.dmg Interpreter.Internal*.zip > SHA256SUMS
+          shasum -a 256 Hacienda.Internal*.dmg Hacienda.Internal*.zip > SHA256SUMS
           cat > INTERNAL_RELEASE.md <<EOF
-          Internal test build of the official Interpreter distribution (Intel x64).
+          Internal test build of the official Hacienda distribution (Intel x64).
 
           Source: $GITHUB_REPOSITORY@$GITHUB_SHA
 
@@ -180,8 +180,8 @@ jobs:
         with:
           name: interpreter-internal-macos-x64
           path: |
-            dist/Interpreter.Internal*.dmg
-            dist/Interpreter.Internal*.zip
+            dist/Hacienda.Internal*.dmg
+            dist/Hacienda.Internal*.zip
             dist/SHA256SUMS
             dist/INTERNAL_RELEASE.md
           if-no-files-found: error
@@ -194,12 +194,12 @@ jobs:
           version=$(node -p "require('./package.json').internalVersion")
           tag="internal-v${version}-build.${GITHUB_RUN_NUMBER}-x64"
           gh release create "$tag" \
-            dist/Interpreter.Internal*.dmg \
-            dist/Interpreter.Internal*.zip \
+            dist/Hacienda.Internal*.dmg \
+            dist/Hacienda.Internal*.zip \
             dist/SHA256SUMS \
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
-            --title "Interpreter Internal v${version} (Intel x64)" \
+            --title "Hacienda Internal v${version} (Intel x64)" \
             --notes-file dist/INTERNAL_RELEASE.md \
             --prerelease
       - name: Publish prerelease to private artifact repository after OSS publication
@@ -211,11 +211,11 @@ jobs:
           version=$(node -p "require('./package.json').internalVersion")
           tag="internal-v${version}-build.${GITHUB_RUN_NUMBER}-x64"
           gh release create "$tag" \
-            dist/Interpreter.Internal*.dmg \
-            dist/Interpreter.Internal*.zip \
+            dist/Hacienda.Internal*.dmg \
+            dist/Hacienda.Internal*.zip \
             dist/SHA256SUMS \
             --repo "$INTERNAL_RELEASE_REPOSITORY" \
             --target "$GITHUB_SHA" \
-            --title "Interpreter Internal v${version} (Intel x64)" \
+            --title "Hacienda Internal v${version} (Intel x64)" \
             --notes-file dist/INTERNAL_RELEASE.md \
             --prerelease

@@ -65,7 +65,7 @@ test('Linux release verification follows electron-builder architecture names', (
     build.indexOf('      - name: Upload immutable build output'),
   );
 
-  assert.match(linuxVerification, /Interpreter-linux-x86_64-\$\{\{ needs\.authorize\.outputs\.version \}\}\.AppImage/);
-  assert.match(linuxVerification, /Interpreter-linux-amd64-\$\{\{ needs\.authorize\.outputs\.version \}\}\.deb/);
-  assert.doesNotMatch(linuxVerification, /Interpreter-linux-x64-/);
+  assert.match(linuxVerification, /Hacienda-linux-x86_64-\$\{\{ needs\.authorize\.outputs\.version \}\}\.AppImage/);
+  assert.match(linuxVerification, /Hacienda-linux-amd64-\$\{\{ needs\.authorize\.outputs\.version \}\}\.deb/);
+  assert.doesNotMatch(linuxVerification, /Hacienda-linux-x64-/);
 });

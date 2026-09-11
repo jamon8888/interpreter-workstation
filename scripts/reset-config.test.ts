@@ -11,31 +11,31 @@ import {
 describe('findProcessesUsingPaths', () => {
   test('matches only processes that are using the reset directories', () => {
     const listing = [
-      '101 /Applications/Interpreter.app --user-data-dir=/Users/alice/Library/Application Support/interpreter',
-      '102 /Users/alice/app/resources/codex app-server --listen stdio:// -c skills={config=[{path="/Users/alice/Library/Application Support/interpreter/codex-home/skills/doc/SKILL.md"}]}',
+      '101 /Applications/Hacienda.app --user-data-dir=/Users/alice/Library/Application Support/hacienda',
+      '102 /Users/alice/app/resources/codex app-server --listen stdio:// -c skills={config=[{path="/Users/alice/Library/Application Support/hacienda/codex-home/skills/doc/SKILL.md"}]}',
       '103 node /Users/alice/.local/bin/codex',
-      '104 /usr/bin/git clone https://github.com/openai/plugins.git /Users/alice/Library/Application Support/interpreter/codex-home/.tmp/plugins-clone-abc',
+      '104 /usr/bin/git clone https://github.com/openai/plugins.git /Users/alice/Library/Application Support/hacienda/codex-home/.tmp/plugins-clone-abc',
     ].join('\n');
 
     expect(
       findProcessesUsingPaths(listing, [
-        '/Users/alice/Library/Application Support/interpreter',
+        '/Users/alice/Library/Application Support/hacienda',
       ], 'darwin'),
     ).toEqual([
       {
         pid: 101,
         command:
-          '/Applications/Interpreter.app --user-data-dir=/Users/alice/Library/Application Support/interpreter',
+          '/Applications/Hacienda.app --user-data-dir=/Users/alice/Library/Application Support/hacienda',
       },
       {
         pid: 102,
         command:
-          '/Users/alice/app/resources/codex app-server --listen stdio:// -c skills={config=[{path="/Users/alice/Library/Application Support/interpreter/codex-home/skills/doc/SKILL.md"}]}',
+          '/Users/alice/app/resources/codex app-server --listen stdio:// -c skills={config=[{path="/Users/alice/Library/Application Support/hacienda/codex-home/skills/doc/SKILL.md"}]}',
       },
       {
         pid: 104,
         command:
-          '/usr/bin/git clone https://github.com/openai/plugins.git /Users/alice/Library/Application Support/interpreter/codex-home/.tmp/plugins-clone-abc',
+          '/usr/bin/git clone https://github.com/openai/plugins.git /Users/alice/Library/Application Support/hacienda/codex-home/.tmp/plugins-clone-abc',
       },
     ]);
   });

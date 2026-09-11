@@ -8,7 +8,11 @@ import { fileURLToPath } from 'node:url';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const distRoot = path.join(root, 'dist');
 const arch = process.argv[2] || process.env.BUILD_ARCH || 'mac-arm64';
-const appBundle = path.join(distRoot, arch, 'Interpreter Internal.app');
+// Derived from the packaged product.json rather than hardcoded: electron-builder
+// names the bundle after `productName`, and the internal build appends " Internal".
+const sourceProduct = JSON.parse(readFileSync(path.join(root, 'product.json'), 'utf8'));
+const internalName = `${sourceProduct.nameLong} Internal`;
+const appBundle = path.join(distRoot, arch, `${internalName}.app`);
 const resources = path.join(appBundle, 'Contents', 'Resources');
 const appAsar = path.join(resources, 'app.asar');
 const requireFromApp = createRequire(path.join(root, 'package.json'));
@@ -53,7 +57,7 @@ if (!internalVersion) throw new Error('Could not resolve internalVersion');
 
 const distributables = ['.dmg', '.zip'].map((extension) => {
   const matches = readdirSync(distRoot)
-    .filter((name) => name.endsWith(extension) && name.includes('Interpreter Internal'));
+    .filter((name) => name.endsWith(extension) && name.includes(internalName));
   if (matches.length !== 1) {
     throw new Error(`Expected one ${extension} artifact, found ${matches.length}`);
   }

@@ -16,8 +16,8 @@ const execFile = promisify(execFileCallback);
 const DEFAULT_TIMEOUT_MS = 5 * 60 * 1000;
 const SYSTEM_APPLICATIONS_DIR = path.join(path.sep, 'Applications');
 const DEFAULT_APP_PATHS = [
-  path.join(SYSTEM_APPLICATIONS_DIR, 'Interpreter.app'),
-  path.join(homedir(), 'Applications', 'Interpreter.app'),
+  path.join(SYSTEM_APPLICATIONS_DIR, 'Hacienda.app'),
+  path.join(homedir(), 'Applications', 'Hacienda.app'),
 ];
 
 type Args = {
@@ -52,7 +52,7 @@ function parseArgs(argv: string[]): Args {
     }
     if (arg === '--app') {
       const value = argv[index + 1];
-      if (!value) throw new Error('--app requires an Interpreter.app path');
+      if (!value) throw new Error('--app requires an Hacienda.app path');
       args.app = path.resolve(value);
       index += 1;
       continue;
@@ -76,9 +76,9 @@ function parseArgs(argv: string[]): Args {
 }
 
 function printHelp(): void {
-  console.log(`Usage: pnpm run test:mac-installed-desktop-permissions -- [--yes] [--app <Interpreter.app>] [--timeout-ms <ms>]
+  console.log(`Usage: pnpm run test:mac-installed-desktop-permissions -- [--yes] [--app <Hacienda.app>] [--timeout-ms <ms>]
 
-Resets macOS TCC grants for the installed Interpreter.app, launches the real
+Resets macOS TCC grants for the installed Hacienda.app, launches the real
 Electron app, calls builtin-cua-driver through the installed app's interpreter-app
 bridge, waits for the native permission flow to complete, verifies the grant,
 and quits the app.
@@ -99,21 +99,21 @@ async function confirm(message: string): Promise<boolean> {
 
 function resolveInstalledApp(args: Args): string {
   if (args.app) {
-    if (!existsSync(args.app)) throw new Error(`Interpreter.app not found: ${args.app}`);
+    if (!existsSync(args.app)) throw new Error(`Hacienda.app not found: ${args.app}`);
     return args.app;
   }
 
   const appPath = DEFAULT_APP_PATHS.find((candidate) => existsSync(candidate));
   if (!appPath) {
     throw new Error(
-      `Unable to find installed Interpreter.app. Checked: ${DEFAULT_APP_PATHS.join(', ')}. Pass --app.`,
+      `Unable to find installed Hacienda.app. Checked: ${DEFAULT_APP_PATHS.join(', ')}. Pass --app.`,
     );
   }
   return appPath;
 }
 
 function executableForApp(appPath: string): string {
-  return path.join(appPath, 'Contents', 'MacOS', 'Interpreter');
+  return path.join(appPath, 'Contents', 'MacOS', 'Hacienda');
 }
 
 function bundledDesktopHelperForApp(appPath: string): string {
@@ -152,10 +152,10 @@ async function readBundleIdentifierIfPresent(bundlePath: string): Promise<string
 async function collectTccBundleIdentifiers(appPath: string): Promise<string[]> {
   const candidates = [
     appPath,
-    path.join(appPath, 'Contents', 'Frameworks', 'Interpreter Helper.app'),
-    path.join(appPath, 'Contents', 'Frameworks', 'Interpreter Helper (Renderer).app'),
-    path.join(appPath, 'Contents', 'Frameworks', 'Interpreter Helper (GPU).app'),
-    path.join(appPath, 'Contents', 'Frameworks', 'Interpreter Helper (Plugin).app'),
+    path.join(appPath, 'Contents', 'Frameworks', 'Hacienda Helper.app'),
+    path.join(appPath, 'Contents', 'Frameworks', 'Hacienda Helper (Renderer).app'),
+    path.join(appPath, 'Contents', 'Frameworks', 'Hacienda Helper (GPU).app'),
+    path.join(appPath, 'Contents', 'Frameworks', 'Hacienda Helper (Plugin).app'),
   ];
   const ids = new Set<string>();
   for (const candidate of candidates) {
@@ -215,7 +215,7 @@ async function killAppProcesses(appPath: string): Promise<void> {
     if (!stdout.trim()) return;
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
-  throw new Error(`Timed out waiting for existing Interpreter process to exit: ${executablePath}`);
+  throw new Error(`Timed out waiting for existing Hacienda process to exit: ${executablePath}`);
 }
 
 function appleScriptString(value: string): string {
@@ -225,7 +225,7 @@ function appleScriptString(value: string): string {
 async function showInstruction(message: string): Promise<void> {
   await execFile('/usr/bin/osascript', [
     '-e',
-    `display dialog ${appleScriptString(message)} with title "Interpreter Desktop Access Test" buttons {"OK"} default button "OK"`,
+    `display dialog ${appleScriptString(message)} with title "Hacienda Desktop Access Test" buttons {"OK"} default button "OK"`,
   ]);
 }
 
@@ -257,14 +257,14 @@ async function waitForAppServerByPolling(timeoutMs: number): Promise<number> {
     }
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
-  throw new Error(`Timed out waiting for installed Interpreter app server after ${timeoutMs}ms.`);
+  throw new Error(`Timed out waiting for installed Hacienda app server after ${timeoutMs}ms.`);
 }
 
 async function launchInstalledApp(
   appPath: string,
   timeoutMs: number,
 ): Promise<{ child: ChildProcessWithoutNullStreams | null; port: number }> {
-  console.log('[mac-installed-desktop-permissions] Launching installed Interpreter.app.');
+  console.log('[mac-installed-desktop-permissions] Launching installed Hacienda.app.');
   await execFile('/usr/bin/open', ['-n', appPath], {
     env: {
       ...process.env,
@@ -389,7 +389,7 @@ async function main(): Promise<void> {
   const appPath = resolveInstalledApp(args);
   const executablePath = executableForApp(appPath);
   const helperPath = bundledDesktopHelperForApp(appPath);
-  if (!existsSync(executablePath)) throw new Error(`Interpreter executable not found: ${executablePath}`);
+  if (!existsSync(executablePath)) throw new Error(`Hacienda executable not found: ${executablePath}`);
   if (!existsSync(helperPath)) throw new Error(`Bundled native desktop helper not found: ${helperPath}`);
 
   await registerBundle(appPath);
@@ -402,7 +402,7 @@ async function main(): Promise<void> {
   console.log(`[mac-installed-desktop-permissions] helper: ${helperPath}`);
   if (!args.yes) {
     const ok = await confirm(
-      'This will quit/relaunch Interpreter and reset local macOS Accessibility and Screen Recording grants for the installed app. Continue?',
+      'This will quit/relaunch Hacienda and reset local macOS Accessibility and Screen Recording grants for the installed app. Continue?',
     );
     if (!ok) {
       console.log('Aborted.');
@@ -426,9 +426,9 @@ async function main(): Promise<void> {
     assertPermissionsDenied(resetCheck);
 
     await showInstruction(
-      'Interpreter is about to request desktop access through the installed app. '
+      'Hacienda is about to request desktop access through the installed app. '
       + 'After you click OK, grant Accessibility and Screen Recording when macOS asks. '
-      + 'The test will wait until Interpreter can actually use both permissions.',
+      + 'The test will wait until Hacienda can actually use both permissions.',
     );
 
     console.log('[mac-installed-desktop-permissions] Calling builtin-cua-driver through installed app interpreter-app bridge.');
@@ -446,7 +446,7 @@ async function main(): Promise<void> {
     }
 
     await showInstruction(
-      'The first permission pass completed. The test will now restart Interpreter, '
+      'The first permission pass completed. The test will now restart Hacienda, '
       + 'then verify the grants still work after relaunch.',
     );
 
@@ -459,7 +459,7 @@ async function main(): Promise<void> {
     const secondToolContext = await registerCliCaller(secondLaunch.port);
     const verification = await callPermissionsTool(secondToolContext, false, 30_000);
     assertPermissionsGranted(verification);
-    console.log('[mac-installed-desktop-permissions] verified through installed Interpreter app after restart.');
+    console.log('[mac-installed-desktop-permissions] verified through installed Hacienda app after restart.');
   } finally {
     await stopInstalledApp(child, helperPath);
   }

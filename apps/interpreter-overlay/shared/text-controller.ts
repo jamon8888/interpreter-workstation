@@ -717,7 +717,7 @@ export function recordOverlayTextControllerAgentLaunchResult(input: {
     controllerDecision: 'fast_model_agent',
     directCommand: null,
     toolCalls: input.toolCalls ?? [],
-    toolResultText: 'Started visible Interpreter agent.',
+    toolResultText: 'Started visible Hacienda agent.',
     permissionResultText: null,
     agentLaunch: input.launch,
   };
@@ -1022,7 +1022,7 @@ export function buildOverlayWorkingPreferencesText(customInstructions: string | 
   }
   return [
     '<overlay_working_preferences source="saved_custom_instructions">',
-    'These are the saved Interpreter working preferences for how the user likes work handled. Follow them unless the current user message overrides them.',
+    'These are the saved Hacienda working preferences for how the user likes work handled. Follow them unless the current user message overrides them.',
     trimmed.slice(0, 12_000),
     '</overlay_working_preferences>',
   ].join('\n');
