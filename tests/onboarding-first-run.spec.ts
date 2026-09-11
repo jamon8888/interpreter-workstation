@@ -94,7 +94,7 @@ test('first run is gated by the shared onboarding state contract', async ({ page
     await reloadAndWaitForPageLoadSignals(page);
     await waitForUiStability(page);
 
-    await expect(page.getByText('Welcome to Interpreter')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText('Welcome to Hacienda')).toBeVisible({ timeout: 15000 });
 
     await setOnboardingState(page, {
       ...createDefaultOnboardingState(),
@@ -104,7 +104,7 @@ test('first run is gated by the shared onboarding state contract', async ({ page
     await reloadAndWaitForPageLoadSignals(page);
     await waitForUiStability(page);
 
-    await expect(page.getByText('Welcome to Interpreter')).toBeHidden({ timeout: 15000 });
+    await expect(page.getByText('Welcome to Hacienda')).toBeHidden({ timeout: 15000 });
     await expect(page.locator(sel('agentEmptyStatePage')).or(page.locator(sel('mainComposerInput'))).first()).toBeVisible({ timeout: 15000 });
   } finally {
     await setOnboardingState(page, original.state);

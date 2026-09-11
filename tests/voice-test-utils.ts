@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { randomUUID } from 'crypto';
+import { DEFAULT_AMBIENT_TRIGGER_PHRASES } from '../shared/types/stt';
 import type { Page } from '@playwright/test';
 import { expect } from './fixtures';
 import { sel } from './selectors';
@@ -249,7 +250,7 @@ export async function configureAmbientVoice(page: Page, backend = getPreferredTe
         voiceMode: 'ambient',
         backend,
         previewBeforeSendMs: 0,
-        ambientTriggerPhrases: ['Interpreter', 'Repertor'],
+        ambientTriggerPhrases: [...DEFAULT_AMBIENT_TRIGGER_PHRASES],
         ambientEndPhrases: ['make it so', 'take it so'],
       },
     });

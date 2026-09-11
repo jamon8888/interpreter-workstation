@@ -35,7 +35,7 @@ type RuntimePermissionState = {
   macosTempAccess: boolean;
 };
 
-const WORKSPACE_WRITE_PROMPT = 'Interpreter wants to change files in this workspace.';
+const WORKSPACE_WRITE_PROMPT = 'Hacienda wants to change files in this workspace.';
 const FILE_CONTENT = 'Interpreter file permissions e2e.\n';
 const TEST_FILESYSTEM_TOOLS = [
   'builtin-test-filesystem__read_file',

@@ -80,7 +80,7 @@ async function runCyclingWithOverlap(audioFile: string): Promise<CyclingResult> 
   const { binaryPath, modelDir } = qwenPaths!;
   const pcm = loadAudioPcm(audioFile);
   const allChunks = splitIntoChunks(pcm);
-  const triggerPattern = buildTolerantPhrasePattern('Interpreter');
+  const triggerPattern = buildTolerantPhrasePattern('Hacienda');
   const endPattern = buildTolerantPhrasePattern('make it so');
 
   const cycleTranscripts: string[] = [];
@@ -180,7 +180,7 @@ async function runCyclingWithOverlap(audioFile: string): Promise<CyclingResult> 
 // ---- Pure logic tests ----
 
 function simulateAmbientCycling(cycleTranscripts: string[]): { sentTexts: string[]; phase: string; accumulatedTranscript: string } {
-  const triggerPattern = buildTolerantPhrasePattern('Interpreter');
+  const triggerPattern = buildTolerantPhrasePattern('Hacienda');
   const endPattern = buildTolerantPhrasePattern('make it so');
   let ambientState: 'waiting' | 'accumulating' = 'waiting';
   let accumulatedTranscript = '';
@@ -252,7 +252,7 @@ describe('ambient cycling logic (pure)', () => {
   test('accumulates across multiple cycles', () => {
     const result = simulateAmbientCycling([
       'blah blah',
-      'Interpreter',
+      'Hacienda',
       'turn on the lights',
       'in the living room make it so',
     ]);
