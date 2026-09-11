@@ -72,8 +72,16 @@ export function extractRehydrationMap(result: unknown): Record<string, string> {
   return {};
 }
 
-async function decrypt(docId: string, passphrase: string): Promise<Record<string, string>> {
-  if (!passphrase) throw new Error('[vault] Passphrase is required to decrypt a rehydration map');
+/**
+ * `encrypt` defaults to the OS-guarded vault key, so a blob written through the
+ * default path can only be reopened with that same key. Requiring the caller to
+ * supply a passphrase made those blobs undecryptable from the renderer, which
+ * has no access to the OS-protected secret. Decryption now mirrors encryption:
+ * an explicit passphrase when one was used, the OS key otherwise.
+ */
+async function decrypt(docId: string, explicitPassphrase?: string): Promise<Record<string, string>> {
+  const passphrase = explicitPassphrase || getOrCreateVaultPassphrase();
+  if (!passphrase) throw new Error('[vault] No vault key available to decrypt a rehydration map');
   const blobPath = resolveVaultBlobPath(docId);
   let encryptedBlob: string;
   try {

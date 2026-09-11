@@ -69,8 +69,6 @@ export interface PiiViewerOptions {
   mode?: 'view' | 'compose';
   /** Vault document id used for explicit decrypt-to-reveal. Labels still render without it. */
   docId?: string;
-  /** Resolve the vault passphrase on demand; never stored by the viewer. */
-  getPassphrase?: () => Promise<string | null>;
 }
 
 interface ActivePiiLabel {
@@ -197,6 +195,7 @@ export const TipTapViewer = forwardRef<TipTapViewerRef, TipTapViewerProps>(
   const [activeUnlinkedMention, setActiveUnlinkedMention] = useState<ActiveUnlinkedMention | null>(null);
   const piiPopoverRef = useRef<HTMLDivElement>(null);
   const piiCloseTimerRef = useRef<number | null>(null);
+  const piiRevealRequestRef = useRef(0);
   const [activePiiLabel, setActivePiiLabel] = useState<ActivePiiLabel | null>(null);
   const activePiiLabelRef = useRef<ActivePiiLabel | null>(null);
   useEffect(() => {
@@ -315,17 +314,7 @@ export const TipTapViewer = forwardRef<TipTapViewerRef, TipTapViewerProps>(
         const piiLabel = target.closest('[data-pii-label="true"]') as HTMLElement | null;
         if (piiLabel) {
           event.preventDefault();
-          const category = piiLabel.getAttribute('data-pii-category') ?? 'unknown';
-          const token = piiLabel.getAttribute('data-pii-token') ?? piiLabel.textContent ?? '';
-          const from = Number(piiLabel.getAttribute('data-from'));
-          const to = Number(piiLabel.getAttribute('data-to'));
-          openPiiLabelPopover({
-            category,
-            token,
-            from: Number.isFinite(from) ? from : 0,
-            to: Number.isFinite(to) ? to : 0,
-            rect: piiLabel.getBoundingClientRect(),
-          });
+          openPiiLabelFromElement(piiLabel);
           return true;
         }
 
@@ -508,6 +497,21 @@ export const TipTapViewer = forwardRef<TipTapViewerRef, TipTapViewerProps>(
     setActivePiiLabel(label);
   }, [clearPiiCloseTimer]);
 
+  // The decoration is rendered with role="button" and tabindex="0", and its
+  // aria-label says "Activate to reveal". Only click opened it, so Enter and
+  // Space did nothing for keyboard and screen-reader users.
+  const openPiiLabelFromElement = useCallback((label: HTMLElement) => {
+    const from = Number(label.getAttribute('data-from'));
+    const to = Number(label.getAttribute('data-to'));
+    openPiiLabelPopover({
+      category: label.getAttribute('data-pii-category') ?? 'unknown',
+      token: label.getAttribute('data-pii-token') ?? label.textContent ?? '',
+      from: Number.isFinite(from) ? from : 0,
+      to: Number.isFinite(to) ? to : 0,
+      rect: label.getBoundingClientRect(),
+    });
+  }, [openPiiLabelPopover]);
+
   const scheduleClosePiiPopover = useCallback((relatedTarget?: EventTarget | null) => {
     if (relatedTarget instanceof Node) {
       if (
@@ -528,34 +532,48 @@ export const TipTapViewer = forwardRef<TipTapViewerRef, TipTapViewerProps>(
   const handleRevealPiiLabel = useCallback(async () => {
     const active = activePiiLabelRef.current;
     const docId = piiOptions?.docId;
-    const getPassphrase = piiOptions?.getPassphrase;
-    if (!active || !docId || !getPassphrase) {
+    if (!active || !docId) {
       return;
     }
-    setActivePiiLabel({ ...active, revealing: true, error: undefined });
+
+    // A reveal outlives the popover that started it: the passphrase prompt and
+    // the vault decrypt are both awaited, and during them the user can close
+    // the popover, focus a different label, or switch files. Writing the
+    // captured label back would put a decrypted value on screen in a context
+    // the user is no longer looking at. Every update below is dropped unless it
+    // is still the newest reveal and the popover still shows the same token.
+    const requestId = piiRevealRequestRef.current + 1;
+    piiRevealRequestRef.current = requestId;
+    const applyIfCurrent = (next: ActivePiiLabel) => {
+      if (piiRevealRequestRef.current !== requestId) return;
+      setActivePiiLabel((current) => (
+        current && current.token === active.token && current.from === active.from
+          ? next
+          : current
+      ));
+    };
+
+    applyIfCurrent({ ...active, revealing: true, error: undefined });
     try {
-      const passphrase = await getPassphrase();
-      if (!passphrase) {
-        setActivePiiLabel({ ...active, revealing: false, error: 'Reveal cancelled.' });
-        return;
-      }
-      const map = await pii.decryptRehydration(docId, passphrase);
+      const map = await pii.decryptRehydration(docId);
       const original = map[active.token];
       if (!original) {
-        setActivePiiLabel({ ...active, revealing: false, error: 'No stored value for this label.' });
+        applyIfCurrent({ ...active, revealing: false, error: 'No stored value for this label.' });
         return;
       }
-      setActivePiiLabel({ ...active, revealing: false, original });
+      applyIfCurrent({ ...active, revealing: false, original });
     } catch (error) {
-      setActivePiiLabel({
+      applyIfCurrent({
         ...active,
         revealing: false,
         error: error instanceof Error ? error.message : 'Reveal failed.',
       });
     }
-  }, [piiOptions?.docId, piiOptions?.getPassphrase]);
+  }, [piiOptions?.docId]);
 
   useEffect(() => {
+    // Also invalidates any reveal still in flight for the previous document.
+    piiRevealRequestRef.current += 1;
     setActivePiiLabel(null);
   }, [filePath]);
 
@@ -756,6 +774,17 @@ export const TipTapViewer = forwardRef<TipTapViewerRef, TipTapViewerProps>(
     };
 
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        const target = event.target;
+        const piiLabel = target instanceof HTMLElement
+          ? target.closest('[data-pii-label="true"]')
+          : null;
+        if (piiLabel instanceof HTMLElement) {
+          event.preventDefault();
+          openPiiLabelFromElement(piiLabel);
+          return;
+        }
+      }
       if (event.key === 'Escape') {
         clearUnlinkedMentionCloseTimer();
         setActiveUnlinkedMention(null);
@@ -788,6 +817,7 @@ export const TipTapViewer = forwardRef<TipTapViewerRef, TipTapViewerProps>(
   }, [
     clearUnlinkedMentionCloseTimer,
     editable,
+    openPiiLabelFromElement,
     filePath,
     openUnlinkedMentionPopover,
     scheduleCloseUnlinkedMentionPopover,
@@ -1045,12 +1075,12 @@ export const TipTapViewer = forwardRef<TipTapViewerRef, TipTapViewerProps>(
                 type="button"
                 size="sm"
                 className="h-7 px-2.5 text-ui-sm"
-                disabled={activePiiLabel.revealing || !piiOptions?.docId || !piiOptions?.getPassphrase}
+                disabled={activePiiLabel.revealing || !piiOptions?.docId}
                 onClick={() => void handleRevealPiiLabel()}
               >
                 {activePiiLabel.revealing ? 'Revealing…' : 'Reveal'}
               </Button>
-              {!piiOptions?.docId || !piiOptions?.getPassphrase ? (
+              {!piiOptions?.docId ? (
                 <span className="text-ui-xs text-[var(--oa-text-muted)]">
                   No vault entry linked for this document.
                 </span>

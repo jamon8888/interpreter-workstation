@@ -626,7 +626,8 @@ export interface WorkspaceScanStatus {
 
 interface PiiIpc {
   detectPii(text: string, options?: { categories?: string[] }): Promise<{ category: string; start: number; end: number; text: string; confidence: number }[]>;
-  decryptRehydration(docId: string, passphrase: string): Promise<Record<string, string>>;
+  /** Decryption uses the OS-guarded vault key; the renderer never handles it. */
+  decryptRehydration(docId: string): Promise<Record<string, string>>;
 }
 interface WorkspaceScanIpc {
   status(): Promise<WorkspaceScanStatus>;
