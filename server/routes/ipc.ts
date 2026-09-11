@@ -188,9 +188,11 @@ const handlers: Record<string, Record<string, HandlerFn>> = {
       const { piiDetectionService } = await import('../services/piiDetection');
       return piiDetectionService.detectPii(text, options);
     },
-    decryptRehydration: async ([docId, passphrase]: [string, string]) => {
+    decryptRehydration: async ([docId]: [string]) => {
       const { vaultManager } = await import('../services/vault');
-      return vaultManager.decrypt(docId, passphrase);
+      // The renderer never handles the vault key: `decrypt` falls back to the
+      // OS-guarded passphrase, the same one `encrypt` defaults to.
+      return vaultManager.decrypt(docId);
     },
   },
 
