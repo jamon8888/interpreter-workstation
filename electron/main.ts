@@ -79,6 +79,14 @@ attachConsoleSinkGuards({
   stderr: process.stderr,
 });
 
+// Enable V8 compile cache for faster module loading on subsequent launches.
+// Must be set before any require() calls — ESM imports are hoisted but
+// dynamic requires inside functions will benefit from the cached bytecode.
+if (!process.env.NODE_COMPILE_CACHE) {
+  const compileCacheDir = path.join(app.getPath('userData'), 'compile-cache');
+  process.env.NODE_COMPILE_CACHE = compileCacheDir;
+}
+
 // =============================================================================
 // FIX PATH - Inherit user's shell PATH in packaged Electron apps
 // Must be called early, before anything that might need PATH (like spawning claude)
@@ -1220,6 +1228,10 @@ function loadFileTreeCache(): void {
 // Load cache early (before app.whenReady)
 loadFileTreeCache();
 
+// Skip Electron's default application menu setup cost. The app builds its
+// own menu via buildApplicationMenu() after app.whenReady().
+Menu.setApplicationMenu(null);
+
 // NOTE(victor): Protocol must be registered before app.whenReady() for proper handling
 const CUSTOM_PROTOCOL = 'workstation';
 
@@ -2258,7 +2270,6 @@ async function createWindow(options?: CreateWindowOptions): Promise<CreateWindow
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false, // Disable sandbox to allow ES module preload
-      webSecurity: false, // NOTE(victor): Disabled to allow file:// <-> http://localhost communication for oo-editors iframe on Windows
       // Use persist partition to ensure localStorage survives app restarts
       // This is CRITICAL for auth token persistence
       partition: WORKSTATION_PARTITION,

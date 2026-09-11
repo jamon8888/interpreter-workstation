@@ -66,6 +66,20 @@ export default defineConfig(() => {
             }
             return 'assets/[name]-[hash][extname]';
           },
+          manualChunks(id) {
+            // React vendor — keep the framework separate from app code
+            if (id.includes('node_modules/react-dom') || id.includes('node_modules/react/') || id.includes('node_modules/react/compiler-runtime')) {
+              return 'vendor-react';
+            }
+            // i18n — heavy language packs, loadable on demand
+            if (id.includes('node_modules/i18next') || id.includes('node_modules/react-i18next') || id.includes('node_modules/i18next-')) {
+              return 'vendor-i18n';
+            }
+            // File viewer runtimes — large binary format decoders
+            if (id.includes('node_modules/@file-viewer/') || id.includes('node_modules/docx-preview') || id.includes('node_modules/xlsx') || id.includes('node_modules/pptx')) {
+              return 'vendor-file-viewer';
+            }
+          },
         },
       },
     },

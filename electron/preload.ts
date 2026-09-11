@@ -9,6 +9,11 @@ import {
   parseWindowSessionKeyArg,
 } from './windowSessionArgs';
 import { shouldDisableMacTransparency } from './utils/macWindowAppearance';
+import { buildVoiceNamespaces } from './preload/voice';
+import { buildDocumentNamespaces } from './preload/documents';
+import { buildBrowserNamespaces } from './preload/browser';
+import { buildAgentNamespaces } from './preload/agent';
+import { buildMiscNamespaces } from './preload/misc';
 import type {
   ApiRequestParams,
   ApiRequestResponse,
@@ -63,7 +68,6 @@ import type {
   WorkspaceConfirmationRespondResponse,
   WorkspaceCreateSampleResponse,
   WorkspaceFilesChangedEvent,
-  PdfUpdateFormDataRequest,
   PdfUpdateFormDataResponse,
   PdfFillFieldEvent,
   FileRefreshedEvent,
@@ -114,7 +118,6 @@ import type {
   FilesSaveClipboardImageRequest,
   FilesDownloadUrlRequest,
   FilesDownloadUrlResponse,
-  ProjectRunnerPathRequest,
   ProjectRunnerStartResponse,
   ProjectRunnerStopResponse,
   ProjectRunnerGetStatusResponse,
@@ -126,11 +129,8 @@ import type {
   MovieExportProgressEvent,
   MovieCompileComponentsRequest,
   MovieCompileComponentsResponse,
-  ShellRevealInFinderRequest,
   ShellRevealInFinderResponse,
-  ShellCopyFileRequest,
   ShellCopyFileResponse,
-  ShellCutFileRequest,
   ShellCutFileResponse,
   ConversationSaveRequest,
   ConversationSaveResponse,
@@ -148,16 +148,10 @@ import type {
   OfficeExtensionDownloadResponse,
   OfficeExtensionStatusResponse,
   OfficeExtensionEnsureRunningResponse,
-  BrowserCreateRequest,
   BrowserCreateResponse,
-  BrowserNavigateRequest,
   BrowserNavigateResponse,
-  BrowserIdRequest,
   BrowserActionResponse,
-  BrowserGetStateRequest,
   BrowserGetStateResponse,
-  BrowserAttachRequest,
-  BrowserSetBoundsRequest,
   BrowserEvent,
   BrowserGetPersistedTabsResponse,
   BrowserTabCreatedEvent,
@@ -527,6 +521,7 @@ export interface ElectronAPI {
     checkInstalled: () => Promise<import('./ipc/registry').OfficeExtensionCheckInstalledResponse>;
     install: () => Promise<import('./ipc/registry').OfficeExtensionInstallResponse>;
     uninstall: () => Promise<import('./ipc/registry').OfficeExtensionUninstallResponse>;
+    healthcheck: () => Promise<{ status: string }>;
     onInstallProgress: (callback: (event: import('./ipc/registry').OfficeExtensionInstallProgressEvent) => void) => () => void;
   };
 
@@ -792,6 +787,13 @@ async function replayPendingAgentTabCreateRequest(requestId?: string): Promise<v
   }
 }
 
+// Build feature namespaces from extracted modules
+const voiceNamespaces = buildVoiceNamespaces(ipcRenderer, IPC_CHANNELS);
+const documentNamespaces = buildDocumentNamespaces(ipcRenderer, IPC_CHANNELS);
+const browserNamespaces = buildBrowserNamespaces(ipcRenderer, IPC_CHANNELS);
+const agentNamespaces = buildAgentNamespaces(ipcRenderer, IPC_CHANNELS, replayPendingAgentTabCreateRequest);
+const miscNamespaces = buildMiscNamespaces(ipcRenderer, IPC_CHANNELS);
+
 // Expose protected methods that allow the renderer process to use
 // the ipcRenderer without exposing the entire object
 contextBridge.exposeInMainWorld('electron', {
@@ -1039,79 +1041,6 @@ contextBridge.exposeInMainWorld('electron', {
     },
   },
 
-  computerUseSetup: {
-    onRequested: (callback: (event: ComputerUseSetupRequestedEvent) => void) => {
-      const listener = (_: any, event: ComputerUseSetupRequestedEvent) => callback(event);
-      ipcRenderer.on(IPC_CHANNELS.COMPUTER_USE_SETUP_REQUESTED, listener);
-      return () => ipcRenderer.removeListener(IPC_CHANNELS.COMPUTER_USE_SETUP_REQUESTED, listener);
-    },
-    onStatusRequested: (callback: (event: import('./ipc/registry').ComputerUseSetupStatusRequestedEvent) => void) => {
-      const listener = (_: any, event: import('./ipc/registry').ComputerUseSetupStatusRequestedEvent) => callback(event);
-      ipcRenderer.on(IPC_CHANNELS.COMPUTER_USE_SETUP_STATUS_REQUESTED, listener);
-      return () => ipcRenderer.removeListener(IPC_CHANNELS.COMPUTER_USE_SETUP_STATUS_REQUESTED, listener);
-    },
-  },
-
-  overlaySettings: {
-    get: () => ipcRenderer.invoke(IPC_CHANNELS.OVERLAY_SETTINGS_GET),
-    set: (settings: import('../apps/interpreter-overlay/shared/settings').InterpreterOverlaySettings) =>
-      ipcRenderer.invoke(IPC_CHANNELS.OVERLAY_SETTINGS_SET, settings),
-    getAccessState: (options?: { forceRefresh?: boolean }) =>
-      ipcRenderer.invoke(IPC_CHANNELS.OVERLAY_SETTINGS_GET_ACCESS_STATE, options),
-    getPermissionStatus: () =>
-      ipcRenderer.invoke(IPC_CHANNELS.OVERLAY_SETTINGS_GET_PERMISSION_STATUS),
-    requestAccessibilityPermission: () =>
-      ipcRenderer.invoke(IPC_CHANNELS.OVERLAY_SETTINGS_REQUEST_ACCESSIBILITY_PERMISSION),
-    requestScreenRecordingPermission: () =>
-      ipcRenderer.invoke(IPC_CHANNELS.OVERLAY_SETTINGS_REQUEST_SCREEN_RECORDING_PERMISSION),
-    openAccessibilitySettings: () =>
-      ipcRenderer.invoke(IPC_CHANNELS.OVERLAY_SETTINGS_OPEN_ACCESSIBILITY_SETTINGS),
-    openScreenRecordingSettings: () =>
-      ipcRenderer.invoke(IPC_CHANNELS.OVERLAY_SETTINGS_OPEN_SCREEN_RECORDING_SETTINGS),
-  },
-
-  interpreterOverlay: {
-    startWindowVoiceMode: (request?: import('./ipc/registry').InterpreterOverlayStartWindowVoiceRequest) =>
-      ipcRenderer.invoke(IPC_CHANNELS.INTERPRETER_OVERLAY_START_WINDOW_VOICE, request),
-    onOnboardingVoiceInterviewCompleted: (
-      callback: (event: import('./ipc/registry').InterpreterOverlayOnboardingVoiceInterviewCompletedEvent) => void,
-    ) => {
-      const listener = (
-        _event: any,
-        data: import('./ipc/registry').InterpreterOverlayOnboardingVoiceInterviewCompletedEvent,
-      ) => callback(data);
-      ipcRenderer.on(IPC_CHANNELS.INTERPRETER_OVERLAY_ONBOARDING_VOICE_INTERVIEW_COMPLETED, listener);
-      return () => ipcRenderer.removeListener(
-        IPC_CHANNELS.INTERPRETER_OVERLAY_ONBOARDING_VOICE_INTERVIEW_COMPLETED,
-        listener,
-      );
-    },
-  },
-
-  // PDF IPC
-  pdf: {
-    updateFormData: (filePath: string, formData: { fields: Array<{ name: string; type: string; value: any }> }) => {
-      const request: PdfUpdateFormDataRequest = { filePath, formData };
-      return ipcRenderer.invoke(IPC_CHANNELS.PDF_UPDATE_FORM_DATA, request);
-    },
-    onFillField: (callback: (event: PdfFillFieldEvent) => void) => {
-      const listener = (_: any, event: PdfFillFieldEvent) => callback(event);
-      ipcRenderer.on(IPC_CHANNELS.PDF_FILL_FIELD, listener);
-      return () => ipcRenderer.removeListener(IPC_CHANNELS.PDF_FILL_FIELD, listener);
-    },
-    readStructure: (filePath: string, page?: number) => {
-      return ipcRenderer.invoke(IPC_CHANNELS.PDF_READ_STRUCTURE, { filePath, page });
-    },
-  },
-
-  markdown: {
-    onFormat: (callback: (action: string) => void) => {
-      const listener = (_: any, action: string) => callback(action);
-      ipcRenderer.on('markdown:format', listener);
-      return () => ipcRenderer.removeListener('markdown:format', listener);
-    },
-  },
-
   // File IPC
   files: {
     onRefreshed: (callback: (event: FileRefreshedEvent) => void) => {
@@ -1201,262 +1130,6 @@ contextBridge.exposeInMainWorld('electron', {
     },
     saveClipboardImage: (request: FilesSaveClipboardImageRequest) =>
       ipcRenderer.invoke(IPC_CHANNELS.FILES_SAVE_CLIPBOARD_IMAGE, request),
-  },
-
-  projectRunner: {
-    start: (projectPath: string) => {
-      const request: ProjectRunnerPathRequest = { projectPath };
-      return ipcRenderer.invoke(IPC_CHANNELS.PROJECT_RUNNER_START, request);
-    },
-    stop: (projectPath: string) => {
-      const request: ProjectRunnerPathRequest = { projectPath };
-      return ipcRenderer.invoke(IPC_CHANNELS.PROJECT_RUNNER_STOP, request);
-    },
-    getStatus: (projectPath: string) => {
-      const request: ProjectRunnerPathRequest = { projectPath };
-      return ipcRenderer.invoke(IPC_CHANNELS.PROJECT_RUNNER_GET_STATUS, request);
-    },
-    onChanged: (callback: (event: ProjectRunnerChangedEvent) => void) => {
-      const listener = (_: any, event: ProjectRunnerChangedEvent) => callback(event);
-      ipcRenderer.on(IPC_CHANNELS.PROJECT_RUNNER_CHANGED, listener);
-      return () => ipcRenderer.removeListener(IPC_CHANNELS.PROJECT_RUNNER_CHANGED, listener);
-    },
-  },
-
-  movie: {
-    compileComponents: (request: MovieCompileComponentsRequest) =>
-      ipcRenderer.invoke(IPC_CHANNELS.MOVIE_COMPILE_COMPONENTS, request),
-    exportProject: (request: MovieExportRequest) =>
-      ipcRenderer.invoke(IPC_CHANNELS.MOVIE_EXPORT, request),
-    cancelExport: (request: MovieCancelExportRequest) =>
-      ipcRenderer.invoke(IPC_CHANNELS.MOVIE_EXPORT_CANCEL, request),
-    onExportProgress: (callback: (event: MovieExportProgressEvent) => void) => {
-      const listener = (_: any, event: MovieExportProgressEvent) => callback(event);
-      ipcRenderer.on(IPC_CHANNELS.MOVIE_EXPORT_PROGRESS, listener);
-      return () => ipcRenderer.removeListener(IPC_CHANNELS.MOVIE_EXPORT_PROGRESS, listener);
-    },
-  },
-
-  // Checkpoint IPC
-  checkpoint: {
-    get: (messageId: string) => {
-      return ipcRenderer.invoke(IPC_CHANNELS.CHECKPOINT_GET, { messageId });
-    },
-    restore: (messageId: string, type: 'before' | 'after', paths?: string[]) => {
-      return ipcRenderer.invoke(IPC_CHANNELS.CHECKPOINT_RESTORE, { messageId, type, paths });
-    },
-    getSettings: () => {
-      return ipcRenderer.invoke(IPC_CHANNELS.CHECKPOINT_SETTINGS_GET);
-    },
-    setSettings: (settings: Partial<CheckpointSettings>) => {
-      return ipcRenderer.invoke(IPC_CHANNELS.CHECKPOINT_SETTINGS_SET, { settings });
-    },
-    onSettingsChanged: (callback: (event: CheckpointSettingsChangedEvent) => void) => {
-      const handler = (_event: unknown, data: CheckpointSettingsChangedEvent) => callback(data);
-      ipcRenderer.on(IPC_CHANNELS.CHECKPOINT_SETTINGS_CHANGED, handler);
-      return () => ipcRenderer.removeListener(IPC_CHANNELS.CHECKPOINT_SETTINGS_CHANGED, handler);
-    },
-    onStatusChanged: (callback: (event: CheckpointStatusEvent) => void) => {
-      const handler = (_event: unknown, data: CheckpointStatusEvent) => callback(data);
-      ipcRenderer.on(IPC_CHANNELS.CHECKPOINT_STATUS_CHANGED, handler);
-      return () => ipcRenderer.removeListener(IPC_CHANNELS.CHECKPOINT_STATUS_CHANGED, handler);
-    },
-  },
-
-  // Shell IPC
-  shell: {
-    revealInFinder: (path: string) => {
-      const request: ShellRevealInFinderRequest = { path };
-      return ipcRenderer.invoke(IPC_CHANNELS.SHELL_REVEAL_IN_FINDER, request);
-    },
-    copyFile: (path: string) => {
-      const request: ShellCopyFileRequest = { path };
-      return ipcRenderer.invoke(IPC_CHANNELS.SHELL_COPY_FILE, request);
-    },
-    cutFile: (path: string) => {
-      const request: ShellCutFileRequest = { path };
-      return ipcRenderer.invoke(IPC_CHANNELS.SHELL_CUT_FILE, request);
-    },
-  },
-
-  // Conversation IPC
-  conversations: {
-    save: (request: ConversationSaveRequest) =>
-      ipcRenderer.invoke(IPC_CHANNELS.CONVERSATION_SAVE, request),
-    load: (request: ConversationLoadRequest) =>
-      ipcRenderer.invoke(IPC_CHANNELS.CONVERSATION_LOAD, request),
-    delete: (request: ConversationDeleteRequest) =>
-      ipcRenderer.invoke(IPC_CHANNELS.CONVERSATION_DELETE, request),
-    list: (request: ConversationListRequest) =>
-      ipcRenderer.invoke(IPC_CHANNELS.CONVERSATION_LIST, request),
-    listWithPreviews: (request: ConversationListWithPreviewsRequest) =>
-      ipcRenderer.invoke(IPC_CHANNELS.CONVERSATION_LIST_WITH_PREVIEWS, request),
-  },
-
-  // OfficeExtension IPC
-  officeExtension: {
-    convert: (request: OfficeExtensionConvertRequest) =>
-      ipcRenderer.invoke(IPC_CHANNELS.OFFICE_EXTENSION_CONVERT, request),
-    download: (request: OfficeExtensionDownloadRequest) =>
-      ipcRenderer.invoke(IPC_CHANNELS.OFFICE_EXTENSION_DOWNLOAD, request),
-    status: () =>
-      ipcRenderer.invoke(IPC_CHANNELS.OFFICE_EXTENSION_STATUS),
-    ensureRunning: () =>
-      ipcRenderer.invoke(IPC_CHANNELS.OFFICE_EXTENSION_ENSURE_RUNNING),
-    checkInstalled: () =>
-      ipcRenderer.invoke(IPC_CHANNELS.OFFICE_EXTENSION_CHECK_INSTALLED),
-    install: () =>
-      ipcRenderer.invoke(IPC_CHANNELS.OFFICE_EXTENSION_INSTALL),
-    uninstall: () =>
-      ipcRenderer.invoke(IPC_CHANNELS.OFFICE_EXTENSION_UNINSTALL),
-    onInstallProgress: (callback: (event: import('./ipc/registry').OfficeExtensionInstallProgressEvent) => void) => {
-      const handler = (_event: any, data: import('./ipc/registry').OfficeExtensionInstallProgressEvent) => callback(data);
-      ipcRenderer.on(IPC_CHANNELS.OFFICE_EXTENSION_INSTALL_PROGRESS, handler);
-      return () => ipcRenderer.removeListener(IPC_CHANNELS.OFFICE_EXTENSION_INSTALL_PROGRESS, handler);
-    },
-  },
-
-  // VoiceExtension IPC
-  voiceExtension: {
-    checkInstalled: (request?: VoiceExtensionCheckInstalledRequest) =>
-      ipcRenderer.invoke(IPC_CHANNELS.VOICE_EXTENSION_CHECK_INSTALLED, request ?? {}),
-    install: (request?: VoiceExtensionInstallRequest) =>
-      ipcRenderer.invoke(IPC_CHANNELS.VOICE_EXTENSION_INSTALL, request ?? {}),
-    onInstallProgress: (callback: (event: import('./ipc/registry').VoiceExtensionInstallProgressEvent) => void) => {
-      const handler = (_event: any, data: import('./ipc/registry').VoiceExtensionInstallProgressEvent) => callback(data);
-      ipcRenderer.on(IPC_CHANNELS.VOICE_EXTENSION_INSTALL_PROGRESS, handler);
-      return () => ipcRenderer.removeListener(IPC_CHANNELS.VOICE_EXTENSION_INSTALL_PROGRESS, handler);
-    },
-  },
-
-  // Text-to-Speech IPC
-  tts: {
-    getSettings: () =>
-      ipcRenderer.invoke(IPC_CHANNELS.TTS_GET_SETTINGS),
-    setSettings: (request: TtsSetSettingsRequest) =>
-      ipcRenderer.invoke(IPC_CHANNELS.TTS_SET_SETTINGS, request),
-    listModels: () =>
-      ipcRenderer.invoke(IPC_CHANNELS.TTS_LIST_MODELS),
-    installModel: (request: TtsInstallModelRequest) =>
-      ipcRenderer.invoke(IPC_CHANNELS.TTS_INSTALL_MODEL, request),
-    getVoices: (request?: TtsGetVoicesRequest) =>
-      ipcRenderer.invoke(IPC_CHANNELS.TTS_GET_VOICES, request ?? {}),
-    speak: (request: TtsSpeakRequest) =>
-      ipcRenderer.invoke(IPC_CHANNELS.TTS_SPEAK, request),
-    onSettingsChanged: (callback: (event: TtsSettingsChangedEvent) => void) => {
-      const handler = (_event: any, data: TtsSettingsChangedEvent) => callback(data);
-      ipcRenderer.on(IPC_CHANNELS.TTS_SETTINGS_CHANGED, handler);
-      return () => ipcRenderer.removeListener(IPC_CHANNELS.TTS_SETTINGS_CHANGED, handler);
-    },
-    onInstallProgress: (callback: (event: TtsInstallProgressEvent) => void) => {
-      const handler = (_event: any, data: TtsInstallProgressEvent) => callback(data);
-      ipcRenderer.on(IPC_CHANNELS.TTS_INSTALL_PROGRESS, handler);
-      return () => ipcRenderer.removeListener(IPC_CHANNELS.TTS_INSTALL_PROGRESS, handler);
-    },
-    onPlaybackRequested: (callback: (event: TtsPlaybackRequestedEvent) => void) => {
-      const handler = (_event: any, data: TtsPlaybackRequestedEvent) => callback(data);
-      ipcRenderer.on(IPC_CHANNELS.TTS_PLAYBACK_REQUESTED, handler);
-      return () => ipcRenderer.removeListener(IPC_CHANNELS.TTS_PLAYBACK_REQUESTED, handler);
-    },
-  },
-
-  // Speech-to-Text IPC
-  stt: {
-    getSettings: () =>
-      ipcRenderer.invoke(IPC_CHANNELS.STT_GET_SETTINGS),
-    setSettings: (request: SttSetSettingsRequest) =>
-      ipcRenderer.invoke(IPC_CHANNELS.STT_SET_SETTINGS, request),
-    onSettingsChanged: (callback: (event: SttSettingsChangedEvent) => void) => {
-      const handler = (_event: any, data: SttSettingsChangedEvent) => callback(data);
-      ipcRenderer.on(IPC_CHANNELS.STT_SETTINGS_CHANGED, handler);
-      return () => ipcRenderer.removeListener(IPC_CHANNELS.STT_SETTINGS_CHANGED, handler);
-    },
-  },
-
-  // Browser IPC
-  browser: {
-    create: (id: string, url: string, browserId?: string, faviconUrl?: string) => {
-      const request: BrowserCreateRequest = { id, url, browserId, faviconUrl };
-      return ipcRenderer.invoke(IPC_CHANNELS.BROWSER_CREATE, request);
-    },
-    navigate: (id: string, url: string) => {
-      const request: BrowserNavigateRequest = { id, url };
-      return ipcRenderer.invoke(IPC_CHANNELS.BROWSER_NAVIGATE, request);
-    },
-    goBack: (id: string) => {
-      const request: BrowserIdRequest = { id };
-      return ipcRenderer.invoke(IPC_CHANNELS.BROWSER_GO_BACK, request);
-    },
-    goForward: (id: string) => {
-      const request: BrowserIdRequest = { id };
-      return ipcRenderer.invoke(IPC_CHANNELS.BROWSER_GO_FORWARD, request);
-    },
-    reload: (id: string) => {
-      const request: BrowserIdRequest = { id };
-      return ipcRenderer.invoke(IPC_CHANNELS.BROWSER_RELOAD, request);
-    },
-    stop: (id: string) => {
-      const request: BrowserIdRequest = { id };
-      return ipcRenderer.invoke(IPC_CHANNELS.BROWSER_STOP, request);
-    },
-    close: (id: string) => {
-      const request: BrowserIdRequest = { id };
-      return ipcRenderer.invoke(IPC_CHANNELS.BROWSER_CLOSE, request);
-    },
-    getState: (id: string) => {
-      const request: BrowserGetStateRequest = { id };
-      return ipcRenderer.invoke(IPC_CHANNELS.BROWSER_GET_STATE, request);
-    },
-    attach: (id: string, windowId: number) => {
-      const request: BrowserAttachRequest = { id, windowId };
-      return ipcRenderer.invoke(IPC_CHANNELS.BROWSER_ATTACH, request);
-    },
-    detach: (id: string) => {
-      const request: BrowserIdRequest = { id };
-      return ipcRenderer.invoke(IPC_CHANNELS.BROWSER_DETACH, request);
-    },
-    setBounds: (id: string, bounds: { x: number; y: number; width: number; height: number }) => {
-      const request: BrowserSetBoundsRequest = { id, bounds };
-      return ipcRenderer.invoke(IPC_CHANNELS.BROWSER_SET_BOUNDS, request);
-    },
-    focus: (id: string) => {
-      const request: BrowserIdRequest = { id };
-      return ipcRenderer.invoke(IPC_CHANNELS.BROWSER_FOCUS, request);
-    },
-    onEvent: (callback: (event: BrowserEvent) => void) => {
-      const listener = (_: any, event: BrowserEvent) => callback(event);
-      ipcRenderer.on(IPC_CHANNELS.BROWSER_EVENT, listener);
-      return () => ipcRenderer.removeListener(IPC_CHANNELS.BROWSER_EVENT, listener);
-    },
-    onTabCreated: (callback: (event: BrowserTabCreatedEvent) => void) => {
-      const listener = (_: any, event: BrowserTabCreatedEvent) => callback(event);
-      ipcRenderer.on(IPC_CHANNELS.BROWSER_TAB_CREATED, listener);
-      return () => ipcRenderer.removeListener(IPC_CHANNELS.BROWSER_TAB_CREATED, listener);
-    },
-    onTabClosed: (callback: (event: BrowserTabClosedEvent) => void) => {
-      const listener = (_: any, event: BrowserTabClosedEvent) => callback(event);
-      ipcRenderer.on(IPC_CHANNELS.BROWSER_TAB_CLOSED, listener);
-      return () => ipcRenderer.removeListener(IPC_CHANNELS.BROWSER_TAB_CLOSED, listener);
-    },
-    getPersistedTabs: () => ipcRenderer.invoke(IPC_CHANNELS.BROWSER_GET_PERSISTED_TABS),
-  },
-
-  browserControl: {
-    getStatus: () => ipcRenderer.invoke(IPC_CHANNELS.BROWSER_CONTROL_GET_STATUS),
-    getPolicy: () => ipcRenderer.invoke(IPC_CHANNELS.BROWSER_CONTROL_GET_POLICY),
-    setPolicy: (policy: BrowserControlSetPolicyRequest['policy']) => {
-      const request: BrowserControlSetPolicyRequest = { policy };
-      return ipcRenderer.invoke(IPC_CHANNELS.BROWSER_CONTROL_SET_POLICY, request);
-    },
-    arrangeSplit: (request: BrowserControlArrangeSplitRequest) =>
-      ipcRenderer.invoke(IPC_CHANNELS.BROWSER_CONTROL_ARRANGE_SPLIT, request),
-    activateTab: (request: BrowserControlActivateTabRequest) =>
-      ipcRenderer.invoke(IPC_CHANNELS.BROWSER_CONTROL_ACTIVATE_TAB, request),
-    onChanged: (callback: (event: BrowserControlChangedEvent) => void) => {
-      const listener = (_: any, event: BrowserControlChangedEvent) => callback(event);
-      ipcRenderer.on(IPC_CHANNELS.BROWSER_CONTROL_CHANGED, listener);
-      return () => ipcRenderer.removeListener(IPC_CHANNELS.BROWSER_CONTROL_CHANGED, listener);
-    },
   },
 
   locale: {
@@ -1686,54 +1359,6 @@ contextBridge.exposeInMainWorld('electron', {
     },
   },
 
-  // Subagent Tool IPC
-  subagentTools: {
-    onToolCall: (callback: (event: SubagentToolCallEvent) => void) => {
-      const handler = (_: any, event: SubagentToolCallEvent) => callback(event);
-      ipcRenderer.on(IPC_CHANNELS.SUBAGENT_TOOL_CALL, handler);
-      return () => ipcRenderer.removeListener(IPC_CHANNELS.SUBAGENT_TOOL_CALL, handler);
-    },
-  },
-
-  // Agent Notifications IPC
-  agentNotifications: {
-    onNotification: (callback: (event: AgentNotificationEvent) => void) => {
-      const handler = (_: any, event: AgentNotificationEvent) => callback(event);
-      ipcRenderer.on(IPC_CHANNELS.AGENT_NOTIFICATION, handler);
-      return () => ipcRenderer.removeListener(IPC_CHANNELS.AGENT_NOTIFICATION, handler);
-    },
-  },
-
-  appToasts: {
-    onShow: (callback: (event: AppToastEvent) => void) => {
-      const handler = (_: any, event: AppToastEvent) => callback(event);
-      ipcRenderer.on(IPC_CHANNELS.APP_TOAST_SHOW, handler);
-      return () => ipcRenderer.removeListener(IPC_CHANNELS.APP_TOAST_SHOW, handler);
-    },
-  },
-
-  // Programmatic Tasks IPC
-  programmaticTasks: {
-    startHeaded: async (request: ProgrammaticTaskStartHeadedRequest) => {
-      const response = await ipcRenderer.invoke(IPC_CHANNELS.PROGRAMMATIC_TASK_START_HEADED, request) as ProgrammaticTaskStartHeadedResponse;
-      if (response.success && response.result?.requestId) {
-        await replayPendingAgentTabCreateRequest(response.result.requestId);
-      }
-      return response;
-    },
-    onStarted: (callback: (event: ProgrammaticTaskStartedEvent) => void) => {
-      const handler = (_: any, event: ProgrammaticTaskStartedEvent) => callback(event);
-      ipcRenderer.on(IPC_CHANNELS.PROGRAMMATIC_TASK_STARTED, handler);
-      return () => ipcRenderer.removeListener(IPC_CHANNELS.PROGRAMMATIC_TASK_STARTED, handler);
-    },
-  },
-
-  // Feedback IPC
-  feedback: {
-    submit: (request: FeedbackSubmitRequest) =>
-      ipcRenderer.invoke(IPC_CHANNELS.FEEDBACK_SUBMIT, request),
-  },
-
   // Global Tools IPC
   globalTools: {
     list: () => ipcRenderer.invoke(IPC_CHANNELS.GLOBAL_TOOLS_LIST),
@@ -1756,65 +1381,12 @@ contextBridge.exposeInMainWorld('electron', {
     },
   },
 
-  // Terminal IPC
-  terminal: {
-    create: (cwd?: string) =>
-      ipcRenderer.invoke(IPC_CHANNELS.TERMINAL_CREATE, { cwd }),
-    write: (sessionId: string, data: string) =>
-      ipcRenderer.invoke(IPC_CHANNELS.TERMINAL_WRITE, { sessionId, data }),
-    resize: (sessionId: string, cols: number, rows: number) =>
-      ipcRenderer.invoke(IPC_CHANNELS.TERMINAL_RESIZE, { sessionId, cols, rows }),
-    close: (sessionId: string) =>
-      ipcRenderer.invoke(IPC_CHANNELS.TERMINAL_CLOSE, { sessionId }),
-    onData: (callback: (event: TerminalDataEvent) => void) => {
-      const listener = (_: any, event: TerminalDataEvent) => callback(event);
-      ipcRenderer.on(IPC_CHANNELS.TERMINAL_DATA, listener);
-      return () => ipcRenderer.removeListener(IPC_CHANNELS.TERMINAL_DATA, listener);
-    },
-    onExit: (callback: (event: TerminalExitEvent) => void) => {
-      const listener = (_: any, event: TerminalExitEvent) => callback(event);
-      ipcRenderer.on(IPC_CHANNELS.TERMINAL_EXIT, listener);
-      return () => ipcRenderer.removeListener(IPC_CHANNELS.TERMINAL_EXIT, listener);
-    },
-  },
-
-  // Codex Server IPC
-  codex: {
-    request: (method: string, params: unknown) =>
-      ipcRenderer.invoke(IPC_CHANNELS.CODEX_REQUEST, method, params),
-    save_thread: (thread_id: string, items: unknown[]) =>
-      ipcRenderer.invoke(IPC_CHANNELS.CODEX_SAVE_THREAD, thread_id, items),
-    load_thread: (thread_id: string) =>
-      ipcRenderer.invoke(IPC_CHANNELS.CODEX_LOAD_THREAD, thread_id),
-    list_threads: () =>
-      ipcRenderer.invoke(IPC_CHANNELS.CODEX_LIST_THREADS),
-    on_event: (callback: (event: CodexEvent) => void) => {
-      const handler = (_: Electron.IpcRendererEvent, event: CodexEvent) => callback(event);
-      ipcRenderer.on(IPC_CHANNELS.CODEX_EVENT, handler);
-      return () => ipcRenderer.removeListener(IPC_CHANNELS.CODEX_EVENT, handler);
-    },
-  },
-  // Skills IPC
-  skills: {
-    list: (request?: SkillsListRequest) => ipcRenderer.invoke(IPC_CHANNELS.SKILLS_LIST, request),
-    delete: (dirPath: string) => ipcRenderer.invoke(IPC_CHANNELS.SKILLS_DELETE, dirPath),
-    reveal: (dirPath: string) => ipcRenderer.invoke(IPC_CHANNELS.SKILLS_REVEAL, dirPath),
-    onChanged: (callback: () => void) => {
-      const listener = () => callback();
-      ipcRenderer.on(IPC_CHANNELS.SKILLS_CHANGED, listener);
-      return () => ipcRenderer.removeListener(IPC_CHANNELS.SKILLS_CHANGED, listener);
-    },
-  },
-  // Desktop Notification IPC
-  desktopNotification: {
-    show: (request: DesktopNotificationShowRequest) =>
-      ipcRenderer.invoke(IPC_CHANNELS.DESKTOP_NOTIFICATION_SHOW, request),
-    onClicked: (callback: (event: DesktopNotificationClickedEvent) => void) => {
-      const listener = (_: any, event: DesktopNotificationClickedEvent) => callback(event);
-      ipcRenderer.on(IPC_CHANNELS.DESKTOP_NOTIFICATION_CLICKED, listener);
-      return () => ipcRenderer.removeListener(IPC_CHANNELS.DESKTOP_NOTIFICATION_CLICKED, listener);
-    },
-  },
+  // Feature namespaces — extracted to preload modules
+  ...voiceNamespaces,
+  ...documentNamespaces,
+  ...browserNamespaces,
+  ...agentNamespaces,
+  ...miscNamespaces,
 } as unknown as ElectronAPI);
 
 console.log('[Preload] Electron API exposed to window.electron');
