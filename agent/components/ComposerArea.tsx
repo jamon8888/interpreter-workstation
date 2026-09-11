@@ -122,6 +122,7 @@ import {
 } from '../../src/stores/agentPendingInputStore';
 import type { StreamImageAttachment } from '../../src/lib/codex/api-types';
 import type { SerializedComposerSubmission } from './composer/attachment/types';
+import { isThreadGoalCommand } from '../utils/threadGoalCommand';
 
 export interface ComposerAreaProps {
   // Tab type
@@ -157,6 +158,7 @@ export interface ComposerAreaProps {
   suggestionOverlayOpacity?: number;
   showQueuedMessages?: boolean;
   topAccessory?: React.ReactNode;
+  onGoalCommand?: (command: string) => boolean | void | Promise<boolean | void>;
   showResizeHandle?: boolean;
   showFirstStartupNudge?: boolean;
   onBeforeSend?: (text: string) => void;
@@ -281,6 +283,7 @@ export const ComposerArea = React.forwardRef<BaseTiptapComposerRef, ComposerArea
   suggestionOverlayOpacity = 1,
   showQueuedMessages = true,
   topAccessory,
+  onGoalCommand,
   showResizeHandle = true,
   showFirstStartupNudge = false,
   onBeforeSend,
@@ -935,6 +938,32 @@ export const ComposerArea = React.forwardRef<BaseTiptapComposerRef, ComposerArea
     const submission = resolveSubmission(text, submissionArg);
     if (!hasSubmissionContent(submission)) return false;
 
+    if (
+      !isTerminal
+      && submission.attachments.length === 0
+      && onGoalCommand
+      && isThreadGoalCommand(submission.text)
+    ) {
+      try {
+        const handled = await onGoalCommand(submission.text);
+        if (handled === false) {
+          return false;
+        }
+
+        pendingMessageSourceRef.current = null;
+        setShowSendButtonPulse(false);
+        refocusComposer();
+        return true;
+      } catch (error) {
+        console.error('[ComposerArea] Failed to handle goal command', {
+          agentId,
+          error,
+        });
+        showToast('Could not update the thread goal. Try again.', 'error', 7000);
+        return false;
+      }
+    }
+
     try {
       if (isTerminal) {
         if (!submission.text.trim()) {
@@ -986,6 +1015,7 @@ export const ComposerArea = React.forwardRef<BaseTiptapComposerRef, ComposerArea
     commitContextSnapshot,
     ensureAgentWorkspaceReady,
     isTerminal,
+    onGoalCommand,
     onAgentSend,
     onBeforeSend,
     onTerminalSend,
@@ -1344,6 +1374,17 @@ export const ComposerArea = React.forwardRef<BaseTiptapComposerRef, ComposerArea
       return false;
     }
   }, [agentId, buildPendingInput, isTerminal, refocusComposer, resolveSubmission, showToast]);
+
+  const handleComposerSend = useCallback((
+    text: string,
+    submission?: SerializedComposerSubmission,
+  ) => {
+    if (isStreaming && !isTerminal && !isThreadGoalCommand(text)) {
+      return handleSteer(text, submission);
+    }
+
+    return handleSend(text, submission);
+  }, [handleSend, handleSteer, isStreaming, isTerminal]);
 
   // Stop current stream
   const handleStop = useCallback(async () => {
@@ -3875,7 +3916,7 @@ export const ComposerArea = React.forwardRef<BaseTiptapComposerRef, ComposerArea
         placeholder={isTerminal
           ? "Send to terminal..."
           : (marketingDemoMode ? "Pick a demo prompt above" : undefined)}
-        onSend={isStreaming && !isTerminal ? handleSteer : handleSend}
+        onSend={handleComposerSend}
         sendButtonLabel="Send message (Enter)"
         autoFocus={false}
         noPadding={true}
@@ -3920,7 +3961,11 @@ export const ComposerArea = React.forwardRef<BaseTiptapComposerRef, ComposerArea
         />
       )}
 
-      {topAccessory}
+      {topAccessory ? (
+        <div className="mb-2" data-thread-accessory-stack-host="true">
+          {topAccessory}
+        </div>
+      ) : null}
 
       {/* Resize handle */}
       {showResizeHandle && (
