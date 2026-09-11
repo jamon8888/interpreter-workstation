@@ -507,6 +507,9 @@ export const BaseTiptapComposer = forwardRef<BaseTiptapComposerRef, BaseTiptapCo
   // instance. Kept in memory only: vault file persistence waits on the
   // passphrase UX decision, and nothing here ever writes raw PII to disk.
   const sessionRehydrationMapRef = useRef<Record<string, string>>({});
+  // PII detection and `onSend` are both awaited while the editor still holds the
+  // text, so a second Enter would serialize the same content and send it twice.
+  const sendInFlightRef = useRef(false);
   const resolveAttachmentRecord = useCallback(
     (attachmentId: string) => attachmentStoreRef.current.get(attachmentId),
     [],
@@ -1214,12 +1217,8 @@ export const BaseTiptapComposer = forwardRef<BaseTiptapComposerRef, BaseTiptapCo
   // always available, full NER merges in when the IPC path answers. The model
   // only ever receives the redacted text. The rehydration map is kept in the
   // session ref; vault file persistence waits on the passphrase UX decision.
-  const handleSend = useCallback(async () => {
+  const sendSubmission = useCallback(async (submission: SerializedComposerSubmission) => {
     if (!editor) return;
-
-    const submission = getSerializedSubmission(editor);
-    if (!hasSubmissionContent(submission)) return;
-
     const fallback = detectRegex(submission.text);
     // `fallback` stands until model-based detection answers; the catch keeps it
     // rather than reassigning the same value, which is what made the initial
@@ -1245,7 +1244,22 @@ export const BaseTiptapComposer = forwardRef<BaseTiptapComposerRef, BaseTiptapCo
       editor.commands.clearContent();
       refocusMainComposer(editor);
     }
-  }, [editor, getSerializedSubmission, hasSubmissionContent, isMainComposer, onSend]);
+  }, [editor, isMainComposer, onSend]);
+
+  const handleSend = useCallback(async () => {
+    if (!editor) return;
+    if (sendInFlightRef.current) return;
+
+    const submission = getSerializedSubmission(editor);
+    if (!hasSubmissionContent(submission)) return;
+
+    sendInFlightRef.current = true;
+    try {
+      await sendSubmission(submission);
+    } finally {
+      sendInFlightRef.current = false;
+    }
+  }, [editor, getSerializedSubmission, hasSubmissionContent, sendSubmission]);
 
   // Handle keyboard shortcuts
   useEffect(() => {
