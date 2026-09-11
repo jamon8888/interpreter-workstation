@@ -455,6 +455,7 @@ export const ComposerArea = React.forwardRef<BaseTiptapComposerRef, ComposerArea
     setPreviewText: (text: string | null) => composerRef.current?.setPreviewText(text),
     getContent: () => composerRef.current?.getContent() ?? '',
     getSubmission: () => composerRef.current?.getSubmission() ?? EMPTY_COMPOSER_SUBMISSION,
+    getRehydrationMap: () => composerRef.current?.getRehydrationMap() ?? {},
     clearContent: () => composerRef.current?.clearContent(),
     setContentWithTokenFlash: (text: string, ranges: Array<{ start: number; end: number }>) => composerRef.current?.setContentWithTokenFlash(text, ranges),
   }), []);
@@ -3623,7 +3624,7 @@ export const ComposerArea = React.forwardRef<BaseTiptapComposerRef, ComposerArea
                   ? 'text-amber-700 hover:text-amber-800 dark:text-amber-300 dark:hover:text-amber-200'
                   : ''
               }`}
-              aria-label={`Open Interpreter access settings. ${sandboxNotice.description}`}
+              aria-label={`Open Hacienda access settings. ${sandboxNotice.description}`}
               data-help-title={`Hacienda access: ${sandboxNotice.label}`}
               data-help-description={`Open access settings. ${sandboxNotice.description}`}
             >

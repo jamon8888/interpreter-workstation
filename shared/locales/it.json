@@ -728,7 +728,7 @@
   "settings.profiles.provider.agent.codexInstalledLoggedIn": "Codex CLI è installato e hai effettuato l'accesso",
   "settings.profiles.provider.agent.codexInstalledNeedsAuth": "Codex CLI è installato ma richiede autenticazione. Imposta OPENAI_API_KEY o accedi tramite la CLI.",
   "settings.profiles.provider.agent.codexNotInstalled": "La CLI di Codex non è installata. Installala da",
-  "settings.profiles.provider.agent.codexLink": "github.com/openinterpreter/codex/releases",
+  "settings.profiles.provider.agent.codexLink": "github.com/openai/codex/releases",
   "settings.profiles.provider.terminal.commandLabel": "Comando",
   "settings.profiles.provider.terminal.commandDescription": "Il comando da eseguire nel terminale.",
   "settings.profiles.provider.terminal.titleMarkerLabel": "Indicatore del titolo",

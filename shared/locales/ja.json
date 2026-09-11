@@ -709,7 +709,7 @@
   "settings.profiles.provider.agent.codexInstalledLoggedIn": "Codex CLI はインストール済みでログイン済みです",
   "settings.profiles.provider.agent.codexInstalledNeedsAuth": "Codex CLI はインストール済みですが、認証が必要です。OPENAI_API_KEY を設定するか CLI でサインインしてください。",
   "settings.profiles.provider.agent.codexNotInstalled": "Codex CLI がインストールされていません。こちらからインストールしてください:",
-  "settings.profiles.provider.agent.codexLink": "github.com/openinterpreter/codex/releases",
+  "settings.profiles.provider.agent.codexLink": "github.com/openai/codex/releases",
   "settings.profiles.provider.terminal.commandLabel": "コマンド",
   "settings.profiles.provider.terminal.commandDescription": "ターミナルで実行するコマンド。",
   "settings.profiles.provider.terminal.titleMarkerLabel": "タイトルマーカー",

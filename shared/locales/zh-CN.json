@@ -709,7 +709,7 @@
   "settings.profiles.provider.agent.codexInstalledLoggedIn": "Codex CLI 已安装并已登录",
   "settings.profiles.provider.agent.codexInstalledNeedsAuth": "Codex CLI 已安装但需要认证。请设置 OPENAI_API_KEY 或通过 CLI 登录。",
   "settings.profiles.provider.agent.codexNotInstalled": "Codex CLI 未安装。请从以下地址安装",
-  "settings.profiles.provider.agent.codexLink": "github.com/openinterpreter/codex/releases",
+  "settings.profiles.provider.agent.codexLink": "github.com/openai/codex/releases",
   "settings.profiles.provider.terminal.commandLabel": "命令",
   "settings.profiles.provider.terminal.commandDescription": "在终端中运行的命令。",
   "settings.profiles.provider.terminal.titleMarkerLabel": "标题标记",

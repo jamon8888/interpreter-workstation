@@ -709,7 +709,7 @@
   "settings.profiles.provider.agent.codexInstalledLoggedIn": "Codex CLI가 설치되어 있고 로그인되어 있습니다",
   "settings.profiles.provider.agent.codexInstalledNeedsAuth": "Codex CLI가 설치되어 있지만 인증이 필요합니다. OPENAI_API_KEY를 설정하거나 CLI에서 로그인하세요.",
   "settings.profiles.provider.agent.codexNotInstalled": "Codex CLI가 설치되어 있지 않습니다. 다음에서 설치하세요:",
-  "settings.profiles.provider.agent.codexLink": "github.com/openinterpreter/codex/releases",
+  "settings.profiles.provider.agent.codexLink": "github.com/openai/codex/releases",
   "settings.profiles.provider.terminal.commandLabel": "명령어",
   "settings.profiles.provider.terminal.commandDescription": "터미널에서 실행할 명령어.",
   "settings.profiles.provider.terminal.titleMarkerLabel": "제목 마커",

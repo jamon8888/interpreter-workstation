@@ -427,6 +427,7 @@ export interface BaseTiptapComposerRef {
   setPreviewText: (text: string | null) => void;
   getContent: () => string;
   getSubmission: () => SerializedComposerSubmission;
+  getRehydrationMap: () => Record<string, string>;
   clearContent: () => void;
 }
 
@@ -1220,12 +1221,14 @@ export const BaseTiptapComposer = forwardRef<BaseTiptapComposerRef, BaseTiptapCo
     if (!hasSubmissionContent(submission)) return;
 
     const fallback = detectRegex(submission.text);
+    // `fallback` stands until model-based detection answers; the catch keeps it
+    // rather than reassigning the same value, which is what made the initial
+    // assignment look dead to no-useless-assignment.
     let detections = fallback;
     try {
-      const ner = await piiIpc.detectPii(submission.text);
-      detections = mergeDetections(ner, fallback);
+      detections = mergeDetections(await piiIpc.detectPii(submission.text), fallback);
     } catch {
-      detections = fallback;
+      // Regex-only detection: `detections` already holds it.
     }
     const { redactedText, rehydrationMap } = buildRedactedText(submission.text, detections);
     sessionRehydrationMapRef.current = { ...sessionRehydrationMapRef.current, ...rehydrationMap };

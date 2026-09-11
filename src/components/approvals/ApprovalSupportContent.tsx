@@ -107,15 +107,21 @@ export function normalizeApprovalCopy(value: string): string {
     return '';
   }
 
+  // The cases match text produced upstream; the returns are our own copy. Both
+  // brandings are accepted on the way in because the runtime emitting these
+  // strings is not renamed in lockstep with the app — dropping the Interpreter
+  // variants would silently stop normalising them, leaving raw runtime text in
+  // the approval UI.
   switch (trimmed) {
-    case 'Hacienda wants to edit files with apply_patch.':
+    case 'Interpreter wants to edit files with apply_patch.':
     case 'Hacienda wants to edit files with apply_patch.':
       return 'Hacienda wants to make changes to files.';
     case 'Interpreter apply_patch requested approval.':
+    case 'Hacienda apply_patch requested approval.':
       return 'Review the proposed changes before continuing.';
     case 'Agent wants to run a shell command.':
     case 'Run this command?':
-    case 'Hacienda wants to run this command.':
+    case 'Interpreter wants to run this command.':
     case 'Hacienda wants to run this command.':
       return 'Hacienda wants to run a command.';
     case 'Delete file requires approval':
@@ -225,7 +231,6 @@ export function normalizeApprovalOptionCopy(
 function isGenericCommandApprovalCopy(value: string): boolean {
   const normalized = normalizeApprovalCopy(value);
   return normalized === 'Hacienda wants to run a command.'
-    || normalized === 'Hacienda wants to run a command.'
     || normalized === 'Review this command before continuing.';
 }
 
