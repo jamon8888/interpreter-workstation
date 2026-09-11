@@ -7,9 +7,10 @@ import type {
   PublicThreadSnapshot,
 } from '../../shared/types/publicThread';
 import { ThreadMessages } from './prompt-kit/thread-messages';
+import { ThreadAccessoryStack } from './ThreadAccessoryStack';
 import { ThreadGoalSummary } from './ThreadGoalSummary';
 
-type RemoteThreadViewerProps = {
+export type RemoteThreadViewerProps = {
   endpoint: string;
   pageSize?: number;
   onReady?: () => void;
@@ -17,7 +18,7 @@ type RemoteThreadViewerProps = {
   embedded?: boolean;
 };
 
-const DEFAULT_PAGE_SIZE = 4;
+const DEFAULT_PAGE_SIZE = 10;
 
 function normalizeEndpoint(endpoint: string): string {
   return endpoint.replace(/\/+$/, '');
@@ -35,10 +36,22 @@ function isSnapshot(value: unknown): value is PublicThreadSnapshot {
     && snapshot.page !== null;
 }
 
+export function resolvePublicArtifactLinks(content: string): string {
+  return content.replace(/\]\((file\?path=[^)\r\n]+)\)/gu, (_match, href: string) => {
+    const path = new URL(href, 'https://workstation.invalid/').searchParams.get('path');
+    const segments = path?.split('/') ?? [];
+    if (!segments.length || segments.some((segment) => !segment || segment === '.' || segment === '..')) {
+      return ']()';
+    }
+    const workspacePath = segments.map((segment) => encodeURIComponent(segment)).join('/');
+    return `](/workspace/${workspacePath})`;
+  });
+}
+
 function toChatMessage(message: PublicThreadMessage): ChatMessage {
   const parts: ChatMessagePart[] = message.parts.map((part): ChatMessagePart => {
     if (part.kind === 'text') {
-      return { kind: 'text', content: part.content };
+      return { kind: 'text', content: resolvePublicArtifactLinks(part.content) };
     }
     return {
       kind: 'tool-call',
@@ -67,10 +80,18 @@ export async function fetchRemoteThreadSnapshot(
   const url = new URL(`${normalizeEndpoint(endpoint)}/snapshot`, window.location.href);
   url.searchParams.set('limit', String(pageSize));
   if (before) url.searchParams.set('before', before);
-  const response = await fetch(url, {
-    headers: { Accept: 'application/json' },
-    cache: 'no-store',
-  });
+  const abortController = new AbortController();
+  const timeoutId = window.setTimeout(() => abortController.abort(), 8_000);
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      headers: { Accept: 'application/json' },
+      cache: 'no-store',
+      signal: abortController.signal,
+    });
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
   if (!response.ok) throw new Error(`Live thread is unavailable (${response.status})`);
   const payload: unknown = await response.json();
   if (!isSnapshot(payload)) throw new Error('Live thread returned an invalid snapshot');
@@ -90,11 +111,14 @@ export function RemoteThreadViewer({
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [initialPositioned, setInitialPositioned] = useState(false);
+  const [accessoryStackHeight, setAccessoryStackHeight] = useState(0);
   const viewerRef = useRef<HTMLDivElement>(null);
+  const accessoryStackRef = useRef<HTMLDivElement>(null);
   const onTitleChangeRef = useRef(onTitleChange);
   const readySignalledRef = useRef(false);
   const gesturePrependAnchorRef = useRef<{ scrollHeight: number; scrollTop: number } | null>(null);
   const touchStartYRef = useRef<number | null>(null);
+  const refreshingRef = useRef(false);
 
   useEffect(() => {
     onTitleChangeRef.current = onTitleChange;
@@ -107,7 +131,7 @@ export function RemoteThreadViewer({
   }, [onReady]);
 
   const applySnapshot = useCallback((next: PublicThreadSnapshot, direction: 'older' | 'newer') => {
-    const incoming = next.messages.map(toChatMessage);
+    const incoming = next.messages.map((message) => toChatMessage(message));
     setMessages((current) => mergeChatHistory(current, incoming, direction));
     setSnapshot((current) => direction === 'older' && current
       ? {
@@ -119,6 +143,10 @@ export function RemoteThreadViewer({
   }, []);
 
   const refresh = useCallback(async (quiet = false) => {
+    // A slow or disconnected publication must not create an ever-growing pile
+    // of overlapping 2.5-second polls in the browser.
+    if (refreshingRef.current) return;
+    refreshingRef.current = true;
     if (!quiet) setLoading(true);
     try {
       const next = await fetchRemoteThreadSnapshot(endpoint, pageSize);
@@ -128,6 +156,7 @@ export function RemoteThreadViewer({
     } catch (refreshError) {
       setError(refreshError instanceof Error ? refreshError.message : 'Live thread is unavailable');
     } finally {
+      refreshingRef.current = false;
       if (!quiet) setLoading(false);
     }
   }, [applySnapshot, endpoint, pageSize]);
@@ -236,6 +265,23 @@ export function RemoteThreadViewer({
     if (initialPositioned) signalReady();
   }, [initialPositioned, signalReady]);
 
+  useLayoutEffect(() => {
+    if (!snapshot?.goal || !accessoryStackRef.current) {
+      setAccessoryStackHeight(0);
+      return;
+    }
+
+    const stack = accessoryStackRef.current;
+    const updateHeight = () => {
+      setAccessoryStackHeight(Math.ceil(stack.getBoundingClientRect().height));
+    };
+
+    updateHeight();
+    const observer = new ResizeObserver(updateHeight);
+    observer.observe(stack);
+    return () => observer.disconnect();
+  }, [snapshot?.goal]);
+
   useEffect(() => {
     if (!loading && !snapshot && error) signalReady();
   }, [error, loading, signalReady, snapshot]);
@@ -279,8 +325,11 @@ export function RemoteThreadViewer({
   return (
     <div
       ref={viewerRef}
-      className="flex h-full min-h-0 flex-col overflow-hidden bg-[var(--oa-bg-app)] text-[var(--oa-text)]"
-      style={{ visibility: initialPositioned ? 'visible' : 'hidden' }}
+      className="relative flex h-full min-h-0 flex-col overflow-hidden bg-[var(--oa-bg-app)] text-[var(--oa-text)]"
+      style={{
+        visibility: initialPositioned ? 'visible' : 'hidden',
+        '--thread-scroll-bottom-clearance': `${accessoryStackHeight + 32}px`,
+      }}
       aria-busy={!initialPositioned}
       onWheelCapture={(event) => {
         if (event.deltaY < 0) armHistoryPaging();
@@ -319,13 +368,6 @@ export function RemoteThreadViewer({
           </div>
         </div>
       </header> : null}
-      {snapshot.goal ? (
-        <ThreadGoalSummary
-          objective={snapshot.goal.objective}
-          status={snapshot.goal.status}
-          readOnly
-        />
-      ) : null}
       {error ? (
         <div className="shrink-0 border-b border-[var(--oa-border)] px-4 py-1.5 text-center text-ui-xs text-[var(--oa-text-muted)]">
           Connection interrupted. Showing the last durable snapshot while reconnecting.
@@ -352,6 +394,23 @@ export function RemoteThreadViewer({
         isEditorPane
         chatResizeBehavior={initialPositioned ? 'smooth' : 'instant'}
       />
+      {snapshot.goal ? (
+        <div
+          ref={accessoryStackRef}
+          className="pointer-events-none absolute inset-x-0 bottom-0 z-20 pb-3"
+          data-thread-accessory-stack-host="true"
+        >
+          <div className="pointer-events-auto">
+            <ThreadAccessoryStack>
+              <ThreadGoalSummary
+                objective={snapshot.goal.objective}
+                status={snapshot.goal.status}
+                readOnly
+              />
+            </ThreadAccessoryStack>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

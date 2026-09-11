@@ -16,6 +16,11 @@ import {
   collectDetachedToolCalls,
   collectLastAssistantMessageIdsInTurns,
   groupMessageParts,
+  isMountedUserMessageFullyOutOfView,
+  isUserMessageFullyOutOfView,
+  mountedMessageRowSelector,
+  observeStickyUserMessageLayout,
+  resolveMeasuredUserMessageSize,
   type MessageBubbleProps,
 } from './thread-messages';
 import type { ChatMessage, ToolCallInfo } from '../../../src/hooks/use-chat';
@@ -235,5 +240,120 @@ describe('grouping helpers used by the virtualized list', () => {
 
     const detached = collectDetachedToolCalls(messages, null);
     expect(detached).toHaveLength(0);
+  });
+});
+
+describe('sticky user-message visibility', () => {
+  test('recomputes sticky state when a mounted message row changes size', async () => {
+    const originalResizeObserver = globalThis.ResizeObserver;
+    const originalMutationObserver = globalThis.MutationObserver;
+    const originalRequestAnimationFrame = globalThis.requestAnimationFrame;
+    const originalCancelAnimationFrame = globalThis.cancelAnimationFrame;
+    let resizeCallback: (() => void) | null = null;
+    let disconnected = 0;
+
+    class TestResizeObserver {
+      constructor(callback: () => void) {
+        resizeCallback = callback;
+      }
+      observe() {}
+      disconnect() { disconnected += 1; }
+    }
+    class TestMutationObserver {
+      observe() {}
+      disconnect() { disconnected += 1; }
+    }
+
+    globalThis.ResizeObserver = TestResizeObserver as unknown as typeof ResizeObserver;
+    globalThis.MutationObserver = TestMutationObserver as unknown as typeof MutationObserver;
+    let nextFrameId = 0;
+    const frameTimers = new Map<number, ReturnType<typeof setTimeout>>();
+    globalThis.requestAnimationFrame = ((callback: FrameRequestCallback) => {
+      const id = ++nextFrameId;
+      frameTimers.set(id, setTimeout(() => {
+        frameTimers.delete(id);
+        callback(0);
+      }, 0));
+      return id;
+    }) as typeof requestAnimationFrame;
+    globalThis.cancelAnimationFrame = ((id: number) => {
+      const timer = frameTimers.get(id);
+      if (timer) clearTimeout(timer);
+      frameTimers.delete(id);
+    }) as typeof cancelAnimationFrame;
+
+    const row = document.createElement('div');
+    row.dataset.index = '0';
+    const container = document.createElement('div');
+    container.appendChild(row);
+    let recomputes = 0;
+
+    try {
+      const cleanup = observeStickyUserMessageLayout({
+        scrollContainer: container,
+        onLayoutChange: () => { recomputes += 1; },
+      });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(recomputes).toBe(1);
+      resizeCallback?.();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(recomputes).toBe(2);
+      cleanup();
+      expect(disconnected).toBe(2);
+    } finally {
+      globalThis.ResizeObserver = originalResizeObserver;
+      globalThis.MutationObserver = originalMutationObserver;
+      globalThis.requestAnimationFrame = originalRequestAnimationFrame;
+      globalThis.cancelAnimationFrame = originalCancelAnimationFrame;
+    }
+  });
+
+  test('does not treat the virtualizer estimate as a measured long bubble', () => {
+    expect(resolveMeasuredUserMessageSize({
+      cachedSize: 240,
+      estimateSize: 240,
+    })).toBeUndefined();
+    expect(resolveMeasuredUserMessageSize({
+      mountedSize: 900,
+      cachedSize: 240,
+      estimateSize: 240,
+    })).toBe(900);
+    expect(resolveMeasuredUserMessageSize({
+      mountedSize: 0,
+      cachedSize: 900,
+      estimateSize: 240,
+    })).toBe(900);
+  });
+
+  test('waits until a long user bubble is fully above the viewport', () => {
+    expect(isUserMessageFullyOutOfView({
+      itemTop: 0,
+      itemHeight: 900,
+      scrollTop: 899,
+    })).toBe(false);
+
+    expect(isUserMessageFullyOutOfView({
+      itemTop: 0,
+      itemHeight: 900,
+      scrollTop: 900,
+    })).toBe(true);
+  });
+
+  test('uses the mounted row position instead of a stale virtual offset', () => {
+    expect(isMountedUserMessageFullyOutOfView({
+      itemBottom: 420,
+      viewportTop: 120,
+    })).toBe(false);
+
+    expect(isMountedUserMessageFullyOutOfView({
+      itemBottom: 120,
+      viewportTop: 120,
+    })).toBe(true);
+  });
+
+  test('selects the mounted row by its stable virtual index', () => {
+    expect(mountedMessageRowSelector(7)).toBe(
+      '.oa-thread-virtual-block > [data-index="7"]',
+    );
   });
 });

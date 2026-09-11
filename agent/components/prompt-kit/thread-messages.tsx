@@ -697,6 +697,7 @@ const EDITOR_BOTTOM_FADE =
   'calc(var(--thread-scroll-bottom-clearance, 7rem) * 0.52)';
 const SIDEBAR_BOTTOM_FADE =
   'calc(var(--thread-scroll-bottom-clearance, 7rem) * 0.56)';
+const VIRTUAL_MESSAGE_ESTIMATE_SIZE = 240;
 const THREAD_HORIZONTAL_INSET = 'var(--unit-padding-medium)';
 const EDITOR_THREAD_TOP_INSET = 'calc(var(--unit-padding) * 2.5)';
 const SIDEBAR_THREAD_TOP_INSET = 'calc(var(--unit-padding) * 1.75)';
@@ -827,6 +828,89 @@ interface UserMessageEntry {
   content: string;
 }
 
+export function isUserMessageFullyOutOfView({
+  itemTop,
+  itemHeight,
+  scrollTop,
+}: {
+  itemTop: number;
+  itemHeight: number;
+  scrollTop: number;
+}): boolean {
+  return itemHeight > 0 && itemTop + itemHeight <= scrollTop;
+}
+
+export function isMountedUserMessageFullyOutOfView({
+  itemBottom,
+  viewportTop,
+}: {
+  itemBottom: number;
+  viewportTop: number;
+}): boolean {
+  return itemBottom <= viewportTop;
+}
+
+export function mountedMessageRowSelector(index: number): string {
+  return `.oa-thread-virtual-block > [data-index="${index}"]`;
+}
+
+export function observeStickyUserMessageLayout({
+  scrollContainer,
+  onLayoutChange,
+}: {
+  scrollContainer: HTMLElement;
+  onLayoutChange: () => void;
+}): () => void {
+  let rafId: number | null = null;
+  const scheduleLayoutChange = () => {
+    if (rafId !== null) return;
+    rafId = requestAnimationFrame(() => {
+      rafId = null;
+      onLayoutChange();
+    });
+  };
+
+  const resizeObserver = new ResizeObserver(scheduleLayoutChange);
+  const observeMountedRows = () => {
+    scrollContainer
+      .querySelectorAll<HTMLElement>('.oa-thread-virtual-block > [data-index]')
+      .forEach((row) => {
+        resizeObserver.observe(row);
+      });
+  };
+
+  observeMountedRows();
+  const mutationObserver = new MutationObserver(() => {
+    observeMountedRows();
+    scheduleLayoutChange();
+  });
+  mutationObserver.observe(scrollContainer, { childList: true, subtree: true });
+  scheduleLayoutChange();
+
+  return () => {
+    mutationObserver.disconnect();
+    resizeObserver.disconnect();
+    if (rafId !== null) cancelAnimationFrame(rafId);
+  };
+}
+
+export function resolveMeasuredUserMessageSize({
+  mountedSize,
+  cachedSize,
+  estimateSize,
+}: {
+  mountedSize?: number;
+  cachedSize?: number;
+  estimateSize: number;
+}): number | undefined {
+  const size = mountedSize !== undefined && mountedSize > 0
+    ? mountedSize
+    : cachedSize !== estimateSize
+      ? cachedSize
+      : undefined;
+  return size !== undefined && size > 0 ? size : undefined;
+}
+
 function useStickyUserMessageHeader({
   scrollContainer,
   isWideUserLayout,
@@ -845,12 +929,18 @@ function useStickyUserMessageHeader({
   // scrollTop against an absolute item offset, not the virtualizer-local one.
   virtualBlockTop: number;
 }) {
-  // Kept as a no-op shim so per-message register/unregister calls in MessageBubble
-  // remain valid. Position-based sticky no longer depends on DOM refs.
+  const mountedMessageElementsRef = useRef(new Map<string, HTMLElement>());
+  const computePinnedRef = useRef<() => void>(() => {});
   const contextValue = useMemo<StickyUserMessageContextValue>(
     () => ({
-      registerMessage: () => {},
-      unregisterMessage: () => {},
+      registerMessage: (id, _content, element) => {
+        mountedMessageElementsRef.current.set(id, element);
+        requestAnimationFrame(() => computePinnedRef.current());
+      },
+      unregisterMessage: (id) => {
+        mountedMessageElementsRef.current.delete(id);
+        requestAnimationFrame(() => computePinnedRef.current());
+      },
     }),
     [],
   );
@@ -885,20 +975,47 @@ function useStickyUserMessageHeader({
     lastScrollTopRef.current = scrollTop;
 
     const cache = virtualizer.measurementsCache;
+    const viewportTop = scrollContainer.getBoundingClientRect().top;
     let candidate: UserMessageEntry | null = null;
 
     for (const entry of userMessageEntries) {
       const measurement = cache[entry.index];
-      // If a message hasn't been measured yet (never been near the viewport),
-      // we can't decide whether it's scrolled past. Skip; estimate is unreliable.
-      if (!measurement) continue;
+      // The virtualizer's internal element cache can briefly lag the actual
+      // mounted rows during measurement/scroll updates. Query the rendered
+      // row first so a visible long prompt can never also appear as sticky.
+      // MessageBubble registers the exact element for this logical message.
+      // Prefer it over selector lookup so nested components that happen to use
+      // data-index can never impersonate the virtualized source row.
+      const registeredElement = mountedMessageElementsRef.current.get(entry.id);
+      const mountedRow = scrollContainer.querySelector<HTMLElement>(
+        mountedMessageRowSelector(entry.index),
+      ) ?? virtualizer.elementsCache.get(entry.id);
+      const mountedElement = registeredElement ?? mountedRow;
+      const mountedRect = mountedElement?.getBoundingClientRect();
+      const measuredSize = resolveMeasuredUserMessageSize({
+        mountedSize: mountedRect?.height,
+        cachedSize: measurement?.size,
+        estimateSize: VIRTUAL_MESSAGE_ESTIMATE_SIZE,
+      });
+      // The measurements cache also contains estimates. A long newly-sent
+      // user bubble can therefore look fully scrolled away for one frame
+      // before its real height is known. Prefer the mounted row's real DOM
+      // height, and only trust an unmounted cached size once it differs from
+      // the virtualizer's estimate.
+      if (!measurement || measuredSize === undefined || measuredSize <= 0) continue;
 
       const itemTopInContainer = virtualBlockTop + measurement.start;
-      const itemHeight = measurement.size;
-      const threshold = Math.max(20, itemHeight - 18);
-      const relativeTop = itemTopInContainer - scrollTop;
-
-      if (relativeTop < -threshold) {
+      const fullyOutOfView = mountedRect
+        ? isMountedUserMessageFullyOutOfView({
+            itemBottom: mountedRect.bottom,
+            viewportTop,
+          })
+        : isUserMessageFullyOutOfView({
+            itemTop: itemTopInContainer,
+            itemHeight: measuredSize,
+            scrollTop,
+          });
+      if (fullyOutOfView) {
         if (!candidate || measurement.start > (cache[candidate.index]?.start ?? -Infinity)) {
           candidate = entry;
         }
@@ -915,6 +1032,7 @@ function useStickyUserMessageHeader({
       setPinnedContent(candidate.content);
     }
   }, [pinnedContent, scrollContainer, userMessageEntries, virtualBlockTop, virtualizer]);
+  computePinnedRef.current = computePinned;
 
   useEffect(() => {
     if (!scrollContainer) return;
@@ -947,6 +1065,19 @@ function useStickyUserMessageHeader({
         rafIdRef.current = null;
       }
     };
+  }, [scrollContainer, computePinned]);
+
+  // A newly submitted message can mount at an estimated height, trigger the
+  // sticky header, and then grow once Markdown has laid out. That correction
+  // does not necessarily emit another scroll event. Follow mounted-row layout
+  // changes so the sticky copy disappears as soon as the source bubble is
+  // visible again.
+  useEffect(() => {
+    if (!scrollContainer) return;
+    return observeStickyUserMessageLayout({
+      scrollContainer,
+      onLayoutChange: computePinned,
+    });
   }, [scrollContainer, computePinned]);
 
   const scrollToMessage = useCallback(() => {
@@ -1609,7 +1740,7 @@ export const ThreadMessages: FC<ThreadMessagesProps> = ({
   const virtualizer = useVirtualizer({
     count: messages.length,
     getScrollElement: () => scrollContainer,
-    estimateSize: () => 240,
+    estimateSize: () => VIRTUAL_MESSAGE_ESTIMATE_SIZE,
     overscan: 4,
     // Use stable item ids so measurement cache survives reorders / streaming
     // appends. ChatMessage.id is stable for committed messages.

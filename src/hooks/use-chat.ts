@@ -472,6 +472,8 @@ export type ChatMessage = {
   role: "user" | "assistant";
   parts: ChatMessagePart[];
   serverMessageId?: string;
+  /** Exact outbound text while an optimistic user row awaits its server echo. */
+  pendingServerEchoText?: string;
   attachments?: StreamImageAttachment[];
 };
 
@@ -1020,6 +1022,12 @@ export function useChat(
   const [runtimeContinuationNonce, setRuntimeContinuationNonce] = useState(0);
 
   const abortRef = useRef<AbortController | null>(null);
+  // React state does not update synchronously. A rapid double activation can
+  // therefore call sendMessage twice through the same render before
+  // isStreaming becomes true, creating two optimistic user bubbles and two
+  // requests. Hold the turn-level lock in a ref so the second activation is
+  // rejected immediately.
+  const sendInFlightRef = useRef(false);
   const draftRef = useRef<ChatMessage | null>(null);
   // Tracks every tool-call id we publish to liveItemsStore during the
   // current stream so we can clear all of them on stream end, regardless
@@ -1501,7 +1509,12 @@ export function useChat(
       const normalizedMarketingDemoMessage =
         stripWorkstationContext(cleanedMessage).trim();
       const pendingAttachments = overrides?.attachments ?? [];
-      if ((!message && pendingAttachments.length === 0) || isStreaming) return;
+      if (
+        (!message && pendingAttachments.length === 0)
+        || isStreaming
+        || sendInFlightRef.current
+      ) return;
+      sendInFlightRef.current = true;
 
       window.dispatchEvent(new Event("assistant-tts:stop"));
 
@@ -1521,6 +1534,7 @@ export function useChat(
         id: crypto.randomUUID(),
         role: "user",
         parts: [{ kind: "text", content: buildUserMessagePreview(message) }],
+        pendingServerEchoText: cleanedMessage,
         ...(pendingAttachments.length > 0
           ? { attachments: pendingAttachments }
           : {}),
@@ -1724,6 +1738,7 @@ export function useChat(
               createMarketingDemoTranscriptMessage(finalAssistantMessage),
             ]);
             marketingDemoTimerIdsRef.current = [];
+            sendInFlightRef.current = false;
             setIsStreaming(false);
             playSound("agentFinished");
             trackResponseReceived({
@@ -1788,6 +1803,7 @@ export function useChat(
                 createMarketingDemoTranscriptMessage(finalAssistantMessage),
               ]);
               marketingDemoTimerIdsRef.current = [];
+              sendInFlightRef.current = false;
               setIsStreaming(false);
               playSound("agentFinished");
               trackResponseReceived({
@@ -2090,6 +2106,7 @@ export function useChat(
           }
         } finally {
           abortRef.current = null;
+          sendInFlightRef.current = false;
           setIsStreaming(false);
         }
       })();
@@ -2113,6 +2130,7 @@ export function useChat(
   const stopGeneration = useCallback((threadIdOverride?: string | null) => {
     window.dispatchEvent(new Event("assistant-tts:stop"));
     trackResponseStopped();
+    sendInFlightRef.current = false;
 
     const stoppedDraft = draftRef.current
       ? stopLoadingToolCallsInMessage(draftRef.current)
