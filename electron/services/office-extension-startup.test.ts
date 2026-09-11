@@ -78,9 +78,9 @@ describe('ensureOfficeExtensionInstalledInBackground', () => {
 
   test('resolves Windows packaged Sentry dependency paths without mixed separators', () => {
     expect(getOoEditorsAppNodeModulesPath(
-      'C:\\Program Files\Hacienda\\resources\\app.asar',
+      'C:\\Program Files\\Hacienda\\resources\\app.asar',
     )).toBe(
-      'C:\\Program Files\Hacienda\\resources\\app.asar\\node_modules',
+      'C:\\Program Files\\Hacienda\\resources\\app.asar\\node_modules',
     );
   });
 
@@ -100,10 +100,10 @@ describe('ensureOfficeExtensionInstalledInBackground', () => {
 
   test('runs Electron-as-Node from the executable directory', () => {
     expect(resolveOoEditorsNodeRuntime({
-      processExecPath: 'C:\\Program Files\Hacienda\\Interpreter.exe',
+      processExecPath: 'C:\\Program Files\\Hacienda\\Interpreter.exe',
     })).toEqual({
-      binaryPath: 'C:\\Program Files\Hacienda\\Interpreter.exe',
-      cwd: 'C:\\Program Files\Hacienda',
+      binaryPath: 'C:\\Program Files\\Hacienda\\Interpreter.exe',
+      cwd: 'C:\\Program Files\\Hacienda',
     });
   });
 
@@ -112,10 +112,10 @@ describe('ensureOfficeExtensionInstalledInBackground', () => {
     process.env.INTERPRETER_NODE_BIN = 'C:\\node\\node.exe';
     try {
       expect(resolveOoEditorsNodeRuntime({
-        processExecPath: 'C:\\Program Files\Hacienda\\Interpreter.exe',
+        processExecPath: 'C:\\Program Files\\Hacienda\\Interpreter.exe',
       })).toEqual({
-        binaryPath: 'C:\\Program Files\Hacienda\\Interpreter.exe',
-        cwd: 'C:\\Program Files\Hacienda',
+        binaryPath: 'C:\\Program Files\\Hacienda\\Interpreter.exe',
+        cwd: 'C:\\Program Files\\Hacienda',
       });
     } finally {
       if (originalNodeOverride === undefined) {
@@ -129,7 +129,7 @@ describe('ensureOfficeExtensionInstalledInBackground', () => {
   for (const code of ['EACCES', 'EPERM'] as const) {
     test(`identifies Windows ${code} oo-editors spawn permission errors`, () => {
       const error = Object.assign(
-        new Error(`spawn C:\\Program Files\Hacienda\\Interpreter.exe ${code}`),
+        new Error(`spawn C:\\Program Files\\Hacienda\\Interpreter.exe ${code}`),
         { code },
       );
 
@@ -139,7 +139,7 @@ describe('ensureOfficeExtensionInstalledInBackground', () => {
 
   test('identifies support issue 2030 Windows oo-editors EACCES spawn errors', () => {
     const error = Object.assign(
-      new Error('spawn C:\\Program Files\Hacienda\\Interpreter.exe EACCES'),
+      new Error('spawn C:\\Program Files\\Hacienda\\Interpreter.exe EACCES'),
       { code: 'EACCES' },
     );
 
@@ -148,7 +148,7 @@ describe('ensureOfficeExtensionInstalledInBackground', () => {
 
   test('does not treat other process errors as Windows spawn permission errors', () => {
     const error = Object.assign(
-      new Error('spawn C:\\Program Files\Hacienda\\Interpreter.exe ENOENT'),
+      new Error('spawn C:\\Program Files\\Hacienda\\Interpreter.exe ENOENT'),
       { code: 'ENOENT' },
     );
 

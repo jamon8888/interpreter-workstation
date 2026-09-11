@@ -31,6 +31,24 @@ describe('findRedactedTokens', () => {
   });
 });
 
+describe('normalizePiiCategory prototype safety', () => {
+  test('does not accept inherited object members as categories', () => {
+    // PII_COLORS and CATEGORY_ALIASES are plain objects, so these names read
+    // back truthy and returned a function or Object.prototype to the caller.
+    for (const name of ['constructor', 'toString', '__proto__', 'valueOf', 'hasOwnProperty']) {
+      expect(typeof normalizePiiCategory(name)).toBe('string');
+    }
+    expect(normalizePiiCategory('__proto__')).toBe('__proto__');
+    expect(normalizePiiCategory('constructor')).toBe('constructor');
+  });
+
+  test('still resolves real categories and aliases', () => {
+    expect(normalizePiiCategory('EMAIL')).toBe('email');
+    expect(normalizePiiCategory('person')).toBe('person_full_name');
+    expect(normalizePiiCategory('iban')).toBe('iban');
+  });
+});
+
 describe('buildRedactedText', () => {
   test('assigns stable per-category tokens in order of appearance', () => {
     const result = buildRedactedText('Call john@example.com or jane@example.com on 415-555-0199', [

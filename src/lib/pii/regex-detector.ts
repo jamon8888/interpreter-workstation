@@ -24,6 +24,23 @@ export function detectRegex(text: string): PiiDetection[] {
     emailRegex.lastIndex = m.index + 1;
   }
 
+  // IBAN. `iban` already has a colour, a token label and normalization tests,
+  // but no pattern produced one, so the category could never be detected. It runs
+  // before the digit-based patterns so their alreadyCovered guards skip digits
+  // that belong to an IBAN.
+  const ibanRegex = /\b[A-Z]{2}\d{2}(?:[ ]?[A-Z0-9]{4}){2,7}(?:[ ]?[A-Z0-9]{1,3})?\b/g;
+  while ((match = ibanRegex.exec(text)) !== null) {
+    const m = match;
+    detections.push({
+      category: 'iban',
+      start: m.index,
+      end: m.index + m[0].length,
+      text: m[0],
+      confidence: 1.0,
+    });
+    ibanRegex.lastIndex = m.index + 1;
+  }
+
   // Phone pattern
   const phoneRegex = /(\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/g;
   while ((match = phoneRegex.exec(text)) !== null) {
@@ -82,7 +99,11 @@ export function detectRegex(text: string): PiiDetection[] {
   const merged: PiiDetection[] = [];
   for (const d of detections) {
     const last = merged[merged.length - 1];
-    if (last && last.end >= d.start - 1) {
+    // `last.end >= d.start - 1` also merged detections separated by a single
+    // character, so "a@b.com 555-0100" became one email detection covering the
+    // phone number too — which then rehydrated under a single [EMAIL_n] token.
+    // Merge only real overlaps, and only within the same category.
+    if (last && last.category === d.category && last.end >= d.start) {
       merged[merged.length - 1] = {
         category: last.category,
         start: last.start,

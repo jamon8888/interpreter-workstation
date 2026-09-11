@@ -30,8 +30,16 @@ const CATEGORY_ALIASES: Record<string, string> = {
 
 export function normalizePiiCategory(label: string): string {
   const key = label.toLowerCase();
-  if (PII_COLORS[key]) return key;
-  return CATEGORY_ALIASES[key] ?? key;
+  // PII_COLORS is a plain object, so `constructor`, `toString` and friends read
+  // back truthy and would be accepted as supported categories. Same guard as
+  // getPiiColor in colors.ts.
+  if (Object.prototype.hasOwnProperty.call(PII_COLORS, key)) return key;
+  // CATEGORY_ALIASES needs the same guard: `constructor` resolves to the Object
+  // constructor and `__proto__` to Object.prototype, neither of which is null
+  // or undefined, so `?? key` would never fire and the caller would receive an
+  // object where it expects a category name.
+  if (Object.prototype.hasOwnProperty.call(CATEGORY_ALIASES, key)) return CATEGORY_ALIASES[key];
+  return key;
 }
 
 const TOKEN_LABELS: Record<string, string> = {

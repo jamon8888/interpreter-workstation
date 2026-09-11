@@ -801,7 +801,7 @@ describe("CodexAppServerClient", () => {
         HOMEPATH: "\\Users\\Alice",
       },
       codeHome: "C:\\Users\\Alice\\AppData\\Roaming\\interpreter\\codex-home",
-      codexBinary: "C:\\Program Files\Hacienda\\resources\\codex.exe",
+      codexBinary: "C:\\Program Files\\Hacienda\\resources\\codex.exe",
       platform: "win32",
       pathExists: (candidatePath) => candidatePath.includes("converter"),
     });
@@ -824,7 +824,7 @@ describe("CodexAppServerClient", () => {
     const env = buildCodexSpawnEnv({
       baseEnv: { Path: "C:\\Windows\\System32" },
       codeHome: "C:\\Users\\Alice\\AppData\\Roaming\\interpreter\\codex-home",
-      codexBinary: "C:\\Program Files\Hacienda\\resources\\codex.exe",
+      codexBinary: "C:\\Program Files\\Hacienda\\resources\\codex.exe",
       platform: "win32",
       pathExists: () => false,
     });
@@ -841,16 +841,16 @@ describe("CodexAppServerClient", () => {
         PATH: "C:\\Windows\\System32",
       },
       codeHome: "C:\\Users\\Alice\\AppData\\Roaming\\interpreter\\codex-home",
-      codexBinary: "C:\\Program Files\Hacienda\\resources\\codex.exe",
+      codexBinary: "C:\\Program Files\\Hacienda\\resources\\codex.exe",
       platform: "win32",
       pathExists: (candidatePath) => candidatePath.includes("converter")
-        || candidatePath.includes("Program Files\Hacienda\\resources"),
+        || candidatePath.includes("Program Files\\Hacienda\\resources"),
     });
 
     assert.equal(env.PATH, undefined);
     assert.equal(
       env.Path,
-      "C:\\Program Files\Hacienda\\resources;C:\\Users\\Alice\\AppData\\Roaming\\interpreter\\oo-editors\\converter;C:\\Users\\Alice\\bin;C:\\Windows\\System32",
+      "C:\\Program Files\\Hacienda\\resources;C:\\Users\\Alice\\AppData\\Roaming\\interpreter\\oo-editors\\converter;C:\\Users\\Alice\\bin;C:\\Windows\\System32",
     );
   });
 
@@ -860,7 +860,7 @@ describe("CodexAppServerClient", () => {
         PATH: "C:\\Windows\\System32",
       },
       codeHome: "C:\\Users\\Alice\\AppData\\Roaming\\interpreter\\codex-home",
-      codexBinary: "C:\\Program Files\Hacienda\\resources\\codex.exe",
+      codexBinary: "C:\\Program Files\\Hacienda\\resources\\codex.exe",
       platform: "win32",
       pathExists: () => false,
     });

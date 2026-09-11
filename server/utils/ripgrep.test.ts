@@ -4,9 +4,9 @@ import { resolveRipgrepBinaryPath, validateRipgrepBinary } from './ripgrep';
 
 describe('resolveRipgrepBinaryPath', () => {
   test('rewrites Windows packaged path', () => {
-    const input = 'C:\\Program Files\Hacienda\\resources\\app.asar\\node_modules\\@vscode\\ripgrep\\bin\\rg.exe';
+    const input = 'C:\\Program Files\\Hacienda\\resources\\app.asar\\node_modules\\@vscode\\ripgrep\\bin\\rg.exe';
     expect(resolveRipgrepBinaryPath(input)).toBe(
-      'C:\\Program Files\Hacienda\\resources\\app.asar.unpacked\\node_modules\\@vscode\\ripgrep\\bin\\rg.exe'
+      'C:\\Program Files\\Hacienda\\resources\\app.asar.unpacked\\node_modules\\@vscode\\ripgrep\\bin\\rg.exe'
     );
   });
 
