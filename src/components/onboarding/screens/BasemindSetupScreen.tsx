@@ -157,17 +157,22 @@ export function BasemindSetupScreen({ onNext }: BasemindSetupScreenProps) {
     onNext();
   }, [onNext, updateUserChoices]);
 
-  const allHandled = Object.values(stageStates).every(
-    s => s.status === 'done' || s.status === 'skipped' || s.status === 'error',
+  // Completion has to mean "everything worked", not "nothing is still running".
+  // The old allHandled counted `error` as handled, which made the footer's
+  // hasError branch unreachable once every stage was terminal: a run whose last
+  // stage failed offered Continue instead of Retry or Skip, and marked setup
+  // complete.
+  const allSucceeded = Object.values(stageStates).every(
+    s => s.status === 'done' || s.status === 'skipped',
   );
   const hasError = Object.values(stageStates).some(s => s.status === 'error');
   const hasIncompatible = STAGES.some(s => !isCompatible(s));
 
   useEffect(() => {
-    if (allHandled && !isSkipped) {
+    if (allSucceeded && !isSkipped) {
       updateUserChoices({ basemindSetupComplete: true });
     }
-  }, [allHandled, isSkipped, updateUserChoices]);
+  }, [allSucceeded, isSkipped, updateUserChoices]);
 
   return (
     <OnboardingScreenShell size="form">
@@ -259,7 +264,7 @@ export function BasemindSetupScreen({ onNext }: BasemindSetupScreenProps) {
       </div>
 
       <div className="mt-8 flex items-center gap-3">
-        {allHandled ? (
+        {allSucceeded ? (
           <Button variant="default" onClick={handleContinue}>
             {t('onboarding.basemind.continue', 'Continue')}
           </Button>

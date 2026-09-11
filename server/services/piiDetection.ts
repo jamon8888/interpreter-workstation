@@ -44,7 +44,21 @@ export function isPiiModelReady(baseDir = resolvePiiModelBaseDir()): boolean {
     const dir = path.join(baseDir, pattern);
     if (!fs.existsSync(dir)) return false;
     try {
-      return fs.readdirSync(dir).some((entry) => entry.endsWith('.onnx'));
+      // The hub stores weights at <repo>/snapshots/<revision>/model.onnx, so a
+      // downloaded model has no .onnx directly under the repo directory and
+      // reported false. Check the repo root and one snapshot level down.
+      if (fs.readdirSync(dir).some((entry) => entry.endsWith('.onnx'))) return true;
+      const snapshots = path.join(dir, 'snapshots');
+      if (!fs.existsSync(snapshots)) return false;
+      return fs.readdirSync(snapshots).some((revision) => {
+        const revisionDir = path.join(snapshots, revision);
+        try {
+          return fs.statSync(revisionDir).isDirectory()
+            && fs.readdirSync(revisionDir).some((entry) => entry.endsWith('.onnx'));
+        } catch {
+          return false;
+        }
+      });
     } catch {
       return false;
     }
