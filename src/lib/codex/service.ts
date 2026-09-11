@@ -363,7 +363,7 @@ function withElectronRunAsNodeConfig(
   return nextConfig;
 }
 
-function extractThreadId(notification: AppServerNotification) {
+export function extractNotificationThreadId(notification: AppServerNotification) {
   return match(notification)
     .with({ method: SERVER_METHOD.threadStarted }, (n) => n.params.thread.id)
     .with({ method: SERVER_METHOD.turnStarted }, (n) => n.params.threadId)
@@ -407,7 +407,7 @@ function extractThreadId(notification: AppServerNotification) {
     .otherwise(() => null);
 }
 
-function extractTurnId(notification: AppServerNotification) {
+export function extractNotificationTurnId(notification: AppServerNotification) {
   return match(notification)
     .with({ method: SERVER_METHOD.turnStarted }, (n) => n.params.turn.id)
     .with({ method: SERVER_METHOD.turnCompleted }, (n) => n.params.turn.id)
@@ -1003,12 +1003,12 @@ export class CodexService {
     threadId: string,
     turnId: string,
   ) {
-    const eventThreadId = extractThreadId(notification);
+    const eventThreadId = extractNotificationThreadId(notification);
     if (eventThreadId && eventThreadId !== threadId) {
       return false;
     }
 
-    const eventTurnId = extractTurnId(notification);
+    const eventTurnId = extractNotificationTurnId(notification);
     if (turnId && eventTurnId && eventTurnId !== turnId) {
       return false;
     }
@@ -1079,6 +1079,34 @@ export class CodexService {
 
 let sharedClient: CodexAppServerClient | null = null;
 let sharedMcpClient: CodexAppServerClient | null = null;
+const persistentNotificationSubscribers = new Set<(notification: AppServerNotification) => void>();
+let sharedNotificationUnsubscribe: (() => void) | null = null;
+
+function attachPersistentNotificationSubscribers(client: CodexAppServerClient): void {
+  sharedNotificationUnsubscribe?.();
+  sharedNotificationUnsubscribe = client.subscribe((notification) => {
+    for (const subscriber of persistentNotificationSubscribers) {
+      try {
+        subscriber(notification);
+      } catch {
+        console.error('[interpreter-server] persistent notification subscriber failed');
+      }
+    }
+  });
+}
+
+/**
+ * Observe notifications across shared app-server restarts. Runtime profile
+ * changes intentionally replace the shared client; publication and other
+ * process-level observers must survive that replacement.
+ */
+export function subscribeCodexNotifications(
+  handler: (notification: AppServerNotification) => void,
+): () => void {
+  persistentNotificationSubscribers.add(handler);
+  getCodexClient();
+  return () => persistentNotificationSubscribers.delete(handler);
+}
 
 export function getCodexClient(): CodexClient {
   if (!sharedClient) {
@@ -1093,6 +1121,7 @@ export function getCodexClient(): CodexClient {
       loadCodexRuntimeAccessSnapshot,
     );
     attachCodexServerRequestApprovals(sharedClient);
+    attachPersistentNotificationSubscribers(sharedClient);
   }
   return sharedClient;
 }
@@ -1125,6 +1154,8 @@ export function getCodexService(): CodexService {
  * Shut down the shared Codex app-server process and reset singletons.
  */
 export function shutdownCodexRuntime(): void {
+  sharedNotificationUnsubscribe?.();
+  sharedNotificationUnsubscribe = null;
   if (sharedClient) {
     sharedClient.shutdown();
     sharedClient = null;
