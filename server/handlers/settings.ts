@@ -289,7 +289,7 @@ export async function setBooleanUISetting(id: BooleanUISettingId, enabled: boole
 }
 
 // ============================================================================
-// Interpreter Overlay Settings
+// Hacienda Overlay Settings
 // ============================================================================
 
 export async function getInterpreterOverlaySettings(): Promise<{ settings: InterpreterOverlaySettings }> {
@@ -373,7 +373,7 @@ function getAccessibilityPermissionErrorMessage(
   }
 
   if (requestError) {
-    return 'Accessibility permission is still not granted. Approve Interpreter in System Settings > Privacy & Security > Accessibility, then return here.';
+    return 'Accessibility permission is still not granted. Approve Hacienda in System Settings > Privacy & Security > Accessibility, then return here.';
   }
 
   return 'Grant Accessibility permission in System Settings > Privacy & Security > Accessibility, then return here.';
@@ -399,21 +399,21 @@ function getScreenRecordingPermissionErrorMessage(
   if (status.screenRecordingStatus === 'denied') {
     if (options.wasDeniedBeforeRequest) {
       if (options.openedSettings) {
-        return 'Screen Recording permission was previously denied. System Settings was opened so you can enable Interpreter in Privacy & Security > Screen Recording.';
+        return 'Screen Recording permission was previously denied. System Settings was opened so you can enable Hacienda in Privacy & Security > Screen Recording.';
       }
       if (options.openSettingsError) {
-        return `Screen Recording permission was previously denied and System Settings could not be opened (${options.openSettingsError}). Enable Interpreter in Privacy & Security > Screen Recording, then return here.`;
+        return `Screen Recording permission was previously denied and System Settings could not be opened (${options.openSettingsError}). Enable Hacienda in Privacy & Security > Screen Recording, then return here.`;
       }
-      return 'Screen Recording permission was previously denied. Enable Interpreter in System Settings > Privacy & Security > Screen Recording, then return here.';
+      return 'Screen Recording permission was previously denied. Enable Hacienda in System Settings > Privacy & Security > Screen Recording, then return here.';
     }
-    return 'Screen Recording permission was not granted. Enable Interpreter in System Settings > Privacy & Security > Screen Recording, then return here.';
+    return 'Screen Recording permission was not granted. Enable Hacienda in System Settings > Privacy & Security > Screen Recording, then return here.';
   }
 
   if (options.captureError) {
-    return 'Screen Recording permission is still not granted. If macOS did not show a prompt, enable Interpreter in System Settings > Privacy & Security > Screen Recording, then return here.';
+    return 'Screen Recording permission is still not granted. If macOS did not show a prompt, enable Hacienda in System Settings > Privacy & Security > Screen Recording, then return here.';
   }
 
-  return 'Screen Recording permission is still not granted. Enable Interpreter in System Settings > Privacy & Security > Screen Recording, then return here.';
+  return 'Screen Recording permission is still not granted. Enable Hacienda in System Settings > Privacy & Security > Screen Recording, then return here.';
 }
 
 function setNonDarwinOverlayScreenCaptureProbeState(
