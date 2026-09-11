@@ -617,7 +617,7 @@ export const closeAgentWindowTool: BuiltinToolDefinition = {
 export const awaitAgentWindowTool: BuiltinToolDefinition = {
   name: 'await_agent_window',
   description:
-    'Wait for an Hacienda-owned agent window to finish its current task and return safe completion metadata. This does not expose caller tokens or full message history.',
+    'Wait for a Hacienda-owned agent window to finish its current task and return safe completion metadata. This does not expose caller tokens or full message history.',
   inputSchema: {
     type: 'object',
     properties: {

@@ -154,7 +154,7 @@ function overlayError(message: string) {
 
 function requireAgentId(context?: BuiltinToolContext): string {
   if (!context?.agentId) {
-    throw new Error('Overlay tools require an Hacienda Overlay agent session.');
+    throw new Error('Overlay tools require a Hacienda Overlay agent session.');
   }
   return context.agentId;
 }

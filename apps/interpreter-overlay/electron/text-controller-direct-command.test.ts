@@ -582,7 +582,7 @@ describe('overlay text controller direct command execution', () => {
     setBrowserPageClickRelayEnsureProviderForTest(async () => {});
     setBrowserPageClickProviderForTest(async () => {
       throw new Error(
-        'Interpreter browser settings blocked this request. Cannot use "https://shop.example.test/checkout" because it does not match the allowed page rules.',
+        'Hacienda browser settings blocked this request. Cannot use "https://shop.example.test/checkout" because it does not match the allowed page rules.',
       );
     });
     setBrowserPermissionReviewPromptProviderForTest(async (input) => {
@@ -635,7 +635,7 @@ describe('overlay text controller direct command execution', () => {
       agentId: 'overlay-agent-1',
       workspacePath: '/workspace',
       profileId: 'profile-fast',
-    }, callTool)).rejects.toThrow('Failed to click browser page element: Interpreter browser settings blocked this request.');
+    }, callTool)).rejects.toThrow('Failed to click browser page element: Hacienda browser settings blocked this request.');
 
     expect(prompts).toEqual([{
       toolName: 'interpreter_browser_page_click',
