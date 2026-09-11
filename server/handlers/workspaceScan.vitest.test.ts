@@ -19,7 +19,18 @@ function seedArtifact(repoDir: string) {
   writeFileSync(join(snapDir, 'model.onnx'), 'fake-bytes');
 }
 
-describe('workspaceScan resourcesReady — truthful model presence', () => {
+// These assert that `resourcesReady` reflects artifacts cached in the Hugging
+// Face hub — seeded here as hub/<repo>/snapshots/<rev>/model.onnx, symlinks
+// included. No implementation does that. `resourceReady()` looks for
+// `<name>.ready` marker files under ~/.local/share/basemind, and #71 replaced
+// the call entirely with `isDaemonRunning()`, which reports readiness from a
+// running daemon even when nothing is downloaded.
+//
+// vitest.config.ts used to exclude this whole file, so the mismatch was
+// invisible. Skipping states it instead: the behaviour is worth having —
+// `isPiiModelReady` in piiDetection.ts already scans the hub cache this way —
+// but implementing it does not belong in a rename.
+describe.skip('workspaceScan resourcesReady — truthful model presence', () => {
   beforeEach(() => {
     savedEnv = {
       HF_HUB_CACHE: process.env.HF_HUB_CACHE,
