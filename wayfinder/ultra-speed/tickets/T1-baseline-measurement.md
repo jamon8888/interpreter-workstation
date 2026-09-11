@@ -17,7 +17,7 @@ Specifically, measure:
 5. **Peak idle memory**: with 1 window open, idle for 30s after first paint
 
 Also profile WHERE the time goes:
-- Main process: run `node --cpu-prof --heap-prof electron/main.ts` (or equivalent) to find which `require()` calls dominate boot time
+- Main process: run `pnpm start -- --cpu-prof --heap-prof` to find which `require()` calls dominate boot time (profile output goes to `CPU.001.cpuprofile` in the working directory)
 - Renderer: use Vite bundle analyzer or rollup-plugin-visualizer to map the chunk tree; identify the largest modules in the main chunk
 - Process count: how many processes does the app spawn at idle? (main + renderer + any hidden BrowserWindows + any spawned children)
 
