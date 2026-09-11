@@ -5,6 +5,7 @@ import os from 'node:os';
 import { randomBytes } from 'node:crypto';
 import fs from 'fs';
 import util from 'node:util';
+import { enableCompileCache, constants } from 'node:module';
 import fixPath from 'fix-path';
 import * as Sentry from '@sentry/electron/main';
 import { handlePendingNativeCrashReports, startLocalCrashReporter } from './crashReports';
@@ -80,11 +81,13 @@ attachConsoleSinkGuards({
 });
 
 // Enable V8 compile cache for faster module loading on subsequent launches.
-// Must be set before any require() calls — ESM imports are hoisted but
-// dynamic requires inside functions will benefit from the cached bytecode.
-if (!process.env.NODE_COMPILE_CACHE) {
-  const compileCacheDir = path.join(app.getPath('userData'), 'compile-cache');
-  process.env.NODE_COMPILE_CACHE = compileCacheDir;
+// Must be called before any require() calls — enables bytecode caching for
+// the current process. ESM imports are hoisted but dynamic requires inside
+// functions will benefit from the cached bytecode.
+const compileCacheDir = path.join(app.getPath('userData'), 'compile-cache');
+const cacheResult = enableCompileCache(compileCacheDir);
+if (cacheResult.status === constants.compileCacheStatus.FAILED) {
+  console.warn('[compile-cache] Failed to enable:', cacheResult.message);
 }
 
 // =============================================================================
