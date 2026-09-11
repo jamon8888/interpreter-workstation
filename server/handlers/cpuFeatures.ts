@@ -7,6 +7,8 @@ type CpuFeatures = typeof DEFAULT_FEATURES;
 
 const FEATURE_FLAGS = ['avx2', 'avx', 'sse4_1', 'sse4_2', 'neon'] as const;
 
+const DETECTION_TIMEOUT_MS = 5_000;
+
 /**
  * `JSON.parse` accepts `{}`, `null`, `42` and arrays just as happily as a real
  * payload. A partial object then reaches `isCompatible`, where a missing `arch`
@@ -32,17 +34,30 @@ export async function cpuFeatures(): Promise<{ arch: string; avx2: boolean; avx:
   return new Promise((resolve) => {
     const child = spawn(binary, ['cpu-features'], { stdio: 'pipe' });
     let stdout = '';
+    let settled = false;
+    // A hung child emits neither `close` nor `error`, and onboarding awaits this
+    // promise, so without a deadline the flow waits forever.
+    const timer = setTimeout(() => {
+      child.kill('SIGKILL');
+      settle(DEFAULT_FEATURES);
+    }, DETECTION_TIMEOUT_MS);
+    function settle(features: CpuFeatures): void {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve(features);
+    }
     child.stdout?.on('data', (chunk: Buffer) => { stdout += chunk.toString(); });
     child.on('close', (code) => {
       if (code === 0) {
         try {
           const parsed: unknown = JSON.parse(stdout.trim());
-          resolve(isCpuFeatures(parsed) ? parsed : DEFAULT_FEATURES);
-        } catch { resolve(DEFAULT_FEATURES); }
+          settle(isCpuFeatures(parsed) ? parsed : DEFAULT_FEATURES);
+        } catch { settle(DEFAULT_FEATURES); }
       } else {
-        resolve(DEFAULT_FEATURES);
+        settle(DEFAULT_FEATURES);
       }
     });
-    child.on('error', () => resolve(DEFAULT_FEATURES));
+    child.on('error', () => settle(DEFAULT_FEATURES));
   });
 }
