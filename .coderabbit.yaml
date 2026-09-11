@@ -1,28 +1,15 @@
 # CodeRabbit configuration for interpreter-workstation
-# https://coderabbit.ai
+# https://docs.coderabbit.ai/reference/yaml-template
 
 reviews:
   auto_review:
-    # Disable auto-pause to prevent reviews being paused on active branches
+    # Reviews stop after this many already-reviewed commits when non-zero.
     auto_pause_after_reviewed_commits: 0
-    # DCO sign-off update
-    # Skip reviews on protected branches by not listing them in base_branches
-    # base_branches is empty by default (reviews default branch only)
-    # To explicitly limit branches, add patterns here
-
-# Optional: customize approval rules
-# approval_rules:
-#   - type: "requisite_approvers"
-#     count: 2
-#     teams: ["code-owners", "engineering"]
-
-# Optional: configure specific file patterns
-# file_patterns:
-#   - "*.ts"
-#   - "*.js"
-#   - "*.test.ts"
-
-# Optional: disable reviews for certain file types
-# skip_file_patterns:
-#   - "*.md"
-#   - "*.json"
+    # CodeRabbit only auto-reviews pull requests targeting the default branch
+    # unless the base is listed here. Large renames have to be split into a
+    # stack to fit under the 100-file review limit, and every link except the
+    # first targets another split branch, so without this the one link worth
+    # reading is the one that never gets read.
+    base_branches:
+      - "main"
+      - "split/.*"
