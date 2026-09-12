@@ -1070,7 +1070,9 @@ export class ToolManager {
           messageId,
         });
         // NOTE(linked-file-redaction): file-read outputs are redacted before
-        // they reach model context (#113). See server/services/runtimeRedaction.ts.
+        // they reach model context (#113). threadKey is a real thread id only;
+        // without one the output still redacts but stores no rehydration map.
+        // See server/services/runtimeRedaction.ts.
         return await maybeRedactToolResult({
           serverId,
           toolName,
@@ -1078,9 +1080,7 @@ export class ToolManager {
           result: rawResult,
           modelConfig,
           threadKey: toolContext?.threadId
-            ?? getToolCallMetadata(externalToolCallId)?.threadId
-            ?? callerTabId
-            ?? undefined,
+            ?? getToolCallMetadata(externalToolCallId)?.threadId,
         });
       });
     }
@@ -1171,12 +1171,14 @@ export class ToolManager {
     );
     // NOTE(linked-file-redaction): same post-execution redaction as the
     // builtin path above — upstream harness reads (builtin-fs) return here.
+    // builtinTool is intentionally omitted: harness tools carry no local
+    // metadata, so isFileReadTool matches them by server/tool name.
     return await maybeRedactToolResult({
       serverId,
       toolName,
       result: mcpResult,
       modelConfig: toolContext?.modelConfig,
-      threadKey: threadId ?? callerTabId ?? undefined,
+      threadKey: threadId,
     });
   }
 

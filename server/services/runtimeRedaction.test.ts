@@ -3,6 +3,7 @@ import { describe, expect, test } from 'bun:test';
 import {
   applyFileReadRedaction,
   clearRuntimeRehydrationMaps,
+  deleteRuntimeRehydrationMap,
   getRuntimeRehydrationMap,
   isFileReadTool,
   maybeRedactToolResult,
@@ -18,9 +19,15 @@ const stubDeps = {
 
 describe('isFileReadTool', () => {
   test('matches builtin tools with read fileAccess', () => {
-    expect(isFileReadTool('builtin-test-filesystem', 'read_file', {
+    expect(isFileReadTool('builtin-workspace', 'read_file', {
       fileAccess: { mode: 'read', pathArg: 'path' },
     } as never)).toBe(true);
+  });
+
+  test('exempts the permission-test stub server (verbatim E2E output)', () => {
+    expect(isFileReadTool('builtin-test-filesystem', 'read_file', {
+      fileAccess: { mode: 'read', pathArg: 'path' },
+    } as never)).toBe(false);
   });
 
   test('matches upstream builtin-fs read_file by name', () => {
@@ -76,7 +83,46 @@ describe('applyFileReadRedaction', () => {
     expect(text).not.toContain('jane@example.com');
   });
 
-  test('marks binary content deferred instead of silently passing it', async () => {
+  test('runs NER even when regex finds nothing (NER-only PII)', async () => {
+    clearRuntimeRehydrationMaps();
+    const result = await applyFileReadRedaction(
+      { content: [{ type: 'text', text: 'Authored by Jane Doe yesterday' }], isError: false },
+      { threadKey: 'thread-ner-only' },
+      {
+        isNerReady: () => true,
+        detectNer: async () => [
+          { category: 'person_full_name', start: 12, end: 20, text: 'Jane Doe', confidence: 0.9 },
+        ],
+      },
+    );
+    const text = (result as { content: Array<{ text: string }> }).content[0].text;
+    expect(text).not.toContain('Jane Doe');
+    expect(text).toMatch(/\[NAME_\d+\]/);
+  });
+
+  test('repeated reads never re-emit a live thread token', async () => {
+    clearRuntimeRehydrationMaps();
+    const first = await applyFileReadRedaction(
+      { content: [{ type: 'text', text: `first ${PROBE_EMAIL}` }], isError: false },
+      { threadKey: 'thread-repeat' },
+      stubDeps,
+    );
+    const firstText = (first as { content: Array<{ text: string }> }).content[0].text;
+    expect(firstText).toContain('[EMAIL_0]');
+    const second = await applyFileReadRedaction(
+      { content: [{ type: 'text', text: 'second bob@example.com' }], isError: false },
+      { threadKey: 'thread-repeat' },
+      stubDeps,
+    );
+    const secondText = (second as { content: Array<{ text: string }> }).content[0].text;
+    expect(secondText).toContain('[EMAIL_1]');
+    expect(secondText).not.toContain('[EMAIL_0]');
+    const map = getRuntimeRehydrationMap('thread-repeat');
+    expect(map['[EMAIL_0]']).toBe(PROBE_EMAIL);
+    expect(map['[EMAIL_1]']).toBe('bob@example.com');
+  });
+
+  test('marks binary content deferred with marker only (no raw bytes)', async () => {
     clearRuntimeRehydrationMaps();
     const result = await applyFileReadRedaction(
       { content: [{ type: 'text', text: 'PNG\0\x01\x02binary' }], isError: false },
@@ -85,15 +131,27 @@ describe('applyFileReadRedaction', () => {
     );
     const text = (result as { content: Array<{ text: string }> }).content[0].text;
     expect(text).toContain('redaction deferred');
+    expect(text).not.toContain('PNG');
   });
 
-  test('passes error results through untouched', async () => {
+  test('redacts error-result text while preserving isError', async () => {
+    clearRuntimeRehydrationMaps();
     const result = await applyFileReadRedaction(
       { content: [{ type: 'text', text: `denied ${PROBE_EMAIL}` }], isError: true },
       { threadKey: 'thread-5' },
       stubDeps,
     );
-    expect((result as { content: Array<{ text: string }> }).content[0].text).toContain(PROBE_EMAIL);
+    const envelope = result as { content: Array<{ text: string }>; isError: boolean };
+    expect(envelope.isError).toBe(true);
+    expect(envelope.content[0].text).not.toContain(PROBE_EMAIL);
+  });
+
+  test('deletes a thread rehydration map', async () => {
+    clearRuntimeRehydrationMaps();
+    await applyFileReadRedaction(`mail ${PROBE_EMAIL}`, { threadKey: 'thread-gone' }, stubDeps);
+    expect(Object.keys(getRuntimeRehydrationMap('thread-gone')).length).toBeGreaterThan(0);
+    deleteRuntimeRehydrationMap('thread-gone');
+    expect(getRuntimeRehydrationMap('thread-gone')).toEqual({});
   });
 });
 

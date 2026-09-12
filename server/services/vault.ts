@@ -73,6 +73,10 @@ export function extractRehydrationMap(result: unknown): Record<string, string> {
   return {};
 }
 
+export interface VaultToolCaller {
+  callTool(serverId: string, toolName: string, args: Record<string, any>): Promise<unknown>;
+}
+
 /**
  * `encrypt` defaults to the OS-guarded vault key, so a blob written through the
  * default path can only be reopened with that same key. Requiring the caller to
@@ -138,10 +142,6 @@ export function extractEncryptedBlob(result: unknown): string {
     }
   }
   return '';
-}
-
-export interface VaultToolCaller {
-  callTool(serverId: string, toolName: string, args: Record<string, any>): Promise<unknown>;
 }
 
 export interface VaultEncryptOptions {

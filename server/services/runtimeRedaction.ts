@@ -75,11 +75,18 @@ function storeRuntimeRehydrationMap(threadKey: string, map: Record<string, strin
   runtimeRehydrationMaps.set(threadKey, { ...existing, ...map });
 }
 
+export function deleteRuntimeRehydrationMap(threadKey: string): void {
+  runtimeRehydrationMaps.delete(threadKey);
+}
+
 export function isFileReadTool(
   serverId: string,
   toolName: string,
   builtinTool?: Pick<BuiltinToolDefinition, 'fileAccess'> | null,
 ): boolean {
+  // builtin-test-filesystem is test infrastructure asserting verbatim tool
+  // output (permission E2E); the production gate must not rewrite its results.
+  if (serverId === 'builtin-test-filesystem') return false;
   const fileAccess = builtinTool?.fileAccess as
     | { mode?: string; pathArg?: string | string[]; pathArgModes?: Record<string, string> }
     | undefined;
@@ -117,22 +124,26 @@ export async function redactFileReadOutputText(
   deps: RuntimeRedactionDeps = {},
 ): Promise<{ text: string; redacted: boolean; deferred: boolean }> {
   if (isNonTextContent(text)) {
-    return { text: `${text}\n${RUNTIME_REDACTION_DEFERRED_MARKER}`, redacted: false, deferred: true };
+    // Fail closed: unscannable bytes never reach the model, only the marker.
+    // Non-text MCP parts (images) are left untouched — image OCR redaction is
+    // out of scope (#110) and replacing them would break the vision contract.
+    return { text: RUNTIME_REDACTION_DEFERRED_MARKER, redacted: false, deferred: true };
   }
   const resolved = resolveDeps(deps);
   const regexDetections = detectRegex(text);
+  // NER runs unconditionally when ready: regex covers patterns (email, phone,
+  // …) but NER-only categories (names, addresses) would otherwise pass raw.
   let detections: PiiDetection[] = regexDetections;
-  if (regexDetections.length > 0) {
-    try {
-      if (await resolved.isNerReady()) {
-        detections = mergeDetections(await resolved.detectNer(text), regexDetections);
-      }
-    } catch {
-      detections = regexDetections;
+  try {
+    if (await resolved.isNerReady()) {
+      detections = mergeDetections(await resolved.detectNer(text), regexDetections);
     }
+  } catch {
+    detections = regexDetections;
   }
   if (detections.length === 0) return { text, redacted: false, deferred: false };
-  const { redactedText, rehydrationMap } = buildRedactedText(text, detections);
+  const reserved = options.threadKey ? Object.keys(runtimeRehydrationMaps.get(options.threadKey) ?? {}) : [];
+  const { redactedText, rehydrationMap } = buildRedactedText(text, detections, new Set(reserved));
   if (options.threadKey) storeRuntimeRehydrationMap(options.threadKey, rehydrationMap);
   return { text: redactedText, redacted: true, deferred: false };
 }
@@ -149,20 +160,13 @@ function isMcpContentResult(value: unknown): value is { content: McpContentPart[
   return Array.isArray(content);
 }
 
-function isErrorResult(value: unknown): boolean {
-  return (
-    typeof value === 'object'
-    && value !== null
-    && (value as { isError?: unknown }).isError === true
-  );
-}
-
 export async function applyFileReadRedaction(
   result: unknown,
   options: RedactTextOptions = {},
   deps: RuntimeRedactionDeps = {},
 ): Promise<unknown> {
-  if (isErrorResult(result)) return result;
+  // Error text can echo paths or content, so it redacts like any other text;
+  // the isError flag survives via the spread below and diagnostics keep working.
   if (typeof result === 'string') {
     return (await redactFileReadOutputText(result, options, deps)).text;
   }
