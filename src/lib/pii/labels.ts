@@ -8,6 +8,20 @@ export interface RedactedToken {
   end: number;
 }
 
+/**
+ * i18n key for the marker shown when a token has no rehydration map to
+ * resolve it against — a turn sent before vault persistence existed, whose
+ * original was never stored anywhere. The gap is permanent by construction
+ * (there is nothing to migrate or backfill), so the copy states that plainly
+ * rather than reading like a transient error.
+ *
+ * One key, three surfaces (#151 / #167): the viewer uses it today; the
+ * composer reveal popover and the chat detokenization plugin should import
+ * this constant when they land (#162, #164) rather than writing their own
+ * copy for the same state.
+ */
+export const PII_UNRESTORABLE_MARKER_KEY = 'basemind.pii.unrestorable';
+
 const TOKEN_RE = /\[([A-Za-z][A-Za-z0-9_]*)_(\d+)\]/g;
 
 const CATEGORY_ALIASES: Record<string, string> = {
