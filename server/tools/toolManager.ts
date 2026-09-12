@@ -14,6 +14,7 @@ import {
 import { emitToolServersChanged } from '../utils/ipcBridge';
 import { getCurrentWorkspace } from '../utils/workspace';
 import { enforceFilesystemBoundary } from './filesystemBoundary';
+import { maybeRedactToolResult } from '../services/runtimeRedaction';
 import { getToolCallMetadata } from '../utils/codexMcpBridge';
 import { getCurrentTurnMessageId } from '../utils/turnMessageIdRegistry';
 import { runWithWorkspaceOverride } from '../utils/workspace';
@@ -1054,7 +1055,7 @@ export class ToolManager {
       if (denial) return denial;
 
       return await runWithWorkspaceOverride(workspace, async () => {
-        return await builtinTool.handler(args, {
+        const rawResult = await builtinTool.handler(args, {
           workspace: workspace || undefined,
           callerTabId,
           threadId: toolContext?.threadId ?? getToolCallMetadata(externalToolCallId)?.threadId,
@@ -1067,6 +1068,19 @@ export class ToolManager {
           toolCallPath,
           maxDepth,
           messageId,
+        });
+        // NOTE(linked-file-redaction): file-read outputs are redacted before
+        // they reach model context (#113). See server/services/runtimeRedaction.ts.
+        return await maybeRedactToolResult({
+          serverId,
+          toolName,
+          builtinTool,
+          result: rawResult,
+          modelConfig,
+          threadKey: toolContext?.threadId
+            ?? getToolCallMetadata(externalToolCallId)?.threadId
+            ?? callerTabId
+            ?? undefined,
         });
       });
     }
@@ -1145,7 +1159,7 @@ export class ToolManager {
       }
     }
 
-    return await getMcpService().callTool(
+    const mcpResult = await getMcpService().callTool(
       threadId,
       serverId,
       toolName,
@@ -1155,6 +1169,15 @@ export class ToolManager {
         cwd: toolContext?.workspace,
       },
     );
+    // NOTE(linked-file-redaction): same post-execution redaction as the
+    // builtin path above — upstream harness reads (builtin-fs) return here.
+    return await maybeRedactToolResult({
+      serverId,
+      toolName,
+      result: mcpResult,
+      modelConfig: toolContext?.modelConfig,
+      threadKey: threadId ?? callerTabId ?? undefined,
+    });
   }
 
   /**

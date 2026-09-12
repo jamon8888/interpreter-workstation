@@ -80,7 +80,11 @@ export function extractRehydrationMap(result: unknown): Record<string, string> {
  * has no access to the OS-protected secret. Decryption now mirrors encryption:
  * an explicit passphrase when one was used, the OS key otherwise.
  */
-async function decrypt(docId: string, explicitPassphrase?: string): Promise<Record<string, string>> {
+async function decrypt(
+  docId: string,
+  explicitPassphrase?: string,
+  toolManager?: VaultToolCaller,
+): Promise<Record<string, string>> {
   const passphrase = explicitPassphrase || getOrCreateVaultPassphrase();
   if (!passphrase) throw new Error('[vault] No vault key available to decrypt a rehydration map');
   const blobPath = resolveVaultBlobPath(docId);
@@ -91,7 +95,11 @@ async function decrypt(docId: string, explicitPassphrase?: string): Promise<Reco
     throw new Error('[vault] No stored rehydration map for this document');
   }
   if (!encryptedBlob) throw new Error('[vault] Stored rehydration map is empty');
-  const manager = new ToolManager();
+  // Both intents are load-bearing and neither replaces the other: the double
+  // keeps the tool call reachable from tests, and `ToolManager.callTool`
+  // refuses an MCP call with no thread context, so the owner thread has to
+  // travel with it. `encrypt` above resolves the same pair the same way.
+  const manager = toolManager ?? new ToolManager();
   const raw = await manager.callTool(
     'basemind',
     'vault',
@@ -132,11 +140,15 @@ export function extractEncryptedBlob(result: unknown): string {
   return '';
 }
 
+export interface VaultToolCaller {
+  callTool(serverId: string, toolName: string, args: Record<string, any>): Promise<unknown>;
+}
+
 export interface VaultEncryptOptions {
   /** Explicit passphrase; defaults to the OS-guarded vault data-protection key. */
   passphrase?: string;
   /** Injectable ToolManager double for tests. */
-  toolManager?: { callTool(serverId: string, toolName: string, args: Record<string, any>): Promise<unknown> };
+  toolManager?: VaultToolCaller;
 }
 
 async function encrypt(
