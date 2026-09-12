@@ -625,7 +625,12 @@ export interface WorkspaceScanStatus {
 }
 
 interface PiiIpc {
-  detectPii(text: string, options?: { categories?: string[] }): Promise<{ category: string; start: number; end: number; text: string; confidence: number }[]>;
+  /**
+   * `minConfidence` overrides the server's per-category confidence policy
+   * uniformly for this call (strict for IBAN/credit-card, medium for names,
+   * a lower default elsewhere) rather than tuning one category.
+   */
+  detectPii(text: string, options?: { categories?: string[]; minConfidence?: number }): Promise<{ category: string; start: number; end: number; text: string; confidence: number }[]>;
   /** Decryption uses the OS-guarded vault key; the renderer never handles it. */
   decryptRehydration(docId: string): Promise<Record<string, string>>;
 }
