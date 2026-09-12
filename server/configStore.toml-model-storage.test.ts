@@ -23,9 +23,9 @@ const CORRUPTED_RECOVERY_CONFIG_FIXTURE = new URL('./test-fixtures/corrupted-rec
 const USER_RESERVED_LOCAL_PROVIDER_CONFIG_FIXTURE = new URL('./test-fixtures/user-reserved-local-provider-config.toml', import.meta.url);
 const MOCK_MODEL_CONFIG_FILE = '/tmp/test-codex-home/config.toml';
 
-const EXACT_REPEATED_RECOVERY_CONFIG_TOML = `# Interpreter user configuration
+const EXACT_REPEATED_RECOVERY_CONFIG_TOML = `# Hacienda user configuration
 # Hosted model IDs must be "interpreter-smart", "interpreter-fast", or <provider>/<model_id>.
-# Interpreter may repair or remove invalid [interpreter_app] profiles when it reloads this file.
+# Hacienda may repair or remove invalid [interpreter_app] profiles when it reloads this file.
 # OpenAI, Groq, and OpenRouter API model IDs are validated against Interpreter's generated models.dev catalog.
 # For API profiles, set base_url to the API root.
 # Responses is the default API wire format. API profiles use wire_api = "chat" only when Chat Completions is explicitly enabled in Settings.
@@ -73,9 +73,9 @@ wire_api = "responses"
 
 [projects."/Users/example/Projects/interpreter-workstation"]
 trust_level = "trusted"
-# Interpreter user configuration
+# Hacienda user configuration
 # Hosted model IDs must be "interpreter-smart", "interpreter-fast", or <provider>/<model_id>.
-# Interpreter may repair or remove invalid [interpreter_app] profiles when it reloads this file.
+# Hacienda may repair or remove invalid [interpreter_app] profiles when it reloads this file.
 # OpenAI, Groq, and OpenRouter API model IDs are validated against Interpreter's generated models.dev catalog.
 # For API profiles, set base_url to the API root.
 # Responses is the default API wire format. API profiles use wire_api = "chat" only when Chat Completions is explicitly enabled in Settings.
@@ -834,9 +834,9 @@ wire_api = "responses"
     await mkdir(dirname(MODEL_CONFIG_FILE), { recursive: true });
     await writeFile(
       MODEL_CONFIG_FILE,
-      `# Interpreter user configuration
+      `# Hacienda user configuration
 # Hosted model IDs must be "interpreter-smart", "interpreter-fast", or <provider>/<model_id>.
-# Interpreter may repair or remove invalid [interpreter_app] profiles when it reloads this file.
+# Hacienda may repair or remove invalid [interpreter_app] profiles when it reloads this file.
 # OpenAI, Groq, and OpenRouter API model IDs are validated against Interpreter's generated models.dev catalog.
 # For API profiles, set base_url to the API root.
 # Responses is the default API wire format. API profiles use wire_api = "chat" only when Chat Completions is explicitly enabled in Settings.
@@ -892,9 +892,9 @@ trust_level = "trusted"
     await mkdir(dirname(MODEL_CONFIG_FILE), { recursive: true });
     await writeFile(
       MODEL_CONFIG_FILE,
-      `# Interpreter user configuration
+      `# Hacienda user configuration
 # Hosted model IDs must be "interpreter-smart", "interpreter-fast", or <provider>/<model_id>.
-# Interpreter may repair or remove invalid [interpreter_app] profiles when it reloads this file.
+# Hacienda may repair or remove invalid [interpreter_app] profiles when it reloads this file.
 # OpenAI, Groq, and OpenRouter API model IDs are validated against Interpreter's generated models.dev catalog.
 # For API profiles, set base_url to the API root.
 # Responses is the default API wire format. API profiles use wire_api = "chat" only when Chat Completions is explicitly enabled in Settings.
@@ -1041,9 +1041,9 @@ base_url = "http://localhost:11434/v1"
     await mkdir(dirname(MODEL_CONFIG_FILE), { recursive: true });
     await writeFile(
       MODEL_CONFIG_FILE,
-      `# Interpreter user configuration
+      `# Hacienda user configuration
 # Hosted model IDs must be "interpreter-smart", "interpreter-fast", or <provider>/<model_id>.
-# Interpreter may repair or remove invalid [interpreter_app] profiles when it reloads this file.
+# Hacienda may repair or remove invalid [interpreter_app] profiles when it reloads this file.
 # OpenAI, Groq, and OpenRouter API model IDs are validated against Interpreter's generated models.dev catalog.
 # For API profiles, set base_url to the API root.
 # Responses is the default API wire format. API profiles use wire_api = "chat" only when Chat Completions is explicitly enabled in Settings.
@@ -1116,9 +1116,9 @@ trust_level = "trusted"
     await mkdir(dirname(MODEL_CONFIG_FILE), { recursive: true });
     await writeFile(
       MODEL_CONFIG_FILE,
-      `# Interpreter user configuration
+      `# Hacienda user configuration
 # Hosted model IDs must be "interpreter-smart", "interpreter-fast", or <provider>/<model_id>.
-# Interpreter may repair or remove invalid [interpreter_app] profiles when it reloads this file.
+# Hacienda may repair or remove invalid [interpreter_app] profiles when it reloads this file.
 # OpenAI, Groq, and OpenRouter API model IDs are validated against Interpreter's generated models.dev catalog.
 # For API profiles, set base_url to the API root.
 # Responses is the default API wire format. API profiles use wire_api = "chat" only when Chat Completions is explicitly enabled in Settings.
@@ -1267,7 +1267,7 @@ web_search = "disabled"
         interpreter: {
           base_url: 'https://api.example.invalid/v0/openrouter',
           experimental_bearer_token: 'token',
-          name: 'Interpreter',
+          name: 'Hacienda',
           requires_openai_auth: false,
           wire_api: 'responses',
           http_headers: {

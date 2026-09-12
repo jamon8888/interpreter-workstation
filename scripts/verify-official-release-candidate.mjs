@@ -9,7 +9,13 @@ import { fileURLToPath } from 'node:url';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const distRoot = path.join(root, 'dist');
 const arch = process.argv[2] || process.env.BUILD_ARCH || 'mac-arm64';
-const appBundle = path.join(distRoot, arch, 'Interpreter.app');
+// Derived from the product.json that gets packaged, not hardcoded: electron-builder
+// names the bundle and the artifacts after `productName`, so a rename used to leave
+// this script looking for a bundle the build no longer produces.
+const sourceProduct = JSON.parse(readFileSync(path.join(root, 'product.json'), 'utf8'));
+const expectedName = sourceProduct.nameLong;
+const expectedBundleId = sourceProduct.darwinBundleIdentifier;
+const appBundle = path.join(distRoot, arch, `${expectedName}.app`);
 const resources = path.join(appBundle, 'Contents', 'Resources');
 const appAsar = path.join(resources, 'app.asar');
 const infoPlist = path.join(appBundle, 'Contents', 'Info.plist');
@@ -26,8 +32,10 @@ function requireFile(filePath, description, minimumBytes = 1) {
 requireFile(appAsar, 'packaged application archive', 1024);
 requireFile(infoPlist, 'packaged application Info.plist', 1024);
 const product = JSON.parse(extractFile(appAsar, 'product.json').toString('utf8'));
-if (product.nameLong !== 'Interpreter' || product.darwinBundleIdentifier !== 'interpreter') {
-  throw new Error('Release candidate does not use the public Interpreter product identity');
+if (product.nameLong !== expectedName || product.darwinBundleIdentifier !== expectedBundleId) {
+  throw new Error(
+    `Release candidate does not use the public ${expectedName} product identity`,
+  );
 }
 if (product.distribution?.id !== 'official') {
   throw new Error(`Expected official distribution, got ${product.distribution?.id ?? 'missing'}`);
@@ -99,9 +107,9 @@ if (!authSettingsResponse.ok) {
 
 const distributables = ['.dmg', '.zip'].map((extension) => {
   const matches = readdirSync(distRoot)
-    .filter((name) => name.endsWith(extension) && name.startsWith('Interpreter-'));
+    .filter((name) => name.endsWith(extension) && name.startsWith(`${expectedName}-`));
   if (matches.length !== 1) {
-    throw new Error(`Expected one public Interpreter ${extension} artifact, found ${matches.length}`);
+    throw new Error(`Expected one public ${expectedName} ${extension} artifact, found ${matches.length}`);
   }
   const artifactPath = path.join(distRoot, matches[0]);
   requireFile(artifactPath, `${extension} release artifact`, 1024 * 1024);

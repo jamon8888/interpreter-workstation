@@ -282,7 +282,7 @@ export const test = base.extend<{}, { electronApp: ElectronApplication }>({
         await setupTestAuth(p);
 
         // Complete onboarding: set user name + default profile
-        // Without both, the app shows the "Welcome to Interpreter" screen
+        // Without both, the app shows the "Welcome to Hacienda" screen
         // instead of the main UI with the agent composer.
         const port = await p.evaluate(async () => {
           return await (window as any).electron.getServerPort();

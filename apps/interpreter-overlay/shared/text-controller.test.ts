@@ -170,7 +170,7 @@ describe('overlay text controller request', () => {
     expect(matchOverlayTextControllerDirectCommand('select the submit button')).toBeNull();
   });
 
-  test('matches explicit computer-state reads to the Interpreter state primitive', () => {
+  test('matches explicit computer-state reads to the Hacienda state primitive', () => {
     expect(matchOverlayTextControllerDirectCommand('show computer state')).toEqual({
       kind: 'tool',
       serverId: 'builtin-interpreter',
@@ -691,7 +691,7 @@ describe('overlay text controller request', () => {
           target: 'overlay_target',
           activate: true,
         },
-        resultText: 'Started visible Interpreter agent.',
+        resultText: 'Started visible Hacienda agent.',
         permissionResultText: null,
       }],
       now: 1000,
@@ -712,10 +712,10 @@ describe('overlay text controller request', () => {
             target: 'overlay_target',
             activate: true,
           },
-          resultText: 'Started visible Interpreter agent.',
+          resultText: 'Started visible Hacienda agent.',
           permissionResultText: null,
         }],
-        toolResultText: 'Started visible Interpreter agent.',
+        toolResultText: 'Started visible Hacienda agent.',
         permissionResultText: null,
         agentLaunch: {
           agentId: 'overlay-agent-1',
@@ -745,7 +745,7 @@ describe('overlay text controller request', () => {
     expect(prompt).toContain('"tool_name":"launch_agent_window"');
     expect(prompt).toContain('"agent_id":"overlay-agent-1"');
     expect(prompt).toContain('"target":"overlay_target"');
-    expect(prompt).toContain('tool_result: Started visible Interpreter agent.');
+    expect(prompt).toContain('tool_result: Started visible Hacienda agent.');
   });
 
   test('records fast model agent launch failures into managed context', () => {
@@ -886,7 +886,7 @@ describe('overlay text controller request', () => {
     const text = buildOverlayWorkingPreferencesText(' Prefer short checklists. ');
 
     expect(text).toContain('<overlay_working_preferences source="saved_custom_instructions">');
-    expect(text).toContain('These are the saved Interpreter working preferences');
+    expect(text).toContain('These are the saved Hacienda working preferences');
     expect(text).toContain('Prefer short checklists.');
     expect(text).toContain('</overlay_working_preferences>');
   });
@@ -1011,7 +1011,7 @@ describe('overlay text controller request', () => {
             active: true,
             highlighted: true,
             pinned: false,
-            title: 'Interpreter',
+            title: 'Hacienda',
             url: 'https://example.com/work',
             status: 'complete',
             controlState: 'controllable',

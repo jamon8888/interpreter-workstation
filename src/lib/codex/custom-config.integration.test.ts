@@ -14,7 +14,7 @@ import {
   spawnInterpreterAppServerForTest,
 } from './test-fixtures/interpreter-app-server-test-binary';
 
-const HEADER_PREFIX = '# Interpreter user configuration';
+const HEADER_PREFIX = '# Hacienda user configuration';
 const TEST_HOME_PREFIX = 'test-custom-config-codex-home-';
 const STARTUP_TIMEOUT_MS = 30_000;
 

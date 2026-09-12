@@ -239,7 +239,7 @@ export async function clearUserConfig(page?: Page) {
 
       // Clear config but preserve auth tokens, theme, and onboarding state for test bootstrapping.
       // userName, onboardingState, and defaultProfileId must be preserved — without them
-      // the app shows the "Welcome to Interpreter" onboarding screen instead of the main UI.
+      // the app shows the "Welcome to Hacienda" onboarding screen instead of the main UI.
       fs.writeFileSync(configPath, JSON.stringify({
         agents: {},
         mcpServers: {},

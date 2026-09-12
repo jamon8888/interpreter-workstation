@@ -342,7 +342,7 @@ describe('sanitizeCodexSentryEvent', () => {
       type: undefined,
       debug_meta: {
         images: [{
-          code_file: '/Applications/Hacienda.app/Contents/MacOS/Interpreter',
+          code_file: '/Applications/Hacienda.app/Contents/MacOS/Hacienda',
           debug_id: 'interpreter',
           type: 'sourcemap',
         }],
@@ -854,7 +854,7 @@ describe('sanitizeCodexSentryEvent', () => {
       },
       debug_meta: {
         images: [{
-          code_file: '/Applications/Hacienda.app/Contents/MacOS/Interpreter',
+          code_file: '/Applications/Hacienda.app/Contents/MacOS/Hacienda',
           debug_id: 'interpreter',
           type: 'macho',
         }],

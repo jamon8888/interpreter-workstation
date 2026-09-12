@@ -20,6 +20,10 @@ import { createSkillMentionSuggestion, setSkillItemRegistry, getSkillItemById } 
 import type { SkillMentionDropdownData, SkillMentionItem } from './mention/SkillMentionDropdown';
 import { ToolKeywordHighlight } from './ToolKeywordHighlight';
 import { VoiceDiffMark } from './VoiceDiffMark';
+import { PiiLabel } from '../../../src/extensions/PiiLabel';
+import { detectRegex } from '../../../src/lib/pii/regex-detector';
+import { buildRedactedText, mergeDetections } from '../../../src/lib/pii/labels';
+import { pii as piiIpc } from '@/ipc';
 import { parseDragData, isFileDragData, isBrowserTabDragData } from '../../../shared/types/drag';
 import { MAIN_COMPOSER_INPUT_ID, MAIN_COMPOSER_SEND_BUTTON_ID } from '../../../shared/element-ids';
 import { humanizeSkillName } from '../../../shared/utils/skillDisplay';
@@ -423,6 +427,7 @@ export interface BaseTiptapComposerRef {
   setPreviewText: (text: string | null) => void;
   getContent: () => string;
   getSubmission: () => SerializedComposerSubmission;
+  getRehydrationMap: () => Record<string, string>;
   clearContent: () => void;
 }
 
@@ -498,6 +503,13 @@ export const BaseTiptapComposer = forwardRef<BaseTiptapComposerRef, BaseTiptapCo
   const composerRef = useRef<HTMLDivElement>(null);
   const voiceDiffClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const attachmentStoreRef = useRef<AttachmentStore>(createAttachmentStore());
+  // Session-scoped token→original entries for messages sent from this composer
+  // instance. Kept in memory only: vault file persistence waits on the
+  // passphrase UX decision, and nothing here ever writes raw PII to disk.
+  const sessionRehydrationMapRef = useRef<Record<string, string>>({});
+  // PII detection and `onSend` are both awaited while the editor still holds the
+  // text, so a second Enter would serialize the same content and send it twice.
+  const sendInFlightRef = useRef(false);
   const resolveAttachmentRecord = useCallback(
     (attachmentId: string) => attachmentStoreRef.current.get(attachmentId),
     [],
@@ -641,6 +653,7 @@ export const BaseTiptapComposer = forwardRef<BaseTiptapComposerRef, BaseTiptapCo
     },
     getContent: () => getSerializedSubmission(editorInstance).text,
     getSubmission: () => getSerializedSubmission(editorInstance),
+    getRehydrationMap: () => ({ ...sessionRehydrationMapRef.current }),
     clearContent: () => {
       if (editorInstance) {
         editorInstance.commands.clearContent();
@@ -683,6 +696,7 @@ export const BaseTiptapComposer = forwardRef<BaseTiptapComposerRef, BaseTiptapCo
       ...(highlightToolKeywords ? [ToolKeywordHighlight] : []),
       VoiceDiffMark,
       AttachmentChip,
+      PiiLabel.configure({ mode: 'compose' }),
     ],
     content: parseContentWithMentions(initialContent),
     editable,
@@ -1199,13 +1213,27 @@ export const BaseTiptapComposer = forwardRef<BaseTiptapComposerRef, BaseTiptapCo
   }, []);
 
   // Handle send action
-  const handleSend = useCallback(async () => {
+  // PII redaction runs at this boundary: regex detections are instant and
+  // always available, full NER merges in when the IPC path answers. The model
+  // only ever receives the redacted text. The rehydration map is kept in the
+  // session ref; vault file persistence waits on the passphrase UX decision.
+  const sendSubmission = useCallback(async (submission: SerializedComposerSubmission) => {
     if (!editor) return;
+    const fallback = detectRegex(submission.text);
+    // `fallback` stands until model-based detection answers; the catch keeps it
+    // rather than reassigning the same value, which is what made the initial
+    // assignment look dead to no-useless-assignment.
+    let detections = fallback;
+    try {
+      detections = mergeDetections(await piiIpc.detectPii(submission.text), fallback);
+    } catch {
+      // Regex-only detection: `detections` already holds it.
+    }
+    const { redactedText, rehydrationMap } = buildRedactedText(submission.text, detections);
+    sessionRehydrationMapRef.current = { ...sessionRehydrationMapRef.current, ...rehydrationMap };
+    const redactedSubmission = { ...submission, text: redactedText };
 
-    const submission = getSerializedSubmission(editor);
-    if (!hasSubmissionContent(submission)) return;
-
-    const handled = await onSend(submission.text, submission);
+    const handled = await onSend(redactedSubmission.text, redactedSubmission);
     if (handled === false) {
       return;
     }
@@ -1216,7 +1244,22 @@ export const BaseTiptapComposer = forwardRef<BaseTiptapComposerRef, BaseTiptapCo
       editor.commands.clearContent();
       refocusMainComposer(editor);
     }
-  }, [editor, getSerializedSubmission, hasSubmissionContent, isMainComposer, onSend]);
+  }, [editor, isMainComposer, onSend]);
+
+  const handleSend = useCallback(async () => {
+    if (!editor) return;
+    if (sendInFlightRef.current) return;
+
+    const submission = getSerializedSubmission(editor);
+    if (!hasSubmissionContent(submission)) return;
+
+    sendInFlightRef.current = true;
+    try {
+      await sendSubmission(submission);
+    } finally {
+      sendInFlightRef.current = false;
+    }
+  }, [editor, getSerializedSubmission, hasSubmissionContent, sendSubmission]);
 
   // Handle keyboard shortcuts
   useEffect(() => {
