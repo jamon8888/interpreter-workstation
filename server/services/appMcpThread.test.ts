@@ -5,7 +5,7 @@ import { getAppMcpOwnerThreadId, resetAppMcpOwnerThread } from './appMcpThread';
 let startCalls = 0;
 
 mock.module('../../src/lib/codex/service', () => ({
-  getCodexService: () => ({
+  getCodexClient: () => ({
     startMcpToolThread: async () => {
       startCalls += 1;
       return `mcp-owner-thread-${startCalls}`;

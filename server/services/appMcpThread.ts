@@ -1,4 +1,4 @@
-import { getCodexService } from '../../src/lib/codex/service';
+import { getCodexClient } from '../../src/lib/codex/service';
 
 /**
  * Owner thread for app-internal MCP calls.
@@ -27,8 +27,10 @@ export async function getAppMcpOwnerThreadId(): Promise<string> {
   if (inflight) return inflight;
 
   inflight = (async () => {
-    const service = getCodexService();
-    const threadId = await service.startMcpToolThread({});
+    // `startMcpToolThread` lives on the app-server client, not on the service
+    // wrapper around it.
+    const client = getCodexClient();
+    const threadId = await client.startMcpToolThread({});
     cachedThreadId = threadId;
     return threadId;
   })();
