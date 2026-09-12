@@ -1,7 +1,7 @@
 /**
  * Close Tab Tool
  *
- * Closes a tab in Interpreter by its ID.
+ * Closes a tab in Hacienda by its ID.
  */
 
 import type { BuiltinToolDefinition } from '../../builtinTools';

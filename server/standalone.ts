@@ -232,7 +232,7 @@ export async function runStandaloneCli(argv: string[] = process.argv.slice(2)) {
         console.log(`  Interpreter CLI: ${interpreterCliPath}`);
         console.log(`  Interpreter CLI connection: ${interpreterCliServerConnection}`);
         if (cliOptions.devAutoApproveTools) {
-          console.log(`  Interpreter CLI caller token: ${devCallerToken}`);
+          console.log(`  Hacienda CLI caller token: ${devCallerToken}`);
         }
         if (cliOptions.devAutoApproveTools) {
           console.log("  Tool approvals: dev auto-approve ENABLED");

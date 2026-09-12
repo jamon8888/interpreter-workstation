@@ -551,7 +551,7 @@ function mapInterpreterModel(
 }
 
 /**
- * List the providers known to the Interpreter runtime (configured plus, when
+ * List the providers known to the Hacienda runtime (configured plus, when
  * `includeUnconfigured`, bundled quick-add presets). Throws on runtime error so
  * callers can decide how to react.
  */
@@ -577,7 +577,7 @@ export async function setInterpreterProvider(
 }
 
 /**
- * List the models the Interpreter runtime exposes for a given provider via the
+ * List the models the Hacienda runtime exposes for a given provider via the
  * same fetch engine as the OpenAI OAuth model lane. Omitting `providerId` lists
  * the active provider's models. Throws on runtime error.
  */
@@ -618,7 +618,7 @@ export async function setInterpreterModel(
 }
 
 /**
- * List the harness choices the Interpreter runtime reports for a provider (and
+ * List the harness choices the Hacienda runtime reports for a provider (and
  * optional model). Plumb-only: pass the runtime data through unchanged. Throws
  * on runtime error.
  */
@@ -2014,7 +2014,7 @@ export async function resolveGitHubCliPath(): Promise<string | null> {
 type GitHubAuthSource = 'gh-cli' | 'env';
 
 export function getGitHubMcpAuthSetupErrorMessage(installed: boolean): string {
-  const setupStep = 'Run "gh auth login" in a terminal, or set GH_TOKEN/GITHUB_TOKEN before starting Interpreter.';
+  const setupStep = 'Run "gh auth login" in a terminal, or set GH_TOKEN/GITHUB_TOKEN before starting Hacienda.';
   if (installed) {
     return `GitHub CLI is installed but not authenticated. ${setupStep}`;
   }
@@ -2588,11 +2588,11 @@ export async function getAllProfileStatuses(isAuthenticated?: boolean): Promise<
       case 'hosted':
         if (isAuthenticated) {
           ready = true;
-          detail = 'Interpreter-managed model, signed in';
+          detail = 'Hacienda-managed model, signed in';
           badge = 'Ready';
         } else {
           ready = false;
-          detail = 'Interpreter-managed model, sign in required';
+          detail = 'Hacienda-managed model, sign in required';
           badge = 'Available';
         }
         break;

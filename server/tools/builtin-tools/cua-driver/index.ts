@@ -11,7 +11,7 @@ function cuaDriverServerDescription(platform: NodeJS.Platform = process.platform
   if (platform === 'win32') {
     return 'Native Windows desktop computer use through Windows UI Automation and targeted HWND messages';
   }
-  return 'Native macOS desktop computer use through Interpreter Computer Use';
+  return 'Native macOS desktop computer use through Hacienda Computer Use';
 }
 
 export const cuaDriverServerDefinition: BuiltinServerDefinition = {

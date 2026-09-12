@@ -1,0 +1,15 @@
+# CodeRabbit configuration for interpreter-workstation
+# https://docs.coderabbit.ai/reference/yaml-template
+
+reviews:
+  auto_review:
+    # Reviews stop after this many already-reviewed commits when non-zero.
+    auto_pause_after_reviewed_commits: 0
+    # CodeRabbit only auto-reviews pull requests targeting the default branch
+    # unless the base is listed here. Large renames have to be split into a
+    # stack to fit under the 100-file review limit, and every link except the
+    # first targets another split branch, so without this the one link worth
+    # reading is the one that never gets read.
+    base_branches:
+      - "main"
+      - "split/.*"
