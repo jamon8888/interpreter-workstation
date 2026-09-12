@@ -20,6 +20,29 @@ describe('FileRedactionNotice', () => {
     ).toBeVisible();
   });
 
+  test('warns that reversibility ends with the session when the vault refused the write', () => {
+    render(
+      <FileRedactionNotice modelProvider="api" hasAttachments={false} rehydrationStorage="session-only" />,
+    );
+    expect(screen.getByText('basemind.pii.sessionOnlyRehydration')).toBeVisible();
+  });
+
+  test('shows the session-only warning even with no attachments staged', () => {
+    // It is about tokens already sent, so it must outlive the staged files
+    // that gate the redaction notice.
+    const { container } = render(
+      <FileRedactionNotice modelProvider="local" hasAttachments={false} rehydrationStorage="session-only" />,
+    );
+    expect(container).not.toBeEmptyDOMElement();
+  });
+
+  test('stays quiet once the map reached the vault', () => {
+    const { container } = render(
+      <FileRedactionNotice modelProvider="api" hasAttachments={false} rehydrationStorage="persisted" />,
+    );
+    expect(container).toBeEmptyDOMElement();
+  });
+
   test('stays hidden without attachments', () => {
     const { container } = render(
       <FileRedactionNotice modelProvider="api" hasAttachments={false} />,

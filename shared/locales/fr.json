@@ -1824,6 +1824,7 @@
   "basemind.download.complete": "Terminé",
   "basemind.degradedMode": "Détection réduite des données personnelles — certaines ressources n'ont pas pu être téléchargées",
   "basemind.settings.retryDownload": "Réessayer le téléchargement",
+  "basemind.pii.sessionOnlyRehydration": "La pseudonymisation de cette conversation n'est pas enregistrée — la révélation cessera de fonctionner à la fermeture de l'application.",
   "onboarding.basemind.title": "Intelligence documentaire",
   "onboarding.basemind.description": "Téléchargez les modèles de compréhension du langage pour une indexation documentaire respectueuse de la vie privée. Une seule fois, stocké localement.",
   "onboarding.basemind.startDownload": "Télécharger et continuer",

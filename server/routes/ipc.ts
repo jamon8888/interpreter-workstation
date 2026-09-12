@@ -188,6 +188,12 @@ const handlers: Record<string, Record<string, HandlerFn>> = {
       const { piiDetectionService } = await import('../services/piiDetection');
       return piiDetectionService.detectPii(text, options);
     },
+    persistRehydration: async (
+      [threadKey, map]: [string, Record<string, string>],
+    ) => {
+      const { persistThreadRehydrationMap } = await import('../services/rehydrationPersistence');
+      return persistThreadRehydrationMap(threadKey, map);
+    },
     decryptRehydration: async ([docId]: [string]) => {
       const { vaultManager } = await import('../services/vault');
       // The renderer never handles the vault key: `decrypt` falls back to the

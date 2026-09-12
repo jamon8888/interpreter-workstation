@@ -1824,6 +1824,7 @@
   "basemind.download.complete": "Complete",
   "basemind.degradedMode": "Reduced PII detection — some resources failed to download",
   "basemind.settings.retryDownload": "Retry download",
+  "basemind.pii.sessionOnlyRehydration": "Redaction for this conversation is not stored — revealing stops working when you close the app.",
   "onboarding.basemind.title": "Set up Basemind",
   "onboarding.basemind.description": "Download the local knowledge base for enhanced context.",
   "onboarding.basemind.startDownload": "Start Download",
