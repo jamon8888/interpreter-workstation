@@ -22,6 +22,7 @@ import { ToolKeywordHighlight } from './ToolKeywordHighlight';
 import { VoiceDiffMark } from './VoiceDiffMark';
 import { PiiLabel } from '../../../src/extensions/PiiLabel';
 import { detectRegex } from '../../../src/lib/pii/regex-detector';
+import { shouldBlockAttachmentSend } from '../../../src/lib/pii/redaction';
 import { buildRedactedText, mergeDetections } from '../../../src/lib/pii/labels';
 import { pii as piiIpc } from '@/ipc';
 import { parseDragData, isFileDragData, isBrowserTabDragData } from '../../../shared/types/drag';
@@ -39,6 +40,7 @@ import { resolveProfileShortcutSlot } from './profileShortcut';
 import type { FocusComposerDetail } from '../../utils/focusComposer';
 import { AttachmentChip } from './attachment/AttachmentChipExtension';
 import { AttachmentPreviewPopover } from './attachment/AttachmentPreviewPopover';
+import { FileRedactionNotice } from './FileRedactionNotice';
 import { createAttachmentStore, type AttachmentStore } from './attachment/attachmentStore';
 import { serializeEditorWithAttachments } from './attachment/serialize';
 import {
@@ -460,6 +462,23 @@ interface BaseTiptapComposerProps {
   highlightToolKeywords?: boolean;
   disableSkillMentions?: boolean;
   skillsWorkspacePath?: string | null;
+  modelProvider?: string | null;
+}
+
+/** True when the doc stages file context: attachment chips or file mentions. */
+function docHasAttachments(editor: Editor): boolean {
+  let found = false;
+  editor.state.doc.descendants((descendantNode) => {
+    if (
+      descendantNode.type.name === 'attachmentChip'
+      || descendantNode.type.name === 'fileMention'
+    ) {
+      found = true;
+      return false;
+    }
+    return true;
+  });
+  return found;
 }
 
 export const BaseTiptapComposer = forwardRef<BaseTiptapComposerRef, BaseTiptapComposerProps>(
@@ -489,6 +508,7 @@ export const BaseTiptapComposer = forwardRef<BaseTiptapComposerRef, BaseTiptapCo
     highlightToolKeywords = false,
     disableSkillMentions = false,
     skillsWorkspacePath,
+    modelProvider = null,
   }, ref) => {
   "use no memo";
 
@@ -497,6 +517,15 @@ export const BaseTiptapComposer = forwardRef<BaseTiptapComposerRef, BaseTiptapCo
   const [editorInstance, setEditorInstance] = useState<Editor | null>(null);
   const [isFocused, setIsFocused] = useState(false);
   const [hasContent, setHasContent] = useState(false);
+  const [hasAttachments, setHasAttachments] = useState(false);
+  const hasAttachmentsRef = useRef(false);
+  const syncHasAttachments = useCallback((targetEditor: Editor) => {
+    const nextHasAttachments = docHasAttachments(targetEditor);
+    if (nextHasAttachments !== hasAttachmentsRef.current) {
+      hasAttachmentsRef.current = nextHasAttachments;
+      setHasAttachments(nextHasAttachments);
+    }
+  }, []);
   const [composerPreviewText, setComposerPreviewText] = useState<string | null>(null);
   const hasContentRef = useRef(false);
   const { showToast } = useToast();
@@ -1032,6 +1061,7 @@ export const BaseTiptapComposer = forwardRef<BaseTiptapComposerRef, BaseTiptapCo
       const nextHasContent = hasSubmissionContent(getSerializedSubmission(editor));
       hasContentRef.current = nextHasContent;
       setHasContent(nextHasContent);
+      syncHasAttachments(editor);
       if (autoFocus) {
         editor.commands.focus();
       }
@@ -1062,6 +1092,7 @@ export const BaseTiptapComposer = forwardRef<BaseTiptapComposerRef, BaseTiptapCo
         hasContentRef.current = nextHasContent;
         setHasContent(nextHasContent);
       }
+      syncHasAttachments(editor);
       applyMentionCompactClasses(editor.view.dom);
       // Drop attachment records whose chips were removed from the document.
       const liveIds = new Set<string>();
@@ -1082,6 +1113,7 @@ export const BaseTiptapComposer = forwardRef<BaseTiptapComposerRef, BaseTiptapCo
     getSerializedSubmission,
     hasSubmissionContent,
     highlightToolKeywords,
+    syncHasAttachments,
   ]);
 
   const lastAppliedInitialContentRef = useRef<string | null>(null);
@@ -1224,10 +1256,22 @@ export const BaseTiptapComposer = forwardRef<BaseTiptapComposerRef, BaseTiptapCo
     // rather than reassigning the same value, which is what made the initial
     // assignment look dead to no-useless-assignment.
     let detections = fallback;
+    let nerFailed = false;
     try {
       detections = mergeDetections(await piiIpc.detectPii(submission.text), fallback);
     } catch {
       // Regex-only detection: `detections` already holds it.
+      nerFailed = true;
+    }
+    // Fail closed for attachment payloads: pasted-text bodies and images must
+    // never ride on the regex-only fallback. Text-only turns keep it.
+    const hasAttachmentPayload = submission.attachments.length > 0
+      || attachmentStoreRef.current.snapshot().some(
+        (record) => record.kind === 'pasted-text' && (record.text ?? '').length > 0,
+      );
+    if (shouldBlockAttachmentSend({ hasAttachmentPayload, nerFailed })) {
+      showToast(t('basemind.attachmentRedactionUnavailable'), 'error', 4000);
+      return;
     }
     const { redactedText, rehydrationMap } = buildRedactedText(submission.text, detections);
     sessionRehydrationMapRef.current = { ...sessionRehydrationMapRef.current, ...rehydrationMap };
@@ -1571,6 +1615,7 @@ export const BaseTiptapComposer = forwardRef<BaseTiptapComposerRef, BaseTiptapCo
                 </div>
               )}
               {contextContent}
+              <FileRedactionNotice modelProvider={modelProvider} hasAttachments={hasAttachments} />
             </div>
 
             <div className="flex items-center gap-1">
