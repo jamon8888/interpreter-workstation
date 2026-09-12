@@ -73,6 +73,34 @@ export function extractRehydrationMap(result: unknown): Record<string, string> {
   return {};
 }
 
+export interface VaultToolCaller {
+  callTool(serverId: string, toolName: string, args: Record<string, any>): Promise<unknown>;
+}
+
+/**
+ * The owner thread exists to satisfy the approval gate in
+ * `ToolManager.callTool`, which refuses an MCP call with no thread context.
+ * An injected double has no gate, and resolving the thread anyway reaches for
+ * the real app-server — which is why tests that pass a double must not pay for
+ * it. Production never passes one, so the gate is never skipped in the app.
+ */
+async function callVaultTool(
+  args: Record<string, unknown>,
+  toolManager?: VaultToolCaller,
+): Promise<unknown> {
+  if (toolManager) {
+    return toolManager.callTool('basemind', 'vault', args);
+  }
+  return new ToolManager().callTool(
+    'basemind',
+    'vault',
+    args,
+    undefined,
+    undefined,
+    { threadId: await getAppMcpOwnerThreadId() },
+  );
+}
+
 /**
  * `encrypt` defaults to the OS-guarded vault key, so a blob written through the
  * default path can only be reopened with that same key. Requiring the caller to
@@ -80,7 +108,11 @@ export function extractRehydrationMap(result: unknown): Record<string, string> {
  * has no access to the OS-protected secret. Decryption now mirrors encryption:
  * an explicit passphrase when one was used, the OS key otherwise.
  */
-async function decrypt(docId: string, explicitPassphrase?: string): Promise<Record<string, string>> {
+async function decrypt(
+  docId: string,
+  explicitPassphrase?: string,
+  toolManager?: VaultToolCaller,
+): Promise<Record<string, string>> {
   const passphrase = explicitPassphrase || getOrCreateVaultPassphrase();
   if (!passphrase) throw new Error('[vault] No vault key available to decrypt a rehydration map');
   const blobPath = resolveVaultBlobPath(docId);
@@ -91,14 +123,9 @@ async function decrypt(docId: string, explicitPassphrase?: string): Promise<Reco
     throw new Error('[vault] No stored rehydration map for this document');
   }
   if (!encryptedBlob) throw new Error('[vault] Stored rehydration map is empty');
-  const manager = new ToolManager();
-  const raw = await manager.callTool(
-    'basemind',
-    'vault',
+  const raw = await callVaultTool(
     { mode: 'decrypt', encrypted_blob: encryptedBlob, passphrase },
-    undefined,
-    undefined,
-    { threadId: await getAppMcpOwnerThreadId() },
+    toolManager,
   );
   const map = extractRehydrationMap(raw);
   if (Object.keys(map).length === 0) {
@@ -136,7 +163,7 @@ export interface VaultEncryptOptions {
   /** Explicit passphrase; defaults to the OS-guarded vault data-protection key. */
   passphrase?: string;
   /** Injectable ToolManager double for tests. */
-  toolManager?: { callTool(serverId: string, toolName: string, args: Record<string, any>): Promise<unknown> };
+  toolManager?: VaultToolCaller;
 }
 
 async function encrypt(
@@ -145,15 +172,7 @@ async function encrypt(
 ): Promise<string> {
   const passphrase = options.passphrase ?? getOrCreateVaultPassphrase();
   if (!passphrase) throw new Error('[vault] Passphrase is required to encrypt a rehydration map');
-  const manager = options.toolManager ?? new ToolManager();
-  const raw = await manager.callTool(
-    'basemind',
-    'vault',
-    { mode: 'encrypt', map, passphrase },
-    undefined,
-    undefined,
-    { threadId: await getAppMcpOwnerThreadId() },
-  );
+  const raw = await callVaultTool({ mode: 'encrypt', map, passphrase }, options.toolManager);
   const blob = extractEncryptedBlob(raw);
   if (!blob) throw new Error('[vault] Encryption returned no blob');
   return blob;

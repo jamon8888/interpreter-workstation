@@ -1,5 +1,6 @@
 import { trashFile } from './files';
 import { getCodexService, THREAD_LIST_DEFAULTS } from '../../src/lib/codex/service';
+import { deleteRuntimeRehydrationMap } from '../services/runtimeRedaction';
 import type { v2 } from './codex-generated-types/index';
 
 type ThreadListService = {
@@ -73,13 +74,17 @@ export async function trashThread(
   try {
     const archivedThread = await service.readThread(threadId);
     if (!archivedThread.path) {
+      deleteRuntimeRehydrationMap(threadId);
       return;
     }
 
     const result = await trashFileImpl(archivedThread.path);
     if (!result.success) {
+      // Intentionally kept: rollback below restores the thread, so its
+      // rehydration map must survive the failed deletion.
       throw new Error(result.error ?? 'Failed to move thread to trash.');
     }
+    deleteRuntimeRehydrationMap(threadId);
   } catch (error) {
     try {
       await service.unarchiveThread(threadId);

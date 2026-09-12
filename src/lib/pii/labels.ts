@@ -65,8 +65,7 @@ export function tokenLabelForCategory(category: string): string {
   return TOKEN_LABELS[normalized] ?? normalized.toUpperCase();
 }
 
-export function findRedactedTokens(text: string): RedactedToken[] {
-  const tokens: RedactedToken[] = [];
+export function findRedactedTokens(text: string): RedactedToken[] {  const tokens: RedactedToken[] = [];
   TOKEN_RE.lastIndex = 0;
   let match: RegExpExecArray | null;
   while ((match = TOKEN_RE.exec(text)) !== null) {
@@ -80,9 +79,12 @@ export function findRedactedTokens(text: string): RedactedToken[] {
   return tokens;
 }
 
+const EMPTY_RESERVED_TOKENS: ReadonlySet<string> = new Set();
+
 export function buildRedactedText(
   text: string,
   detections: PiiDetection[],
+  reservedTokens: ReadonlySet<string> = EMPTY_RESERVED_TOKENS,
 ): { redactedText: string; rehydrationMap: Record<string, string> } {
   const sorted = [...detections].sort((a, b) => a.start - b.start || b.end - a.end);
   const accepted: PiiDetection[] = [];
@@ -97,6 +99,9 @@ export function buildRedactedText(
   // tokens in the output for a single rehydration entry, and rehydration would
   // then overwrite the pre-existing literal with the detected value.
   const taken = new Set(findRedactedTokens(text).map((existing) => existing.token));
+  // Reserved tokens (e.g. a thread's existing rehydration map) win the same
+  // way, so repeated redactions never re-emit a live token for new content.
+  for (const reserved of reservedTokens) taken.add(reserved);
 
   const counters = new Map<string, number>();
   const rehydrationMap: Record<string, string> = {};
