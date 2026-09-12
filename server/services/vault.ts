@@ -78,6 +78,30 @@ export interface VaultToolCaller {
 }
 
 /**
+ * The owner thread exists to satisfy the approval gate in
+ * `ToolManager.callTool`, which refuses an MCP call with no thread context.
+ * An injected double has no gate, and resolving the thread anyway reaches for
+ * the real app-server — which is why tests that pass a double must not pay for
+ * it. Production never passes one, so the gate is never skipped in the app.
+ */
+async function callVaultTool(
+  args: Record<string, unknown>,
+  toolManager?: VaultToolCaller,
+): Promise<unknown> {
+  if (toolManager) {
+    return toolManager.callTool('basemind', 'vault', args);
+  }
+  return new ToolManager().callTool(
+    'basemind',
+    'vault',
+    args,
+    undefined,
+    undefined,
+    { threadId: await getAppMcpOwnerThreadId() },
+  );
+}
+
+/**
  * `encrypt` defaults to the OS-guarded vault key, so a blob written through the
  * default path can only be reopened with that same key. Requiring the caller to
  * supply a passphrase made those blobs undecryptable from the renderer, which
@@ -99,18 +123,9 @@ async function decrypt(
     throw new Error('[vault] No stored rehydration map for this document');
   }
   if (!encryptedBlob) throw new Error('[vault] Stored rehydration map is empty');
-  // Both intents are load-bearing and neither replaces the other: the double
-  // keeps the tool call reachable from tests, and `ToolManager.callTool`
-  // refuses an MCP call with no thread context, so the owner thread has to
-  // travel with it. `encrypt` above resolves the same pair the same way.
-  const manager = toolManager ?? new ToolManager();
-  const raw = await manager.callTool(
-    'basemind',
-    'vault',
+  const raw = await callVaultTool(
     { mode: 'decrypt', encrypted_blob: encryptedBlob, passphrase },
-    undefined,
-    undefined,
-    { threadId: await getAppMcpOwnerThreadId() },
+    toolManager,
   );
   const map = extractRehydrationMap(raw);
   if (Object.keys(map).length === 0) {
@@ -157,15 +172,7 @@ async function encrypt(
 ): Promise<string> {
   const passphrase = options.passphrase ?? getOrCreateVaultPassphrase();
   if (!passphrase) throw new Error('[vault] Passphrase is required to encrypt a rehydration map');
-  const manager = options.toolManager ?? new ToolManager();
-  const raw = await manager.callTool(
-    'basemind',
-    'vault',
-    { mode: 'encrypt', map, passphrase },
-    undefined,
-    undefined,
-    { threadId: await getAppMcpOwnerThreadId() },
-  );
+  const raw = await callVaultTool({ mode: 'encrypt', map, passphrase }, options.toolManager);
   const blob = extractEncryptedBlob(raw);
   if (!blob) throw new Error('[vault] Encryption returned no blob');
   return blob;
