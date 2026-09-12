@@ -73,6 +73,20 @@ export function getRuntimeRehydrationMap(threadKey: string): Record<string, stri
   return { ...(runtimeRehydrationMaps.get(threadKey) ?? {}) };
 }
 
+/**
+ * Merge a map produced outside this module — the composer's send-path map —
+ * into the same thread store, so one blob per thread holds every token a
+ * reveal might be asked for, whoever redacted it. Honours the tombstone for
+ * the same reason the runtime path does.
+ */
+export function mergeRuntimeRehydrationMap(
+  threadKey: string,
+  map: Record<string, string>,
+): Record<string, string> {
+  storeRuntimeRehydrationMap(threadKey, map);
+  return getRuntimeRehydrationMap(threadKey);
+}
+
 export function clearRuntimeRehydrationMaps(): void {
   runtimeRehydrationMaps.clear();
   deletedThreadKeys.clear();

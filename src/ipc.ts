@@ -624,8 +624,18 @@ export interface WorkspaceScanStatus {
   };
 }
 
+export type RehydrationPersistResult =
+  | { persisted: true; tokenCount: number }
+  | { persisted: false; reason: 'os-store-unavailable' | 'write-failed'; message: string };
+
 interface PiiIpc {
   detectPii(text: string, options?: { categories?: string[] }): Promise<{ category: string; start: number; end: number; text: string; confidence: number }[]>;
+  /**
+   * Persist a thread's rehydration map at the send seam. Resolves with
+   * `persisted: false` instead of rejecting when the vault is unavailable —
+   * losing reversibility must never block a send.
+   */
+  persistRehydration(threadKey: string, map: Record<string, string>): Promise<RehydrationPersistResult>;
   /** Decryption uses the OS-guarded vault key; the renderer never handles it. */
   decryptRehydration(docId: string): Promise<Record<string, string>>;
 }
@@ -714,7 +724,11 @@ export const basemind: BasemindIpc = isMarketingDemoMode()
   ? { register: async () => { throw new Error('Not available in demo mode'); }, unregister: async () => { throw new Error('Not available in demo mode'); }, status: async () => { throw new Error('Not available in demo mode'); }, download: async () => { throw new Error('Not available in demo mode'); }, cpuFeatures: async () => ({ arch: 'unknown', avx2: false, avx: false, sse4_1: false, sse4_2: false, neon: false }) }
   : (client.basemind as BasemindIpc);
 export const pii: PiiIpc = isMarketingDemoMode()
-  ? { detectPii: async () => { throw new Error('Not available in demo mode'); }, decryptRehydration: async () => { throw new Error('Not available in demo mode'); } }
+  ? {
+      detectPii: async () => { throw new Error('Not available in demo mode'); },
+      persistRehydration: async () => ({ persisted: false as const, reason: 'write-failed' as const, message: 'Not available in demo mode' }),
+      decryptRehydration: async () => { throw new Error('Not available in demo mode'); },
+    }
   : client.pii;
 export const setup = client.setup;
 export const computerUseSetup: ComputerUseSetupIpc = {
