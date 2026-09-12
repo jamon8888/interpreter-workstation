@@ -61,7 +61,6 @@ agent-reference/
 pdf-reference/
 
 # Basemind is a separate git repository; never track it as a gitlink
-basemind/
 
 # Monocart cache
 monocart-report/
