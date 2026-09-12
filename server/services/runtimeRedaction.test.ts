@@ -153,6 +153,25 @@ describe('applyFileReadRedaction', () => {
     deleteRuntimeRehydrationMap('thread-gone');
     expect(getRuntimeRehydrationMap('thread-gone')).toEqual({});
   });
+
+  test('deletion during in-flight NER leaves text redacted with no stored map', async () => {
+    clearRuntimeRehydrationMaps();
+    let resolveNer!: (detections: Array<{ category: string; start: number; end: number; text: string; confidence: number }>) => void;
+    const nerGate = new Promise<Array<{ category: string; start: number; end: number; text: string; confidence: number }>>(
+      (resolve) => { resolveNer = resolve; },
+    );
+    const pending = applyFileReadRedaction(
+      { content: [{ type: 'text', text: `mail ${PROBE_EMAIL}` }], isError: false },
+      { threadKey: 'thread-race' },
+      { isNerReady: () => true, detectNer: () => nerGate },
+    );
+    deleteRuntimeRehydrationMap('thread-race');
+    resolveNer([]);
+    const result = await pending;
+    const text = (result as { content: Array<{ text: string }> }).content[0].text;
+    expect(text).not.toContain(PROBE_EMAIL);
+    expect(getRuntimeRehydrationMap('thread-race')).toEqual({});
+  });
 });
 
 describe('maybeRedactToolResult', () => {

@@ -10,6 +10,7 @@ import {
 } from '../handlers/agentThreads';
 import {
   applyFileReadRedaction,
+  clearRuntimeRehydrationMaps,
   getRuntimeRehydrationMap,
 } from '../services/runtimeRedaction';
 
@@ -211,11 +212,12 @@ describe('agent thread handlers', () => {
   });
 
   test('clears the thread rehydration map when trashing succeeds', async () => {
-    await applyFileReadRedaction('mail john@example.com', { threadKey: 'thread-1' }, {
+    clearRuntimeRehydrationMaps();
+    await applyFileReadRedaction('mail john@example.com', { threadKey: 'thread-map-clear' }, {
       isNerReady: () => false,
       detectNer: async () => [],
     });
-    expect(Object.keys(getRuntimeRehydrationMap('thread-1')).length).toBeGreaterThan(0);
+    expect(Object.keys(getRuntimeRehydrationMap('thread-map-clear')).length).toBeGreaterThan(0);
 
     const service = {
       readThread: async (threadId: string) => ({
@@ -241,20 +243,21 @@ describe('agent thread handlers', () => {
       },
     };
 
-    await trashThread('thread-1', {
+    await trashThread('thread-map-clear', {
       service,
       trashFileImpl: async () => ({ success: true }),
     });
 
-    expect(getRuntimeRehydrationMap('thread-1')).toEqual({});
+    expect(getRuntimeRehydrationMap('thread-map-clear')).toEqual({});
   });
 
   test('keeps the thread rehydration map when trashing fails', async () => {
-    await applyFileReadRedaction('mail john@example.com', { threadKey: 'thread-2' }, {
+    clearRuntimeRehydrationMaps();
+    await applyFileReadRedaction('mail john@example.com', { threadKey: 'thread-map-keep' }, {
       isNerReady: () => false,
       detectNer: async () => [],
     });
-    expect(Object.keys(getRuntimeRehydrationMap('thread-2')).length).toBeGreaterThan(0);
+    expect(Object.keys(getRuntimeRehydrationMap('thread-map-keep')).length).toBeGreaterThan(0);
 
     const service = {
       readThread: async (threadId: string) => ({
@@ -278,11 +281,11 @@ describe('agent thread handlers', () => {
       unarchiveThread: async () => {},
     };
 
-    await expect(trashThread('thread-2', {
+    await expect(trashThread('thread-map-keep', {
       service,
       trashFileImpl: async () => ({ success: false, error: 'Permission denied' }),
     })).rejects.toThrow('Permission denied');
 
-    expect(Object.keys(getRuntimeRehydrationMap('thread-2')).length).toBeGreaterThan(0);
+    expect(Object.keys(getRuntimeRehydrationMap('thread-map-keep')).length).toBeGreaterThan(0);
   });
 });

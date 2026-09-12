@@ -80,6 +80,8 @@ export async function trashThread(
 
     const result = await trashFileImpl(archivedThread.path);
     if (!result.success) {
+      // Intentionally kept: rollback below restores the thread, so its
+      // rehydration map must survive the failed deletion.
       throw new Error(result.error ?? 'Failed to move thread to trash.');
     }
     deleteRuntimeRehydrationMap(threadId);

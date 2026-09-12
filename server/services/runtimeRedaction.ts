@@ -28,7 +28,10 @@ import type { AgentModelConfig } from '../../shared/types/model';
 export const RUNTIME_REDACTION_DEFERRED_MARKER =
   '[redaction deferred: non-text content is not scanned for PII]';
 
-/** Upstream harness file-read tools have no local metadata; match by name. */
+/** Upstream harness file-read tools have no local metadata; match by name.
+ * Deliberately an explicit allowlist (not a read_* prefix): the set is the
+ * audit point, and harness tool-surface changes are reviewed — extend it
+ * when the harness adds file-read tools. */
 const MCP_FILE_READ_TOOLS: ReadonlySet<string> = new Set(['read_file']);
 
 export interface RuntimeRedactionDeps {
@@ -61,6 +64,10 @@ function resolveDeps(deps: RuntimeRedactionDeps = {}): {
 // Thread-scoped rehydration maps: token -> original text. In-memory only;
 // vault persistence (#114) will adopt this shape once the passphrase UX lands.
 const runtimeRehydrationMaps = new Map<string, Record<string, string>>();
+// Tombstones for deleted threads: if trashThread runs while a redaction is
+// still awaiting NER, the stale result must not recreate the map afterwards.
+// Thread ids are unique per thread, so a tombstone never blocks a live thread.
+const deletedThreadKeys = new Set<string>();
 
 export function getRuntimeRehydrationMap(threadKey: string): Record<string, string> {
   return { ...(runtimeRehydrationMaps.get(threadKey) ?? {}) };
@@ -68,15 +75,20 @@ export function getRuntimeRehydrationMap(threadKey: string): Record<string, stri
 
 export function clearRuntimeRehydrationMaps(): void {
   runtimeRehydrationMaps.clear();
+  deletedThreadKeys.clear();
 }
 
 function storeRuntimeRehydrationMap(threadKey: string, map: Record<string, string>): void {
+  // A thread deleted mid-redaction stays deleted: dropping the stale map
+  // keeps text redaction intact while leaving no PII behind.
+  if (deletedThreadKeys.has(threadKey)) return;
   const existing = runtimeRehydrationMaps.get(threadKey) ?? {};
   runtimeRehydrationMaps.set(threadKey, { ...existing, ...map });
 }
 
 export function deleteRuntimeRehydrationMap(threadKey: string): void {
   runtimeRehydrationMaps.delete(threadKey);
+  deletedThreadKeys.add(threadKey);
 }
 
 export function isFileReadTool(
