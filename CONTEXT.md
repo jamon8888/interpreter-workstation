@@ -9,3 +9,8 @@ Ubiquitous language for the interpreter-workstation effort. Glossary only — no
 - **Must-verify features**: basemind 0.29 integration, GDPR/xberg redaction pipeline, needle deferred routing, onboarding flow, provider/model management.
 - **Theater**: UI or progress reporting that claims work it does not perform (e.g. a download that downloads nothing). Never ships as production-ready.
 - **Resources-ready**: the app's `resourcesReady` markers (nerModel, embeddings, reranker). Open question whether these marker paths match where basemind actually provisions models — see the download-design ticket.
+- **Pseudonymization**: the whole reversible loop (detect → tokenize → send → persist → reveal). Never "redaction" alone.
+- **Redaction**: the forward step only: source text becomes `[LABEL_N]` tokens plus a rehydration map.
+- **Rehydration / reveal**: the reverse step: tokens back to originals through a vault-backed map.
+- **Rehydration map**: the token → original mapping produced by one redaction pass.
+- **Extraction**: the eager workspace-wide detection pass that runs when a folder is opened.
