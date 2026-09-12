@@ -43,8 +43,8 @@ export function FeedbackStep({ onComplete, telemetryEnabled }: FeedbackStepProps
           </h1>
           <p className="text-base text-muted-foreground">
             {telemetryEnabled
-              ? "During the Interpreter beta, we're improving things quickly and your feedback helps us prioritize what to fix next."
-              : "During the Interpreter beta, feedback is especially important because telemetry is off and we rely on your reports to improve the app."}
+              ? "During the Hacienda beta, we're improving things quickly and your feedback helps us prioritize what to fix next."
+              : "During the Hacienda beta, feedback is especially important because telemetry is off and we rely on your reports to improve the app."}
           </p>
           <p className="text-base text-muted-foreground">
             If you hit a bug or want to suggest something, please click Feedback.

@@ -222,7 +222,7 @@ afterEach(() => {
   setToolManager(new ToolManager());
 });
 
-test("builds Windows Interpreter CLI tool commands for OIX exec_command", () => {
+test("builds Windows Hacienda CLI tool commands for OIX exec_command", () => {
   const command = interpreterCliToolCommand(
     "C:\\Interpreter Data\\runtime\\interpreter-cli\\bin\\interpreter-app.cmd",
     "builtin-mcp-management",

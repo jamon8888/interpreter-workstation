@@ -3,7 +3,7 @@ import { assertTrustedFileIpcFrame, isTrustedAppRendererUrl, isTrustedFileIpcFra
 
 describe('trustedRenderer', () => {
   test('allows the packaged app main frame', () => {
-    expect(isTrustedFileIpcFrame('file:///Applications/Interpreter/index.html', true)).toBe(true);
+    expect(isTrustedFileIpcFrame('file:///Applications/Hacienda/index.html', true)).toBe(true);
   });
 
   test('allows the local dev app main frame', () => {

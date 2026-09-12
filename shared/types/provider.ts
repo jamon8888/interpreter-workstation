@@ -268,7 +268,7 @@ export function getDefaultResponsesApiBaseURL(): string {
 }
 
 const DEFAULT_UNSUPPORTED_RESPONSES_API_BASE_URL_MESSAGE =
-  'This base URL does not support the OpenAI Responses API (/responses). Use Interpreter-hosted models or OpenRouter instead.';
+  'This base URL does not support the OpenAI Responses API (/responses). Use Hacienda-hosted models or OpenRouter instead.';
 
 const NVIDIA_UNSUPPORTED_RESPONSES_API_BASE_URL_MESSAGE =
   'NVIDIA\'s hosted integrate.api.nvidia.com endpoint does not expose the OpenAI Responses API (/responses). Use OpenRouter or another Responses-compatible endpoint instead.';
