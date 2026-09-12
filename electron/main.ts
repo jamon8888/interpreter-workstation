@@ -439,6 +439,10 @@ if (!forcedAppName && !process.env.INTERPRETER_USER_DATA_DIR?.trim()) {
     console.log(`[user-data] carried ${migration.from} over to ${migration.to}`);
   } else if (migration.action === 'failed') {
     console.error(`[user-data] could not carry ${migration.from} over to ${migration.to}: ${migration.error}`);
+  } else if (migration.action === 'none' && migration.code === 'current-holds-data') {
+    // Declining here is correct, but it leaves the previous install's data
+    // stranded where support will have to go looking for it.
+    console.warn(`[user-data] previous data left in place: ${migration.reason}`);
   }
 }
 

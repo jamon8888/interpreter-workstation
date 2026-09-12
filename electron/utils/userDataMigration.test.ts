@@ -97,6 +97,35 @@ function makeRoot(): string {
 describe('migrateUserDataDirectory', () => {
   const names = { currentName: 'Hacienda', legacyName: 'Interpreter' };
 
+  test('declines when the current path is a symlink to a populated directory', () => {
+    const root = makeRoot();
+    fs.mkdirSync(path.join(root, 'Interpreter'), { recursive: true });
+    fs.writeFileSync(path.join(root, 'Interpreter', 'config.json'), '{}');
+    const elsewhere = path.join(root, 'elsewhere');
+    fs.mkdirSync(elsewhere, { recursive: true });
+    fs.writeFileSync(path.join(elsewhere, 'keep.json'), 'keep');
+    fs.symlinkSync(elsewhere, path.join(root, 'Hacienda'));
+
+    const result = migrateUserDataDirectory({ ...names, currentDir: path.join(root, 'Hacienda') });
+
+    expect(result.action).toBe('none');
+    expect(fs.readFileSync(path.join(elsewhere, 'keep.json'), 'utf8')).toBe('keep');
+  });
+
+  test('replaces a symlink standing in for an empty current directory', () => {
+    const root = makeRoot();
+    fs.mkdirSync(path.join(root, 'Interpreter'), { recursive: true });
+    fs.writeFileSync(path.join(root, 'Interpreter', 'config.json'), '{}');
+    const empty = path.join(root, 'empty');
+    fs.mkdirSync(empty, { recursive: true });
+    fs.symlinkSync(empty, path.join(root, 'Hacienda'));
+
+    const result = migrateUserDataDirectory({ ...names, currentDir: path.join(root, 'Hacienda') });
+
+    expect(result.action).toBe('move');
+    expect(fs.readFileSync(path.join(root, 'Hacienda', 'config.json'), 'utf8')).toBe('{}');
+  });
+
   test('carries the vault key across the rename', () => {
     const root = makeRoot();
     const legacy = path.join(root, 'Interpreter');
