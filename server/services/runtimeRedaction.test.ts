@@ -146,6 +146,29 @@ describe('applyFileReadRedaction', () => {
     expect(envelope.content[0].text).not.toContain(PROBE_EMAIL);
   });
 
+  test('multipart results never reuse a token across parts', async () => {
+    clearRuntimeRehydrationMaps();
+    const result = await applyFileReadRedaction(
+      {
+        content: [
+          { type: 'text', text: `first ${PROBE_EMAIL}` },
+          { type: 'text', text: 'second bob@example.com' },
+        ],
+        isError: false,
+      },
+      { threadKey: 'thread-multi' },
+      stubDeps,
+    );
+    const parts = (result as { content: Array<{ text: string }> }).content;
+    expect(parts[0].text).toContain('[EMAIL_0]');
+    expect(parts[1].text).toContain('[EMAIL_1]');
+    expect(parts[1].text).not.toContain('[EMAIL_0]');
+    expect(getRuntimeRehydrationMap('thread-multi')).toEqual({
+      '[EMAIL_0]': PROBE_EMAIL,
+      '[EMAIL_1]': 'bob@example.com',
+    });
+  });
+
   test('deletes a thread rehydration map', async () => {
     clearRuntimeRehydrationMaps();
     await applyFileReadRedaction(`mail ${PROBE_EMAIL}`, { threadKey: 'thread-gone' }, stubDeps);

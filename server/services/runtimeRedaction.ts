@@ -183,14 +183,25 @@ export async function applyFileReadRedaction(
     return (await redactFileReadOutputText(result, options, deps)).text;
   }
   if (isMcpContentResult(result)) {
-    const content = await Promise.all(
-      result.content.map(async (part) => {
-        if (part?.type !== 'text' || typeof part.text !== 'string') return part;
-        const redacted = await redactFileReadOutputText(part.text, options, deps);
-        return redacted.redacted || redacted.deferred ? { ...part, text: redacted.text } : part;
-      }),
-    );
-    if (content.every((part, index) => part === result.content[index])) return result;
+    // Sequential on purpose: each part stores into the thread map before the
+    // next part redacts, so reserved tokens accumulate and two parts can never
+    // emit the same token for different originals (see the multipart test).
+    const content: McpContentPart[] = [];
+    let changed = false;
+    for (const part of result.content) {
+      if (part?.type !== 'text' || typeof part.text !== 'string') {
+        content.push(part);
+        continue;
+      }
+      const redacted = await redactFileReadOutputText(part.text, options, deps);
+      if (redacted.redacted || redacted.deferred) {
+        content.push({ ...part, text: redacted.text });
+        changed = true;
+      } else {
+        content.push(part);
+      }
+    }
+    if (!changed) return result;
     return { ...result, content };
   }
   return result;
