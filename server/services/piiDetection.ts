@@ -13,6 +13,7 @@ import { homedir } from 'node:os';
 
 import { ToolManager } from '../tools/toolManager';
 import { getAppMcpOwnerThreadId } from './appMcpThread';
+import { resolveMinConfidence } from './piiConfidencePolicy';
 
 export interface PiiDetectionResult {
   category: string;
@@ -121,8 +122,12 @@ async function detectPii(
     { threadId: await getAppMcpOwnerThreadId() },
   );
   const parsed = parseRedactTextResult(raw);
-  const minConfidence = options?.minConfidence ?? 0;
-  return parsed.detections.filter((detection) => detection.confidence >= minConfidence);
+  // Below-bar spans are dropped, not surfaced as a failure: this only narrows
+  // what a successful NER run reports. `shouldBlockAttachmentSend` is the
+  // fail-closed path, and it only fires when NER did not run at all.
+  return parsed.detections.filter(
+    (detection) => detection.confidence >= resolveMinConfidence(detection.category, options?.minConfidence),
+  );
 }
 
 export const piiDetectionService = {

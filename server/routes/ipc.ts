@@ -184,7 +184,7 @@ const handlers: Record<string, Record<string, HandlerFn>> = {
   // for `pii.detectPii` in `src/ipc.ts` to reach anything. Without it the
   // composer's call rejected and detection fell back to regex on every send.
   pii: {
-    detectPii: async ([text, options]: [string, { categories?: string[] }?]) => {
+    detectPii: async ([text, options]: [string, { categories?: string[]; minConfidence?: number }?]) => {
       const { piiDetectionService } = await import('../services/piiDetection');
       return piiDetectionService.detectPii(text, options);
     },
