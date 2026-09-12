@@ -463,6 +463,12 @@ interface BaseTiptapComposerProps {
   disableSkillMentions?: boolean;
   skillsWorkspacePath?: string | null;
   modelProvider?: string | null;
+  /**
+   * Codex thread id, used to key this thread's persisted rehydration map.
+   * Null until the first turn assigns one; the map accumulates and the next
+   * send persists everything, so turn one is recovered rather than lost.
+   */
+  threadId?: string | null;
 }
 
 /** True when the doc stages file context: attachment chips or file mentions. */
@@ -509,6 +515,7 @@ export const BaseTiptapComposer = forwardRef<BaseTiptapComposerRef, BaseTiptapCo
     disableSkillMentions = false,
     skillsWorkspacePath,
     modelProvider = null,
+    threadId = null,
   }, ref) => {
   "use no memo";
 
@@ -539,6 +546,9 @@ export const BaseTiptapComposer = forwardRef<BaseTiptapComposerRef, BaseTiptapCo
   // PII detection and `onSend` are both awaited while the editor still holds the
   // text, so a second Enter would serialize the same content and send it twice.
   const sendInFlightRef = useRef(false);
+  // `session-only` means the vault refused the write, so the tokens sent this
+  // session stop resolving once it ends. Surfaced, never fatal.
+  const [rehydrationStorage, setRehydrationStorage] = useState<'unknown' | 'persisted' | 'session-only'>('unknown');
   const resolveAttachmentRecord = useCallback(
     (attachmentId: string) => attachmentStoreRef.current.get(attachmentId),
     [],
@@ -1244,6 +1254,25 @@ export const BaseTiptapComposer = forwardRef<BaseTiptapComposerRef, BaseTiptapCo
     };
   }, []);
 
+  /**
+   * Persist this thread's accumulated map, not just the turn's delta: the
+   * first turn has no thread id yet, so sending the whole map on the next one
+   * recovers it. The server merges, so repeating entries costs nothing.
+   */
+  const persistRehydrationForThread = useCallback(async () => {
+    const map = sessionRehydrationMapRef.current;
+    if (!threadId || Object.keys(map).length === 0) return;
+    try {
+      const result = await piiIpc.persistRehydration(threadId, map);
+      setRehydrationStorage(result.persisted ? 'persisted' : 'session-only');
+    } catch {
+      // The route resolves rather than rejects for the expected failures, so
+      // reaching here means the bridge itself is down. Same user-visible
+      // consequence: reversibility lasts only this session.
+      setRehydrationStorage('session-only');
+    }
+  }, [threadId]);
+
   // Handle send action
   // PII redaction runs at this boundary: regex detections are instant and
   // always available, full NER merges in when the IPC path answers. The model
@@ -1273,7 +1302,14 @@ export const BaseTiptapComposer = forwardRef<BaseTiptapComposerRef, BaseTiptapCo
       showToast(t('basemind.attachmentRedactionUnavailable'), 'error', 4000);
       return;
     }
-    const { redactedText, rehydrationMap } = buildRedactedText(submission.text, detections);
+    // Tokens already issued this thread are reserved, or a later turn would
+    // mint `[EMAIL_0]` a second time for a different address and the merged
+    // map would keep only one of the two.
+    const { redactedText, rehydrationMap } = buildRedactedText(
+      submission.text,
+      detections,
+      new Set(Object.keys(sessionRehydrationMapRef.current)),
+    );
     sessionRehydrationMapRef.current = { ...sessionRehydrationMapRef.current, ...rehydrationMap };
     const redactedSubmission = { ...submission, text: redactedText };
 
@@ -1282,13 +1318,17 @@ export const BaseTiptapComposer = forwardRef<BaseTiptapComposerRef, BaseTiptapCo
       return;
     }
 
+    // After the send, never before: what was sent is what has to be
+    // recoverable, and a vault failure must not cost the user their turn.
+    void persistRehydrationForThread();
+
     attachmentStoreRef.current.clear();
 
     if (isMainComposer) {
       editor.commands.clearContent();
       refocusMainComposer(editor);
     }
-  }, [editor, isMainComposer, onSend]);
+  }, [editor, isMainComposer, onSend, persistRehydrationForThread]);
 
   const handleSend = useCallback(async () => {
     if (!editor) return;
@@ -1615,7 +1655,11 @@ export const BaseTiptapComposer = forwardRef<BaseTiptapComposerRef, BaseTiptapCo
                 </div>
               )}
               {contextContent}
-              <FileRedactionNotice modelProvider={modelProvider} hasAttachments={hasAttachments} />
+              <FileRedactionNotice
+                modelProvider={modelProvider}
+                hasAttachments={hasAttachments}
+                rehydrationStorage={rehydrationStorage}
+              />
             </div>
 
             <div className="flex items-center gap-1">
