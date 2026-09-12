@@ -14,6 +14,7 @@ import {
   listenOnAvailableLocalPort,
 } from './utils/localServerPort';
 import { destroyTraySafely, shouldKeepAppResident } from './utils/windowCloseBehavior';
+import { migrateUserDataDirectory } from './utils/userDataMigration';
 import {
   buildMainProcessFatalErrorHandler,
   configureMainProcessSentryIntegrations,
@@ -423,6 +424,23 @@ app.commandLine.appendSwitch('disable-background-timer-throttling');
 
 const forcedAppName = process.env.INTERPRETER_APP_NAME?.trim();
 app.setName(forcedAppName || (isInternal ? `${ACTIVE_BRAND.appName} Internal` : ACTIVE_BRAND.appName));
+
+// `userData` follows the app name, so the rename moved it out from under every
+// existing install. Carry the previous directory over before anything reads
+// from the new one — the vault key lives in there, and a missing key is minted
+// anew, which orphans every blob encrypted under the old one.
+if (!forcedAppName && !process.env.INTERPRETER_USER_DATA_DIR?.trim()) {
+  const migration = migrateUserDataDirectory({
+    currentDir: app.getPath('userData'),
+    currentName: ACTIVE_BRAND.appName,
+    legacyName: ACTIVE_BRAND.legacyAppName,
+  });
+  if (migration.action === 'move') {
+    console.log(`[user-data] carried ${migration.from} over to ${migration.to}`);
+  } else if (migration.action === 'failed') {
+    console.error(`[user-data] could not carry ${migration.from} over to ${migration.to}: ${migration.error}`);
+  }
+}
 
 // Surface the real app version in the native "About" panel (macOS/Linux). Without
 // this, the panel falls back to app.getVersion(), which in dev reports the Electron
