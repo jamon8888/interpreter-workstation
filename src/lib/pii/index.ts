@@ -10,4 +10,3 @@ export {
   tokenLabelForCategory,
 } from './labels';
 export type { RedactedToken } from './labels';
-export { needsRedactionForProvider, shouldBlockAttachmentSend } from './redaction';
