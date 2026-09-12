@@ -1824,6 +1824,7 @@
   "basemind.download.complete": "Complete",
   "basemind.degradedMode": "Reduced PII detection — some resources failed to download",
   "basemind.settings.retryDownload": "Retry download",
+  "basemind.pii.unrestorable": "This value can't be restored — it predates secure storage.",
   "onboarding.basemind.title": "Document Intelligence",
   "onboarding.basemind.description": "Download language understanding models for privacy-preserving document indexing. This happens once and is stored locally.",
   "onboarding.basemind.startDownload": "Download & Continue",

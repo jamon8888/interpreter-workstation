@@ -14,6 +14,8 @@ import { DraggableTaskItem } from '../extensions/DraggableTaskItem';
 import { ResizableImage, type ResolveImageSrc } from '../extensions/ResizableImage';
 import { AnimationHighlight } from '../extensions/AnimationHighlight';
 import { openExternal, showContextMenu, pii, vault, workspace, type ContextMenuItem } from '@/ipc';
+import { useTranslation } from 'react-i18next';
+import { PII_UNRESTORABLE_MARKER_KEY } from '@/lib/pii/labels';
 import { markdownToTiptap } from '../utils/markdown-parser';
 import { resolveLocalLinkTarget } from '../utils/localLinkDetection';
 import { shouldRefreshUnlinkedMentionCandidatesFromWorkspaceEvent } from '../utils/unlinkedMentionRefresh';
@@ -181,6 +183,8 @@ export const TipTapViewer = forwardRef<TipTapViewerRef, TipTapViewerProps>(
     pii: piiOptions,
   }, ref) {
   "use no memo";
+
+  const { t } = useTranslation();
 
   // Use ref to hold latest onUpdate callback to avoid stale closures
   const onUpdateRef = useRef(onUpdate);
@@ -572,7 +576,7 @@ export const TipTapViewer = forwardRef<TipTapViewerRef, TipTapViewerProps>(
       const map = await pii.decryptRehydration(docId);
       const original = map[active.token];
       if (!original) {
-        applyIfCurrent({ ...active, revealing: false, error: 'No stored value for this label.' });
+        applyIfCurrent({ ...active, revealing: false, error: t(PII_UNRESTORABLE_MARKER_KEY) });
         return;
       }
       applyIfCurrent({ ...active, revealing: false, original });
