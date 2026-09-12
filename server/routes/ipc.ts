@@ -179,6 +179,23 @@ const handlers: Record<string, Record<string, HandlerFn>> = {
     },
   },
 
+  // ========== PII redaction and rehydration ==========
+  // The renderer redacts at the send boundary, so this namespace has to exist
+  // for `pii.detectPii` in `src/ipc.ts` to reach anything. Without it the
+  // composer's call rejected and detection fell back to regex on every send.
+  pii: {
+    detectPii: async ([text, options]: [string, { categories?: string[] }?]) => {
+      const { piiDetectionService } = await import('../services/piiDetection');
+      return piiDetectionService.detectPii(text, options);
+    },
+    decryptRehydration: async ([docId]: [string]) => {
+      const { vaultManager } = await import('../services/vault');
+      // The renderer never handles the vault key: `decrypt` falls back to the
+      // OS-guarded passphrase, the same one `encrypt` defaults to.
+      return vaultManager.decrypt(docId);
+    },
+  },
+
   // ========== Basemind MCP Server Lifecycle ==========
   basemind: {
     register: async () => {

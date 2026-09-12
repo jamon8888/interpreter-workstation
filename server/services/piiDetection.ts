@@ -12,6 +12,7 @@ import fs from 'node:fs';
 import { homedir } from 'node:os';
 
 import { ToolManager } from '../tools/toolManager';
+import { getAppMcpOwnerThreadId } from './appMcpThread';
 
 export interface PiiDetectionResult {
   category: string;
@@ -109,10 +110,16 @@ async function detectPii(
   options?: { categories?: string[]; minConfidence?: number },
 ): Promise<PiiDetectionResult[]> {
   const manager = new ToolManager();
-  const raw = await manager.callTool('basemind', 'redact_text', {
-    text,
-    categories: options?.categories ?? [],
-  });
+  const raw = await manager.callTool(
+    'basemind',
+    'redact_text',
+    { text, categories: options?.categories ?? [] },
+    undefined,
+    undefined,
+    // Without a thread context `callTool` throws before reaching the tool, so
+    // detection silently degraded to the regex fallback on every send.
+    { threadId: await getAppMcpOwnerThreadId() },
+  );
   const parsed = parseRedactTextResult(raw);
   const minConfidence = options?.minConfidence ?? 0;
   return parsed.detections.filter((detection) => detection.confidence >= minConfidence);
