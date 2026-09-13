@@ -1,4 +1,4 @@
-import { resolveBasemindBinary } from '../utils/basemindManager';
+import { isModelResourceReady, type ModelResource } from '../utils/hubCache';
 
 export type BasemindDownloadStage = 'ner' | 'embeddings' | 'reranker';
 
@@ -9,43 +9,30 @@ export interface BasemindDownloadProgress {
   error?: string;
 }
 
-async function* downloadResource(
-  stage: BasemindDownloadStage,
-): AsyncGenerator<number> {
-  for (let p = 0; p <= 100; p += 10) {
-    yield p;
-    await new Promise(r => setTimeout(r, 200));
-  }
-}
+const STAGES: Array<{ stage: BasemindDownloadStage; resource: ModelResource }> = [
+  { stage: 'ner', resource: 'nerModel' },
+  { stage: 'embeddings', resource: 'embeddings' },
+  { stage: 'reranker', resource: 'reranker' },
+];
 
 /**
- * Download all Basemind global resources sequentially.
- * Yields progress updates per stage.
+ * Basemind has no CLI download command: models download lazily inside
+ * basemind processes on first feature use. This reports the truth —
+ * an already-cached stage succeeds immediately, a missing stage fails with
+ * that explanation instead of faking progress (theater never ships).
  */
 export async function* basemindDownload(): AsyncGenerator<BasemindDownloadProgress> {
-  const stages: BasemindDownloadStage[] = ['ner', 'embeddings', 'reranker'];
-
-  for (const stage of stages) {
+  for (const { stage, resource } of STAGES) {
     yield { stage, progress: 0, done: false };
-
-    let lastProgress = 0;
-
-    try {
-      for await (const progress of downloadResource(stage)) {
-        if (progress !== lastProgress) {
-          lastProgress = progress;
-          yield { stage, progress, done: false };
-        }
-      }
+    if (isModelResourceReady(resource)) {
       yield { stage, progress: 100, done: true };
-    } catch (err) {
+    } else {
       yield {
         stage,
-        progress: lastProgress,
+        progress: 0,
         done: false,
-        error: err instanceof Error ? err.message : String(err),
+        error: 'basemind has no CLI download command; models download lazily on first feature use',
       };
-      continue;
     }
   }
 }
