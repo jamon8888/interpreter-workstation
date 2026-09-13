@@ -27,6 +27,8 @@ import { tokenizePastedContent } from '../composer/attachment/pastedContent';
 import type { ComposerAttachmentRecord } from '../composer/attachment/types';
 import { useAttachmentPreviewTrigger } from '../composer/attachment/useAttachmentPreviewTrigger';
 import { remarkPastedContentTokens } from './remarkPastedContentTokens';
+import { remarkPiiTokens } from './remarkPiiTokens';
+import { PiiToken } from './PiiToken';
 import { useResolvedWikilink } from '../../../src/hooks/useResolvedWikilink';
 import { showFileReferenceContextMenu } from '../../../src/utils/fileReferenceContextMenu';
 
@@ -985,6 +987,7 @@ const BASE_COMPONENTS: Partial<Components> & Record<string, unknown> = {
     );
   },
   'file-link': FileLink,
+  'pii-token': PiiToken,
   'skill-link': SkillLink,
   wikilink: WikiLink,
   'file-link-grid': FileLinkGrid,
@@ -1089,8 +1092,8 @@ function MarkdownComponent({
   );
   const remarkPlugins = useMemo<RemarkPlugins>(
     () => renderFileCollections
-      ? [remarkGfm, remarkBreaks, pastedContentPlugin, remarkSkillLinks, remarkFileLinks, remarkWikilinks, remarkStandaloneFileLinkGrids]
-      : [remarkGfm, remarkBreaks, pastedContentPlugin, remarkSkillLinks, remarkFileLinks, remarkWikilinks],
+      ? [remarkGfm, remarkBreaks, pastedContentPlugin, remarkSkillLinks, remarkFileLinks, remarkWikilinks, remarkPiiTokens, remarkStandaloneFileLinkGrids]
+      : [remarkGfm, remarkBreaks, pastedContentPlugin, remarkSkillLinks, remarkFileLinks, remarkWikilinks, remarkPiiTokens],
     [pastedContentPlugin, renderFileCollections],
   );
   const hasPastedContent = Object.keys(tokenizedContent.recordsById).length > 0;
