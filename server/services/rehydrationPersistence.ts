@@ -16,15 +16,14 @@
 import { mergeRuntimeRehydrationMap } from './runtimeRedaction';
 import { persistEncryptedBlob, vaultManager, type VaultEncryptOptions } from './vault';
 import { VAULT_DEGRADED_MESSAGE } from './vaultKey';
+// One definition, shared with the renderer that reads these blobs back (#164).
+import { threadVaultDocId } from '../../src/lib/pii/vaultScope';
+
+export { threadVaultDocId };
 
 export type RehydrationPersistResult =
   | { persisted: true; tokenCount: number }
   | { persisted: false; reason: 'os-store-unavailable' | 'write-failed'; message: string };
-
-/** Vault blobs are keyed per thread; `sanitizeVaultDocId` accepts this shape. */
-export function threadVaultDocId(threadKey: string): string {
-  return `thread-${threadKey}`;
-}
 
 /** Per-thread mutex to serialize merge/encrypt/write operations for the same thread. */
 const threadWriteLocks = new Map<string, Promise<unknown>>();
