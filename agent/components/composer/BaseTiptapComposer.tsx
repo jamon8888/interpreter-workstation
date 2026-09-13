@@ -543,6 +543,9 @@ export const BaseTiptapComposer = forwardRef<BaseTiptapComposerRef, BaseTiptapCo
   // instance. Kept in memory only: vault file persistence waits on the
   // passphrase UX decision, and nothing here ever writes raw PII to disk.
   const sessionRehydrationMapRef = useRef<Record<string, string>>({});
+  // Track the threadId this map belongs to, so we can persist the pending map
+  // when threadId changes (PersistentLayer swaps threads without remounting).
+  const mapThreadIdRef = useRef<string | null>(threadId);
   // PII detection and `onSend` are both awaited while the editor still holds the
   // text, so a second Enter would serialize the same content and send it twice.
   const sendInFlightRef = useRef(false);
@@ -581,6 +584,29 @@ export const BaseTiptapComposer = forwardRef<BaseTiptapComposerRef, BaseTiptapCo
   useEffect(() => {
     tabsRef.current = layout?.state.tabs ?? {};
   }, [layout?.state.tabs]);
+
+  // When threadId changes (PersistentLayer swaps threads without remounting),
+  // persist the pending map under the old threadId, then reset for the new one.
+  // If the old threadId was null (first turn before Codex assigns an ID),
+  // flush those accumulated mappings when the real threadId arrives.
+  useEffect(() => {
+    const prevThreadId = mapThreadIdRef.current;
+    const currentMap = sessionRehydrationMapRef.current;
+    const hasMap = Object.keys(currentMap).length > 0;
+
+    if (prevThreadId !== threadId && hasMap) {
+      const persistThreadId = prevThreadId ?? threadId;
+      if (persistThreadId) {
+        // Fire-and-forget: the server resolves failures without throwing.
+        piiIpc.persistRehydration(persistThreadId, currentMap).catch(() => {
+          // Ignore: the server already logs the failure.
+        });
+      }
+      // Reset the map for the new thread
+      sessionRehydrationMapRef.current = {};
+    }
+    mapThreadIdRef.current = threadId;
+  }, [threadId]);
 
   const getSerializedSubmission = useCallback((
     editorLike?: Editor | null,

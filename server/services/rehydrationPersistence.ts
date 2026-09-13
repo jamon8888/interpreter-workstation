@@ -26,6 +26,32 @@ export function threadVaultDocId(threadKey: string): string {
   return `thread-${threadKey}`;
 }
 
+/** Per-thread mutex to serialize merge/encrypt/write operations for the same thread. */
+const threadWriteLocks = new Map<string, Promise<unknown>>();
+
+async function withThreadLock<T>(
+  threadKey: string,
+  operation: () => Promise<T>,
+): Promise<T> {
+  const prev = threadWriteLocks.get(threadKey) ?? Promise.resolve();
+  const next = (async () => {
+    await prev.catch(() => {});
+    return operation();
+  })();
+  const cleanup = next.then(
+    () => {},
+    () => {},
+  );
+  threadWriteLocks.set(threadKey, cleanup);
+  try {
+    return await next;
+  } finally {
+    if (threadWriteLocks.get(threadKey) === cleanup) {
+      threadWriteLocks.delete(threadKey);
+    }
+  }
+}
+
 export async function persistThreadRehydrationMap(
   threadKey: string,
   map: Record<string, string>,
@@ -39,25 +65,38 @@ export async function persistThreadRehydrationMap(
     };
   }
 
-  // Merge first, persist second. Even when the write fails the union is in the
-  // thread store, so a reveal within this session still resolves tokens the
-  // composer produced.
-  const merged = mergeRuntimeRehydrationMap(threadKey, map);
-  if (Object.keys(merged).length === 0) {
-    return { persisted: true, tokenCount: 0 };
-  }
+  return withThreadLock(threadKey, async () => {
+    // Load any existing vault blob and merge it with the in-memory map first,
+    // so a post-restart send preserves previously persisted tokens.
+    let merged = { ...map };
+    try {
+      const vaultMap = await vaultManager.decrypt(
+        threadVaultDocId(threadKey),
+        options.passphrase,
+        options.toolManager,
+      );
+      merged = { ...vaultMap, ...merged };
+    } catch {
+      // No existing blob or decryption failed — proceed with just the in-memory map.
+    }
 
-  try {
-    const blob = await vaultManager.encrypt(merged, options);
-    persistEncryptedBlob(threadVaultDocId(threadKey), blob);
-    return { persisted: true, tokenCount: Object.keys(merged).length };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    // The OS credential store being unavailable is an expected degraded mode,
-    // not a defect: it earns its own reason so the renderer can explain that
-    // reversibility ends with the session instead of showing a write error.
-    const reason = message.includes(VAULT_DEGRADED_MESSAGE) ? 'os-store-unavailable' : 'write-failed';
-    console.warn(`[vault] Rehydration map not persisted for thread ${threadKey}: ${message}`);
-    return { persisted: false, reason, message };
-  }
+    // Merge first, persist second. Even when the write fails the union is in the
+    // thread store, so a reveal within this session still resolves tokens the
+    // composer produced.
+    merged = mergeRuntimeRehydrationMap(threadKey, merged);
+    if (Object.keys(merged).length === 0) {
+      return { persisted: true, tokenCount: 0 };
+    }
+
+    try {
+      const blob = await vaultManager.encrypt(merged, options);
+      persistEncryptedBlob(threadVaultDocId(threadKey), blob);
+      return { persisted: true, tokenCount: Object.keys(merged).length };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const reason = message.includes(VAULT_DEGRADED_MESSAGE) ? 'os-store-unavailable' : 'write-failed';
+      console.warn(`[vault] Rehydration map not persisted for thread ${threadKey}: ${message}`);
+      return { persisted: false, reason, message };
+    }
+  });
 }

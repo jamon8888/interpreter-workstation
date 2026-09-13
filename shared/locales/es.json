@@ -1825,7 +1825,7 @@
   "basemind.degradedMode": "Reduced PII detection — some resources failed to download",
   "basemind.settings.retryDownload": "Retry download",
   "basemind.pii.unrestorable": "This value can't be restored — it predates secure storage.",
-  "basemind.pii.sessionOnlyRehydration": "Redaction for this conversation is not stored — revealing stops working when you close the app.",
+  "basemind.pii.sessionOnlyRehydration": "La redacción de esta conversación no se guarda — la revelación deja de funcionar cuando cierras la aplicación.",
   "onboarding.basemind.title": "Set up Basemind",
   "onboarding.basemind.description": "Download the local knowledge base for enhanced context.",
   "onboarding.basemind.startDownload": "Start Download",
