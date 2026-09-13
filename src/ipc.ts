@@ -643,6 +643,23 @@ interface PiiIpc {
   persistRehydration(threadKey: string, map: Record<string, string>): Promise<RehydrationPersistResult>;
   /** Decryption uses the OS-guarded vault key; the renderer never handles it. */
   decryptRehydration(docId: string): Promise<Record<string, string>>;
+  /**
+   * Append one line to the local reveal audit trail after a successful
+   * reveal. Never the decrypted value — only that a token was revealed,
+   * where, and by which surface.
+   */
+  recordReveal(entry: PiiRevealAuditEntry): Promise<void>;
+}
+
+export type PiiRevealScopeType = 'document' | 'thread';
+export type PiiRevealSurface = 'viewer' | 'composer' | 'chat';
+
+export interface PiiRevealAuditEntry {
+  scope: string;
+  scopeType: PiiRevealScopeType;
+  token: string;
+  category: string;
+  surface: PiiRevealSurface;
 }
 interface WorkspaceScanIpc {
   status(): Promise<WorkspaceScanStatus>;
@@ -733,6 +750,7 @@ export const pii: PiiIpc = isMarketingDemoMode()
       detectPii: async () => { throw new Error('Not available in demo mode'); },
       persistRehydration: async () => ({ persisted: false as const, reason: 'write-failed' as const, message: 'Not available in demo mode' }),
       decryptRehydration: async () => { throw new Error('Not available in demo mode'); },
+      recordReveal: async () => {},
     }
   : client.pii;
 export const setup = client.setup;

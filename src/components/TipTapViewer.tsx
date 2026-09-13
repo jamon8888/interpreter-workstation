@@ -580,6 +580,17 @@ export const TipTapViewer = forwardRef<TipTapViewerRef, TipTapViewerProps>(
         return;
       }
       applyIfCurrent({ ...active, revealing: false, original });
+      // Audit only a successful reveal — a failed decrypt or an unrestorable
+      // token never exposed anything, so there is nothing to hold accountable.
+      // Fire-and-forget: a logging failure must not surface as a reveal error,
+      // and the popover has already shown the value regardless of this call.
+      void pii.recordReveal({
+        scope: docId,
+        scopeType: 'document',
+        token: active.token,
+        category: active.category,
+        surface: 'viewer',
+      }).catch(() => {});
     } catch (error) {
       applyIfCurrent({
         ...active,
