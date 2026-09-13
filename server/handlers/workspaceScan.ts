@@ -1,7 +1,5 @@
-import { existsSync } from 'node:fs';
 import { basemindScan, basemindRescan, resolveBasemindBinary, isDaemonRunning } from '../utils/basemindManager';
-import { resolveXbergPipelineBinary } from '../utils/xbergPipelineBinary';
-import path from 'node:path';
+import { isModelResourceReady, type ModelResource } from '../utils/hubCache';
 
 export interface WorkspaceScanRequest {
   /** Absolute workspace root path (basemind --root). */
@@ -50,29 +48,18 @@ export function setIndexingState(inProgress: boolean, count: number = 0) {
   }
 }
 
-const GLOBAL_RESOURCES_DIR = path.join(process.env.HOME ?? process.env.USERPROFILE ?? '', '.local', 'share', 'basemind');
-
-function resourceReady(resource: 'nerModel' | 'embeddings' | 'reranker'): boolean {
-  const markers: Record<typeof resource, string> = {
-    nerModel: 'ner-model.ready',
-    embeddings: 'embeddings.ready',
-    reranker: 'reranker.ready',
-  };
-  return existsSync(path.join(GLOBAL_RESOURCES_DIR, markers[resource]));
-}
+// basemind has no .ready marker files; model presence is probed in the hub
+// cache (see server/utils/hubCache.ts) — the <name>.ready markers this module
+// used to look for were never written by anything.
 
 /**
- * Returns the current status of workspace scanning, xberg pipeline availability,
+ * Returns the current status of workspace scanning, pipeline availability,
  * and global resource readiness.
  */
 export function getWorkspaceScanStatus(): WorkspaceScanStatus {
-  let xbergAvailable = false;
-  try {
-    resolveXbergPipelineBinary();
-    xbergAvailable = true;
-  } catch {
-    xbergAvailable = false;
-  }
+  // xberg ships inside the basemind binary (no standalone pipeline binary
+  // exists), so binary presence is the honest availability signal.
+  const xbergAvailable = resolveBasemindBinary() !== '';
 
   const basemindAvailable = isDaemonRunning();
 
@@ -84,9 +71,9 @@ export function getWorkspaceScanStatus(): WorkspaceScanStatus {
     xbergAvailable,
     basemindAvailable,
     resourcesReady: {
-      nerModel: basemindAvailable,
-      embeddings: basemindAvailable,
-      reranker: basemindAvailable,
+      nerModel: isModelResourceReady('nerModel'),
+      embeddings: isModelResourceReady('embeddings'),
+      reranker: isModelResourceReady('reranker'),
     },
   };
 }
