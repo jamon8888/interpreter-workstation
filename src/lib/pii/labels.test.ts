@@ -93,7 +93,18 @@ describe('buildRedactedText', () => {
     const { redactedText, rehydrationMap } = buildRedactedText(text, detectRegex(text));
     expect(redactedText).toContain('[EMAIL_0]');
     expect(redactedText).not.toContain('john@example.com');
-    expect(rehydrationMap['[EMAIL_0]']).toBe('john@example.com');  });
+    expect(rehydrationMap['[EMAIL_0]']).toBe('john@example.com');
+  });
+
+  test('skips reserved tokens from prior redactions', () => {
+    const result = buildRedactedText(
+      'mail bob@example.com',
+      [{ category: 'email', start: 5, end: 20, text: 'bob@example.com', confidence: 1 }],
+      new Set(['[EMAIL_0]']),
+    );
+    expect(result.redactedText).toBe('mail [EMAIL_1]');
+    expect(result.rehydrationMap).toEqual({ '[EMAIL_1]': 'bob@example.com' });
+  });
 });
 
 describe('mergeDetections', () => {

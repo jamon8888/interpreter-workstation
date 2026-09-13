@@ -1,6 +1,14 @@
-import { describe, expect, test } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
-import { extractRehydrationMap, resolveVaultBlobPath, sanitizeVaultDocId } from './vault';
+import {
+  extractRehydrationMap,
+  resolveVaultBlobPath,
+  sanitizeVaultDocId,
+  vaultManager,
+} from './vault';
 
 describe('sanitizeVaultDocId', () => {
   test('accepts safe document ids', () => {
@@ -28,5 +36,113 @@ describe('extractRehydrationMap', () => {
 
   test('returns empty map when nothing decrypted', () => {
     expect(extractRehydrationMap(null)).toEqual({});
+  });
+});
+
+// #114: session rehydration maps persist to the encrypted vault gated on an
+// explicit passphrase. These tests pin the vault-service seam contract:
+// encrypt under a passphrase, reload from disk, decrypt to the same map —
+// and every failure mode throws (fail closed) so callers degrade to
+// tokens-without-reveal instead of resending raw PII. Nothing here wires
+// persistence into the send path: that waits on the passphrase UX decision,
+// and the composer handoff plus session-lifetime notice ride with the v1
+// composer work (#102–#104).
+
+/** In-test basemind `vault` tool double: base64(JSON) stands in for ciphertext. */
+function stubBasemindVault() {
+  return {
+    async callTool(_serverId: string, toolName: string, args: Record<string, any>): Promise<unknown> {
+      if (toolName !== 'vault') throw new Error(`unexpected tool ${toolName}`);
+      if (args.mode === 'encrypt') {
+        return {
+          structuredContent: {
+            result: { encrypted_blob: Buffer.from(JSON.stringify(args.map), 'utf8').toString('base64') },
+          },
+        };
+      }
+      if (args.mode === 'decrypt') {
+        const json = Buffer.from(String(args.encrypted_blob), 'base64').toString('utf8');
+        return { structuredContent: { result: { map: JSON.parse(json) as unknown } } };
+      }
+      throw new Error(`unexpected mode ${String(args.mode)}`);
+    },
+  };
+}
+
+describe('vault rehydration round-trip', () => {
+  let userDataDir = '';
+  let savedEnv: string | undefined;
+
+  beforeEach(() => {
+    savedEnv = process.env.INTERPRETER_USER_DATA_DIR;
+    userDataDir = mkdtempSync(join(tmpdir(), 'vault-roundtrip-'));
+    process.env.INTERPRETER_USER_DATA_DIR = userDataDir;
+  });
+
+  afterEach(() => {
+    if (savedEnv === undefined) delete process.env.INTERPRETER_USER_DATA_DIR;
+    else process.env.INTERPRETER_USER_DATA_DIR = savedEnv;
+    rmSync(userDataDir, { recursive: true, force: true });
+  });
+
+  test('encrypt under a test passphrase, reload, decrypt to the same map', async () => {
+    const map = { '[EMAIL_0]': 'john@example.com', '[NAME_0]': 'Jane Doe' };
+    const blob = await vaultManager.encrypt(map, {
+      passphrase: 'test-passphrase',
+      toolManager: stubBasemindVault(),
+    });
+    vaultManager.persistEncryptedBlob('doc-1', blob);
+    // "Reload": a fresh decrypt re-reads the blob from disk.
+    const roundTripped = await vaultManager.decrypt('doc-1', 'test-passphrase', stubBasemindVault());
+    expect(roundTripped).toEqual(map);
+  });
+
+  test('missing blob fails closed', async () => {
+    await expect(vaultManager.decrypt('no-such-doc', 'test-passphrase', stubBasemindVault())).rejects.toThrow(
+      'No stored rehydration map',
+    );
+  });
+
+  test('corrupt blob fails closed (throws; caller keeps tokens-without-reveal)', async () => {
+    vaultManager.persistEncryptedBlob('doc-corrupt', '!!!not-a-ciphertext!!!');
+    const undecryptableVault = {
+      async callTool(_serverId: string, _toolName: string, _args: Record<string, any>): Promise<unknown> {
+        return { structuredContent: { result: { map: {} } } };
+      },
+    };
+    await expect(vaultManager.decrypt('doc-corrupt', 'test-passphrase', undecryptableVault)).rejects.toThrow(
+      'no entries',
+    );
+  });
+
+  test('wrong passphrase yields no entries (caller keeps tokens-without-reveal)', async () => {
+    const blob = await vaultManager.encrypt(
+      { '[EMAIL_0]': 'john@example.com' },
+      { passphrase: 'test-passphrase', toolManager: stubBasemindVault() },
+    );
+    vaultManager.persistEncryptedBlob('doc-2', blob);
+    const wrongKeyVault = {
+      async callTool(_serverId: string, _toolName: string, _args: Record<string, any>): Promise<unknown> {
+        return { structuredContent: { result: { map: {} } } };
+      },
+    };
+    await expect(vaultManager.decrypt('doc-2', 'wrong-passphrase', wrongKeyVault)).rejects.toThrow(
+      'no entries',
+    );
+  });
+
+  test('persist refuses an empty blob', () => {
+    expect(() => vaultManager.persistEncryptedBlob('doc-3', '')).toThrow('empty encrypted blob');
+  });
+
+  test('encrypt surfaces an empty-blob tool result as a throw', async () => {
+    const emptyVault = {
+      async callTool(): Promise<unknown> {
+        return { structuredContent: { result: {} } };
+      },
+    };
+    await expect(
+      vaultManager.encrypt({ '[EMAIL_0]': 'a@b.c' }, { passphrase: 'test-passphrase', toolManager: emptyVault }),
+    ).rejects.toThrow('no blob');
   });
 });
