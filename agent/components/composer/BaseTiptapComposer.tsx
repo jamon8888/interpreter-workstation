@@ -602,8 +602,14 @@ export const BaseTiptapComposer = forwardRef<BaseTiptapComposerRef, BaseTiptapCo
           // Ignore: the server already logs the failure.
         });
       }
-      // Reset the map for the new thread
-      sessionRehydrationMapRef.current = {};
+      // Only a real thread swap resets the map. A null previous id is this
+      // same conversation receiving its id, and clearing there would empty the
+      // reserved-token set: the next turn would mint `[EMAIL_0]` again for a
+      // different address, the server merge would keep only the newer one, and
+      // turn one's token would then reveal the wrong value.
+      if (prevThreadId !== null) {
+        sessionRehydrationMapRef.current = {};
+      }
     }
     mapThreadIdRef.current = threadId;
   }, [threadId]);

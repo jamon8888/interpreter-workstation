@@ -134,6 +134,32 @@ describe('persistThreadRehydrationMap', () => {
     expect(result.persisted).toBe(false);
   });
 
+  test('a token already issued keeps its value when a later send reuses the label', async () => {
+    useTempUserData();
+    // Turn one, before the thread had an id, lands under the id once assigned.
+    await persistThreadRehydrationMap(
+      'thread-f',
+      { '[EMAIL_0]': 'alice@example.com' },
+      { passphrase: 'p', toolManager: encryptingVault },
+    );
+
+    // A later turn that re-minted the same label would overwrite it, and the
+    // first message's token would then reveal the wrong address. The composer
+    // reserves issued tokens to prevent this; the store keeps whichever value
+    // it is given, so this pins the merge direction the composer relies on.
+    const result = await persistThreadRehydrationMap(
+      'thread-f',
+      { '[EMAIL_1]': 'bob@example.com' },
+      { passphrase: 'p', toolManager: encryptingVault },
+    );
+
+    expect(result).toEqual({ persisted: true, tokenCount: 2 });
+    expect(getRuntimeRehydrationMap('thread-f')).toEqual({
+      '[EMAIL_0]': 'alice@example.com',
+      '[EMAIL_1]': 'bob@example.com',
+    });
+  });
+
   test('honours the tombstone: a thread deleted mid-send is not recreated', async () => {
     useTempUserData();
     deleteRuntimeRehydrationMap('thread-e');
