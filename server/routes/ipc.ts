@@ -200,6 +200,16 @@ const handlers: Record<string, Record<string, HandlerFn>> = {
       // OS-guarded passphrase, the same one `encrypt` defaults to.
       return vaultManager.decrypt(docId);
     },
+    recordReveal: async ([entry]: [{
+      scope: string;
+      scopeType: 'document' | 'thread';
+      token: string;
+      category: string;
+      surface: 'viewer' | 'composer' | 'chat';
+    }]) => {
+      const { recordPiiReveal } = await import('../services/piiAuditLog');
+      recordPiiReveal(entry);
+    },
   },
 
   // ========== Basemind MCP Server Lifecycle ==========
