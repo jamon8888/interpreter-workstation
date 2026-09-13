@@ -780,6 +780,7 @@ const EditorAgentPane = React.memo(function EditorAgentPane({ agentId, threadId,
               ref={composerRef}
               isTerminal={false}
               agentId={agentId}
+              threadId={threadId}
               modelConfig={modelConfig}
               workspacePath={workspacePath}
               isStreaming={isStreaming}

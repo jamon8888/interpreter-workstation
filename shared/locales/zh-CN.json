@@ -1825,6 +1825,7 @@
   "basemind.degradedMode": "Reduced PII detection — some resources failed to download",
   "basemind.settings.retryDownload": "Retry download",
   "basemind.pii.unrestorable": "This value can't be restored — it predates secure storage.",
+  "basemind.pii.sessionOnlyRehydration": "此对话的编辑内容未保存 — 关闭应用后显示将停止工作。",
   "onboarding.basemind.title": "Set up Basemind",
   "onboarding.basemind.description": "Download the local knowledge base for enhanced context.",
   "onboarding.basemind.startDownload": "Start Download",

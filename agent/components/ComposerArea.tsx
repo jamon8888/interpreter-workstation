@@ -131,6 +131,8 @@ export interface ComposerAreaProps {
 
   // Agent mode props
   agentId?: string;
+  /** Codex thread id, forwarded so the composer can key its persisted map. */
+  threadId?: string | null;
   modelConfig?: AgentModelConfig;
   workspacePath?: string;
   isStreaming?: boolean;
@@ -267,6 +269,7 @@ function resolveManagedSttBackend(backend: SttBackend): SttBackend {
 export const ComposerArea = React.forwardRef<BaseTiptapComposerRef, ComposerAreaProps>(function ComposerArea({
   isTerminal,
   agentId,
+  threadId = null,
   modelConfig,
   workspacePath,
   isStreaming = false,
@@ -3937,6 +3940,7 @@ export const ComposerArea = React.forwardRef<BaseTiptapComposerRef, ComposerArea
         settingsContent={settingsContent}
         skillsWorkspacePath={effectiveWorkspacePath ?? null}
         modelProvider={modelProvider}
+        threadId={threadId}
       />
     </div>
   );
