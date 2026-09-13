@@ -13,4 +13,5 @@ Ubiquitous language for the interpreter-workstation effort. Glossary only — no
 - **Redaction**: the forward step only: source text becomes `[LABEL_N]` tokens plus a rehydration map.
 - **Rehydration / reveal**: the reverse step: tokens back to originals through a vault-backed map.
 - **Rehydration map**: the token → original mapping produced by one redaction pass.
+- **Vault key**: the identifier of one encrypted rehydration-map blob in the vault (`doc-{sanitizedPath}` for document/extraction blobs, `thread-{threadKey}` for runtime conversation blobs). Never "docId" — a vault key is a blob location, not a document identity.
 - **Extraction**: the eager workspace-wide detection pass that runs when a folder is opened.
