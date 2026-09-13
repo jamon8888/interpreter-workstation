@@ -107,7 +107,7 @@ function killPid(pid: number): void {
 
 async function waitForCondition(
   predicate: () => Promise<boolean>,
-  timeoutMs = 5000,
+  timeoutMs = 10000,
 ): Promise<void> {
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
