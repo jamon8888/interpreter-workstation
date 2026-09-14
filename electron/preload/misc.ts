@@ -23,6 +23,14 @@ export function buildMiscNamespaces(ipcRenderer: IpcRenderer, IPC_CHANNELS: type
       },
     },
 
+    vault: {
+      onOrphanBlobsCleaned: (callback: (event: { count: number }) => void) => {
+        const listener = (_: any, event: { count: number }) => callback(event);
+        ipcRenderer.on(IPC_CHANNELS.VAULT_ORPHAN_BLOBS_CLEANED, listener);
+        return () => ipcRenderer.removeListener(IPC_CHANNELS.VAULT_ORPHAN_BLOBS_CLEANED, listener);
+      },
+    },
+
     overlaySettings: {
       get: () => ipcRenderer.invoke(IPC_CHANNELS.OVERLAY_SETTINGS_GET),
       set: (settings: import('../../apps/interpreter-overlay/shared/settings').InterpreterOverlaySettings) =>

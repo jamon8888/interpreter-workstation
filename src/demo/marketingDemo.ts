@@ -2722,6 +2722,9 @@ export const marketingDemoVaultIpc = {
   getNoteContext: async () => structuredClone(MARKETING_DEMO_EMPTY_VAULT_CONTEXT),
   getTags: async () => ({ tags: [] }),
   searchNotes: async () => structuredClone(MARKETING_DEMO_EMPTY_VAULT_SEARCH_RESULTS),
+  // No real vault/GC activity in demo mode; App.tsx subscribes unconditionally
+  // on mount, so this has to exist as a no-op rather than be omitted.
+  onOrphanBlobsCleaned: (_callback: (event: { count: number }) => void) => NOOP_UNSUBSCRIBE,
 };
 
 export const marketingDemoPdfIpc = {

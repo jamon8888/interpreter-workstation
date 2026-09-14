@@ -411,6 +411,10 @@ export interface ElectronAPI {
     onStatusRequested: (callback: (event: import('./ipc/registry').ComputerUseSetupStatusRequestedEvent) => void) => () => void;
   };
 
+  vault: {
+    onOrphanBlobsCleaned: (callback: (event: { count: number }) => void) => () => void;
+  };
+
   overlaySettings: {
     get: () => Promise<{ settings: import('../apps/interpreter-overlay/shared/settings').InterpreterOverlaySettings }>;
     set: (settings: import('../apps/interpreter-overlay/shared/settings').InterpreterOverlaySettings) => Promise<{ success: boolean; settings: import('../apps/interpreter-overlay/shared/settings').InterpreterOverlaySettings }>;
