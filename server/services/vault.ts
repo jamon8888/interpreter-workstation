@@ -14,7 +14,28 @@ import { homedir } from 'node:os';
 import { ToolManager } from '../tools/toolManager';
 import { getOrCreateVaultPassphrase } from './vaultKey';
 import { getAppMcpOwnerThreadId } from './appMcpThread';
+import { runOrphanBlobGcOnce } from './vaultGc';
+import { broadcastEvent } from '../handlers/broadcast';
+import { listAllThreadIds } from '../handlers/agentThreads';
+import { getCodexService, THREAD_LIST_DEFAULTS } from '../../src/lib/codex/service';
 export { runOrphanBlobGcOnce, resetGcFlagForTests } from './vaultGc';
+
+let gcTriggered = false;
+
+async function triggerOrphanGcIfFirstAccess(): Promise<void> {
+  if (gcTriggered) return;
+  gcTriggered = true;
+  try {
+    const service = getCodexService();
+    const threadIds = await listAllThreadIds(service, THREAD_LIST_DEFAULTS);
+    const { cleaned } = runOrphanBlobGcOnce({ activeThreadIds: threadIds });
+    if (cleaned > 0) {
+      broadcastEvent('vault:orphan-blobs-cleaned', { count: cleaned });
+    }
+  } catch {
+    // GC failure is non-fatal; swallow silently
+  }
+}
 
 export function sanitizeVaultDocId(docId: string): string {
   if (!/^[A-Za-z0-9_-]{1,128}$/.test(docId)) {
@@ -131,6 +152,7 @@ async function decrypt(
   explicitPassphrase?: string,
   toolManager?: VaultToolCaller,
 ): Promise<Record<string, string>> {
+  await triggerOrphanGcIfFirstAccess();
   const passphrase = explicitPassphrase || getOrCreateVaultPassphrase();
   if (!passphrase) throw new Error('[vault] No vault key available to decrypt a rehydration map');
   const blobPath = resolveVaultBlobPath(docId);
@@ -199,6 +221,9 @@ async function encrypt(
 /** Write an encrypted blob to `{userData}/vaults/{docId}.enc`; returns the path. */
 export function persistEncryptedBlob(docId: string, blob: string, userDataDir = resolveUserDataDir()): string {
   if (!blob) throw new Error('[vault] Cannot persist an empty encrypted blob');
+  // Fire-and-forget: GC is async but this method is sync.
+  // The gcTriggered flag ensures it runs at most once per session.
+  triggerOrphanGcIfFirstAccess();
   const blobPath = resolveVaultBlobPath(docId, userDataDir);
   fs.mkdirSync(path.dirname(blobPath), { recursive: true });
   fs.writeFileSync(blobPath, blob, 'utf8');
