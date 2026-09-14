@@ -336,4 +336,28 @@ describe('agent thread handlers', () => {
       rmSync(dir, { recursive: true });
     }
   });
+
+  test('trashThread deletes vault blob even when thread has no path', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'trash-nopath-'));
+    process.env.INTERPRETER_USER_DATA_DIR = dir;
+    try {
+      const vaultsDir = join(dir, 'vaults');
+      mkdirSync(vaultsDir, { recursive: true });
+      const blobPath = join(vaultsDir, 'thread-nopath123.enc');
+      writeFileSync(blobPath, 'encrypted');
+
+      const service = {
+        readThread: async () => ({ id: 'nopath123', path: null }),
+        archiveThread: async () => {},
+        unarchiveThread: async () => {},
+      };
+
+      await trashThread('nopath123', { service });
+
+      expect(existsSync(blobPath)).toBe(false);
+    } finally {
+      delete process.env.INTERPRETER_USER_DATA_DIR;
+      rmSync(dir, { recursive: true });
+    }
+  });
 });
