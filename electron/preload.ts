@@ -378,6 +378,11 @@ export interface ElectronAPI {
     onFilesChanged: (callback: (event: WorkspaceFilesChangedEvent) => void) => () => void;
   };
 
+  // Vault IPC methods
+  vault: {
+    onOrphanBlobsCleaned: (callback: (event: { count: number }) => void) => () => void;
+  };
+
   // Tool server CRUD + tool execution
   servers: {
     list: () => Promise<{ servers: any[] }>;
@@ -1000,6 +1005,15 @@ contextBridge.exposeInMainWorld('electron', {
       const listener = (_: any, event: WorkspaceFilesChangedEvent) => callback(event);
       ipcRenderer.on(IPC_CHANNELS.WORKSPACE_FILES_CHANGED, listener);
       return () => ipcRenderer.removeListener(IPC_CHANNELS.WORKSPACE_FILES_CHANGED, listener);
+    },
+  },
+
+  // Vault IPC
+  vault: {
+    onOrphanBlobsCleaned: (callback: (event: { count: number }) => void) => {
+      const listener = (_: any, event: { count: number }) => callback(event);
+      ipcRenderer.on(IPC_CHANNELS.VAULT_ORPHAN_BLOBS_CLEANED, listener);
+      return () => ipcRenderer.removeListener(IPC_CHANNELS.VAULT_ORPHAN_BLOBS_CLEANED, listener);
     },
   },
 

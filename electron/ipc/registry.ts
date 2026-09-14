@@ -126,6 +126,9 @@ export const IPC_CHANNELS = {
   WORKSPACE_REMOVE_WATCH: 'workspace:remove-watch',
   GET_INITIAL_FILE_TREE: 'get-initial-file-tree',
 
+  // Vault
+  VAULT_ORPHAN_BLOBS_CLEANED: 'vault:orphan-blobs-cleaned',
+
   // Tool Server Setup
   SETUP_COMPLETED: 'setup:completed',
   TOOL_SERVERS_GET_SNAPSHOT: 'toolServers:get-snapshot',
