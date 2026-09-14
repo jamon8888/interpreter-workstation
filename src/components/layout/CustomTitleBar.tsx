@@ -63,6 +63,7 @@ export function CustomTitleBar() {
   }>>([]);
   const [searchOpen, setSearchOpen] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
   const { isCommandHeld, activatedKey } = useCommandOverlay();
   const pendingApprovalsByAgent = usePendingApprovalsByAgent();
   const runtimePlatform = getRuntimeSystemInfo().platform;
@@ -343,11 +344,15 @@ export function CustomTitleBar() {
     }
   };
 
+  const searchSeqRef = useRef(0);
+
   const handleSearch = async (query: string) => {
     if (!query.trim()) {
       setSearchResults([]);
+      setSearchError(null);
       return;
     }
+    const seq = ++searchSeqRef.current;
     setIsSearching(true);
     try {
       const result = await search.searchCode({
@@ -355,6 +360,7 @@ export function CustomTitleBar() {
         limit: 10,
         lane: 'hybrid',
       });
+      if (seq !== searchSeqRef.current) return;
       setSearchResults(result.hits.map((hit) => ({
         path: hit.path,
         chunkId: hit.chunkId,
@@ -364,11 +370,14 @@ export function CustomTitleBar() {
         lineStart: hit.lineStart,
         lineEnd: hit.lineEnd,
       })));
+      setSearchError(null);
     } catch (err) {
+      if (seq !== searchSeqRef.current) return;
       console.error('[CustomTitleBar] Search failed:', err);
       setSearchResults([]);
+      setSearchError(err instanceof Error ? err.message : String(err));
     } finally {
-      setIsSearching(false);
+      if (seq === searchSeqRef.current) setIsSearching(false);
     }
   };
 
@@ -376,6 +385,7 @@ export function CustomTitleBar() {
 
   const handleSearchChange = (query: string) => {
     setSearchQuery(query);
+    setSearchError(null);
     setSearchOpen(true);
     if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
     searchDebounceRef.current = setTimeout(() => {
@@ -535,6 +545,11 @@ export function CustomTitleBar() {
                       <span className="text-ui-xs text-muted-foreground/50 font-mono">{result.lineStart}–{result.lineEnd}</span>
                     </button>
                   ))}
+                </div>
+              )}
+              {searchOpen && !isSearching && searchResults.length === 0 && searchQuery.trim() && searchError && (
+                <div className="absolute top-full left-0 right-0 mt-1 z-50 bg-popover border border-border rounded-lg shadow-lg overflow-hidden px-3 py-2">
+                  <span className="text-ui-xs text-destructive">{searchError}</span>
                 </div>
               )}
             </div>

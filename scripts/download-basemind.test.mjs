@@ -1,0 +1,66 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+
+import {
+  getPlatformKey,
+  parseArgs,
+  getPlatformsToDownload,
+  PLATFORM_KEYS,
+  BASEMIND_PLATFORMS,
+} from './download-basemind.mjs';
+
+test('getPlatformKey maps current OS and arch', () => {
+  const key = getPlatformKey('darwin', 'arm64');
+  assert.equal(key, 'darwin-arm64');
+});
+
+test('getPlatformKey normalises win32', () => {
+  assert.equal(getPlatformKey('win32', 'x64'), 'win32-x64');
+});
+
+test('parseArgs extracts version and flags', () => {
+  const result = parseArgs(['v1.2.3', '--current-platform']);
+  assert.equal(result.version, 'v1.2.3');
+  assert.equal(result.currentPlatformOnly, true);
+  assert.equal(result.requestedPlatform, undefined);
+});
+
+test('parseArgs extracts --platform', () => {
+  const result = parseArgs(['--platform', 'linux-x64']);
+  assert.equal(result.requestedPlatform, 'linux-x64');
+});
+
+test('parseArgs falls back to pinned version', () => {
+  const result = parseArgs([]);
+  assert.ok(result.version.startsWith('v'), 'default version is a tag');
+});
+
+test('getPlatformsToDownload returns all keys when no filter', () => {
+  const platforms = getPlatformsToDownload();
+  assert.deepEqual(platforms, [...PLATFORM_KEYS]);
+});
+
+test('getPlatformsToDownload returns single platform for --platform', () => {
+  const platforms = getPlatformsToDownload({ requestedPlatform: 'darwin-arm64' });
+  assert.deepEqual(platforms, ['darwin-arm64']);
+});
+
+test('getPlatformsToDownload returns current platform for --current-platform', () => {
+  const platforms = getPlatformsToDownload({ currentPlatformOnly: true, currentPlatformKey: 'linux-x64' });
+  assert.deepEqual(platforms, ['linux-x64']);
+});
+
+test('getPlatformsToDownload throws on unknown platform', () => {
+  assert.throws(
+    () => getPlatformsToDownload({ requestedPlatform: 'unknown' }),
+    /No basemind binary available for platform/,
+  );
+});
+
+test('all platforms have required fields', () => {
+  for (const [key, config] of Object.entries(BASEMIND_PLATFORMS)) {
+    assert.ok(config.asset, `${key} missing asset`);
+    assert.ok(config.binary, `${key} missing binary`);
+    assert.ok(config.target, `${key} missing target`);
+  }
+});

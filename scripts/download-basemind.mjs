@@ -222,6 +222,11 @@ async function downloadAndExtract(version, platform) {
     }
 
     console.log(`ok ${platform}: done`);
+  } catch (error) {
+    // Remove partially extracted directory so re-run doesn't treat corrupt
+    // binaries as current (the VERSION file won't be updated on failure).
+    fs.rmSync(platformDir, { recursive: true, force: true });
+    throw error;
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }

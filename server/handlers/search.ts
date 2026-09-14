@@ -100,6 +100,16 @@ export async function basemindSearchCode(params: {
     throw new Error('basemind daemon not running');
   }
 
+  if (!params.query || !params.query.trim()) {
+    throw new Error('query must be a non-empty string');
+  }
+  if (params.limit !== undefined && (typeof params.limit !== 'number' || params.limit <= 0)) {
+    throw new Error('limit must be a positive number');
+  }
+  if (params.rerankerTopK !== undefined && (typeof params.rerankerTopK !== 'number' || params.rerankerTopK <= 0)) {
+    throw new Error('rerankerTopK must be a positive number');
+  }
+
   const args: Record<string, unknown> = {
     query: params.query,
   };
