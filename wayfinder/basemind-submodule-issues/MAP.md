@@ -37,7 +37,7 @@ redaction without needing a local Rust toolchain.
 |-----------|--------|-------|--------|
 | T1 | [#190](https://github.com/jamon8888/interpreter-workstation/issues/190) | Basemind never ships with app | implemented (3d3447a), blocked on newer basemind release |
 | T2 | [#186](https://github.com/jamon8888/interpreter-workstation/issues/186) | Basemind absent from CI | partially resolved (985ffc4), CI build blocked (ops repo) |
-| T3 | [#183](https://github.com/jamon8888/interpreter-workstation/issues/183) | Ingest-time redaction in basemind | open, unblocked (part of #174) |
+| T3 | [#183](https://github.com/jamon8888/interpreter-workstation/issues/183) | Ingest-time redaction in basemind | implemented (a9be94f), PR #16 open |
 | T4 | [#184](https://github.com/jamon8888/interpreter-workstation/issues/184) | Docs BM25 lane in basemind | open, unblocked (part of #174) |
 
 ## Blocking
