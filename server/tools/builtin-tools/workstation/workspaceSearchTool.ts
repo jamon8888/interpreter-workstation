@@ -6,8 +6,31 @@
  */
 
 import type { BuiltinToolDefinition } from '../../builtinTools';
-import { basemindSearchCode } from '../../../handlers/search';
+import { basemindSearchCode, type SearchHit } from '../../../handlers/search';
 import { isDaemonRunning } from '../../../utils/basemindManager';
+import { checkFileAccessPermissionAsync } from '../../../utils/permissions';
+import { getCurrentWorkspace } from '../../../utils/workspace';
+
+/**
+ * basemind indexes the whole workspace, so a hit's `path` can name anything in
+ * it — not just what the calling agent is scoped to. The declarative
+ * `fileAccess`/`pathArg` mechanism (see filesystemBoundary.ts) only checks
+ * arguments the model passed in against the workspace boundary; it has no way
+ * to filter a tool's *return value*, and `query` is a search string, not a
+ * path, so pointing `pathArg` at it would be a no-op at best. Filtering has to
+ * happen here, the same way `vaultTool.ts` filters `VaultSnapshot.notes`.
+ */
+async function filterHitsByAgentScope(
+  hits: SearchHit[],
+  agentId: string | undefined,
+  workspace: string | null,
+): Promise<SearchHit[]> {
+  if (!agentId) return hits;
+  const accessible = await Promise.all(
+    hits.map((hit) => checkFileAccessPermissionAsync(agentId, hit.path, 'read', workspace)),
+  );
+  return hits.filter((_, i) => accessible[i]);
+}
 
 export const workspaceSearchTool: BuiltinToolDefinition = {
   name: 'interpreter_workspace_search',
@@ -35,11 +58,11 @@ export const workspaceSearchTool: BuiltinToolDefinition = {
   annotations: {
     readOnlyHint: true,
   },
-  fileAccess: {
-    mode: 'read',
-    pathArg: 'query',
-  },
-  handler: async (args) => {
+  // No `fileAccess` declaration: the model-supplied argument here (`query`) is
+  // a search string, not a path, so the boundary mechanism has nothing to
+  // check on the way in. The scope check that matters runs on the way out —
+  // see `filterHitsByAgentScope` above.
+  handler: async (args, context) => {
     const query = String(args.query ?? '').trim();
     if (!query) {
       return {
@@ -67,7 +90,10 @@ export const workspaceSearchTool: BuiltinToolDefinition = {
         lane: typeof args.lane === 'string' ? args.lane : 'hybrid',
       });
 
-      if (result.hits.length === 0) {
+      const workspace = context?.workspace ?? getCurrentWorkspace();
+      const hits = await filterHitsByAgentScope(result.hits, context?.agentId, workspace);
+
+      if (hits.length === 0) {
         return {
           content: [
             {
@@ -79,7 +105,7 @@ export const workspaceSearchTool: BuiltinToolDefinition = {
         };
       }
 
-      const lines = result.hits.map((hit, i) => {
+      const lines = hits.map((hit, i) => {
         const parts = [
           `[${i + 1}] ${hit.path}:${hit.lineStart}–${hit.lineEnd}`,
           hit.symbol && `symbol: ${hit.symbol}`,
@@ -99,7 +125,7 @@ export const workspaceSearchTool: BuiltinToolDefinition = {
         content: [
           {
             type: 'text',
-            text: `${result.hits.length} hit${result.hits.length === 1 ? '' : 's'} for "${result.query}" (${(result.elapsedUs / 1000).toFixed(0)}ms):\n${lines.join('\n')}${degraded}`,
+            text: `${hits.length} hit${hits.length === 1 ? '' : 's'} for "${result.query}" (${(result.elapsedUs / 1000).toFixed(0)}ms):\n${lines.join('\n')}${degraded}`,
           },
         ],
         isError: false,

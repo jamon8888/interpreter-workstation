@@ -19,6 +19,15 @@ function findBasemindBinary(): string {
     if (existsSync(packaged)) return packaged;
   }
 
+  // Dev checkout and CI: `pnpm download:basemind` stages the binary at
+  // resources/basemind/<platform>-<arch>/ (the layout `download-basemind.mjs`
+  // writes and `extraResources` reads for packaging). Checked before PATH for
+  // the same reason as the packaged path above: a stray basemind on a
+  // developer's PATH should not silently take the place of the pinned build.
+  const devPlatformKey = `${process.platform}-${process.arch}`;
+  const devStaged = resolve(projectRoot, 'resources', 'basemind', devPlatformKey, BINARY_NAME);
+  if (existsSync(devStaged)) return devStaged;
+
   const pathBin = process.env.PATH?.split(process.platform === 'win32' ? ';' : ':')
     .map(p => resolve(p, BINARY_NAME))
     .find(p => { try { return existsSync(p); } catch { return false; } }) ?? '';

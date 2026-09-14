@@ -35,6 +35,9 @@ const COMBINED = (() => {
 
 export function detectRegex(text: string): PiiDetection[] {
   const detections: PiiDetection[] = [];
+  // Regex objects with the `g` flag carry mutable state across calls; reset it
+  // so a throw mid-scan on a previous call can't leave a stale lastIndex here.
+  COMBINED.lastIndex = 0;
 
   let match: RegExpExecArray | null;
   while ((match = COMBINED.exec(text)) !== null) {
@@ -49,12 +52,13 @@ export function detectRegex(text: string): PiiDetection[] {
     const start = m.index;
     const end = start + m[0].length;
 
-    // Check overlap against ALL prior detections (cross-category). Matches
-    // arrive in document order from the combined regex, so a linear scan is
-    // sufficient — each prior detection ends before the current one starts or
-    // overlaps it.
-    const overlaps = detections.some(d => d.start < end && start < d.end);
-    if (overlaps) {
+    // Matches arrive in increasing `start` order, and accepted detections are
+    // kept disjoint by this same check — so their `end` values are
+    // non-decreasing and the last accepted detection always has the greatest
+    // `end` seen so far. Comparing against it alone is enough; no need to
+    // scan the whole accepted list.
+    const last = detections[detections.length - 1];
+    if (last && last.start < end && start < last.end) {
       COMBINED.lastIndex = m.index + 1;
       continue;
     }
@@ -67,11 +71,10 @@ export function detectRegex(text: string): PiiDetection[] {
       confidence: 1.0,
     });
 
-    COMBINED.lastIndex = m.index + 1;
+    // Skip straight past the accepted span: anything the regex would find
+    // inside it necessarily overlaps and would be rejected above anyway.
+    COMBINED.lastIndex = end;
   }
-
-  // Sort by start position (already sorted from a single pass, but be safe)
-  detections.sort((a, b) => a.start - b.start);
 
   // Merge overlapping/adjacent detections within the same category
   const merged: PiiDetection[] = [];

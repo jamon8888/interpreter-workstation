@@ -23,6 +23,7 @@ export interface SearchCodeParams {
   query: string;
   limit?: number;
   maxTokens?: number;
+  /** Unused by `basemindSearchCode`: the outbound call always pins `format: 'json'`. */
   format?: string;
   lane?: string;
   rerankerEnabled?: boolean;
@@ -105,7 +106,6 @@ export async function basemindSearchCode(params: {
 
   if (params.limit !== undefined) args.limit = params.limit;
   if (params.maxTokens !== undefined) args.max_tokens = params.maxTokens;
-  if (params.format !== undefined) args.format = params.format;
   if (params.lane !== undefined) args.lane = params.lane;
   if (params.rerankerEnabled !== undefined) args.reranker_enabled = params.rerankerEnabled;
   if (params.rerankerPreset !== undefined) args.reranker_preset = params.rerankerPreset;
@@ -115,11 +115,31 @@ export async function basemindSearchCode(params: {
     name: 'code',
     arguments: {
       mode: 'semantic',
+      // Pinned regardless of `params.format`: basemind's `wants_toon` falls back
+      // to the caller's local `[documents.output] format` config when no format
+      // is given, which would silently swap the payload for TOON text on some
+      // installs. This handler only ever parses JSON.
+      format: 'json',
       ...args,
     },
   });
 
-  const response = result as {
+  // rmcp's CallToolResult carries the typed payload under `structuredContent`
+  // (SEP-2106) — `code`'s handler returns `CallToolResult::structured(value)`,
+  // never a bare object. `mcpRequest` hands back the JSON-RPC `result` as-is,
+  // so the tool payload has to be unwrapped here. Fall back to parsing the
+  // mirrored text block for a server that only populates `content`.
+  const envelope = result as { structuredContent?: unknown; content?: Array<{ type?: string; text?: string }> };
+  const payload = envelope.structuredContent
+    ?? (() => {
+      const text = envelope.content?.find((block) => block.type === 'text')?.text;
+      if (text === undefined) {
+        throw new Error('basemind search result carried neither structuredContent nor a text content block');
+      }
+      return JSON.parse(text);
+    })();
+
+  const response = payload as {
     query: string;
     budgeted: boolean;
     hits: Array<Record<string, unknown>>;
@@ -131,8 +151,8 @@ export async function basemindSearchCode(params: {
   return {
     query: response.query,
     budgeted: response.budgeted,
-    hits: response.hits.map(mapSearchHit),
-    degradedLanes: response.degraded_lanes,
+    hits: (response.hits ?? []).map(mapSearchHit),
+    degradedLanes: response.degraded_lanes ?? [],
     degradedReason: response.degraded_reason,
     elapsedUs: response.elapsed_us,
   };

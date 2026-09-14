@@ -12,6 +12,7 @@
  *   --platform <key>    Download only the specified platform key
  */
 
+import { createHash } from 'node:crypto';
 import { execFileSync, execSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -22,6 +23,12 @@ const ROOT = path.join(__dirname, '..');
 const BASEMIND_DIR = path.join(ROOT, 'resources', 'basemind');
 const BASEMIND_REPO = 'jamon8888/basemind';
 const PINNED_VERSION = 'v0.29.0';
+
+// The checksum file carries the bare version, not the tag: v0.29.0 ships
+// basemind_0.29.0_checksums.txt.
+function checksumAssetFor(version) {
+  return `basemind_${version.replace(/^v/, '')}_checksums.txt`;
+}
 
 const PLATFORMS = {
   'darwin-arm64': {
@@ -95,17 +102,57 @@ function hasGhWithAuth() {
   }
 }
 
-function downloadAsset(version, asset, destinationDir) {
-  const destinationPath = path.join(destinationDir, asset);
-  if (hasGhWithAuth()) {
-    execFileSync('gh', ['release', 'download', version, '--repo', BASEMIND_REPO, '--pattern', asset, '--dir', destinationDir], {
-      stdio: 'pipe',
-    });
-    return;
-  }
-
+function downloadWithCurl(version, asset, destinationDir) {
   const url = `https://github.com/${BASEMIND_REPO}/releases/download/${version}/${asset}`;
-  execFileSync('curl', ['-L', '--fail', '-o', destinationPath, url], { stdio: 'pipe' });
+  execFileSync(
+    'curl',
+    [
+      '-sSL', '--fail',
+      // Without these a stalled connection hangs indefinitely and `--retry`
+      // never fires: observed hanging 13+ minutes on a few-hundred-byte
+      // checksum file. Fail fast, then retry.
+      '--connect-timeout', '20',
+      '--max-time', '600',
+      '--retry', '3', '--retry-all-errors', '--retry-delay', '3',
+      '-o', path.join(destinationDir, asset), url,
+    ],
+    { stdio: 'pipe' },
+  );
+}
+
+function downloadAsset(version, asset, destinationDir) {
+  // `gh` is preferred because it carries the user's auth for a private or
+  // rate-limited repo, but its asset redirect has been seen to time out in
+  // TLS handshake where a plain curl of the same signed URL succeeds — so a
+  // `gh` failure falls through to curl rather than aborting the download.
+  if (hasGhWithAuth()) {
+    try {
+      execFileSync(
+        'gh',
+        ['release', 'download', version, '--repo', BASEMIND_REPO, '--pattern', asset, '--dir', destinationDir],
+        { stdio: 'pipe' },
+      );
+      return;
+    } catch {
+      console.log(`  gh failed for ${asset}, falling back to curl`);
+    }
+  }
+  downloadWithCurl(version, asset, destinationDir);
+}
+
+function verifyArchiveDigest(assetPath, checksumPath) {
+  const assetName = path.basename(assetPath);
+  const line = fs.readFileSync(checksumPath, 'utf8')
+    .split(/\r?\n/)
+    .find((entry) => entry.trim().endsWith(` ${assetName}`) || entry.trim().endsWith(`*${assetName}`));
+  if (!line) {
+    throw new Error(`No checksum found for ${assetName} in ${path.basename(checksumPath)}`);
+  }
+  const expected = line.trim().split(/\s+/)[0];
+  const actual = createHash('sha256').update(fs.readFileSync(assetPath)).digest('hex');
+  if (actual !== expected) {
+    throw new Error(`Checksum mismatch for ${assetName}: expected ${expected}, got ${actual}`);
+  }
 }
 
 function extractArchive(assetPath, platformDir, assetName) {
@@ -147,8 +194,12 @@ async function downloadAndExtract(version, platform) {
   fs.mkdirSync(tmpDir, { recursive: true });
 
   try {
+    const checksumAsset = checksumAssetFor(version);
     downloadAsset(version, config.asset, tmpDir);
+    downloadAsset(version, checksumAsset, tmpDir);
+
     const assetPath = path.join(tmpDir, config.asset);
+    verifyArchiveDigest(assetPath, path.join(tmpDir, checksumAsset));
     extractArchive(assetPath, platformDir, config.asset);
 
     if (!fs.existsSync(binaryPath)) {
@@ -157,9 +208,11 @@ async function downloadAndExtract(version, platform) {
 
     if (!platform.startsWith('win32')) {
       fs.chmodSync(binaryPath, 0o755);
-      // Also chmod any .dylib / .so files that need execute permission
+      // Also chmod any .dylib / .so* files that need execute permission. A
+      // versioned soname (libssl.so.3) doesn't end in literal ".so", so this
+      // matches on the substring rather than a suffix.
       for (const entry of fs.readdirSync(platformDir)) {
-        if (entry.endsWith('.dylib') || entry.endsWith('.so') || entry.endsWith('.so.*')) {
+        if (entry.endsWith('.dylib') || entry.includes('.so')) {
           const entryPath = path.join(platformDir, entry);
           try { fs.chmodSync(entryPath, 0o755); } catch {}
         }

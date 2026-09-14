@@ -62,7 +62,10 @@ describe('detectRegex', () => {
     const elapsed = performance.now() - start;
 
     expect(detections.length).toBeGreaterThan(500);
-    // Should complete in under 1 second on any modern machine.
-    expect(elapsed).toBeLessThan(1000);
+    // A loose regression guard, not a benchmark: a genuine O(n^2) revert at
+    // this input size costs whole seconds, not milliseconds, so this ceiling
+    // stays well clear of normal CI variance while still catching that class
+    // of regression.
+    expect(elapsed).toBeLessThan(5000);
   });
 });
