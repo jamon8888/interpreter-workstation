@@ -36,7 +36,7 @@ redaction without needing a local Rust toolchain.
 | Wayfinder | GitHub | Title | Status |
 |-----------|--------|-------|--------|
 | T1 | [#190](https://github.com/jamon8888/interpreter-workstation/issues/190) | Basemind never ships with app | implemented (3d3447a), blocked on newer basemind release |
-| T2 | [#186](https://github.com/jamon8888/interpreter-workstation/issues/186) | Basemind absent from CI | open, blocked by T1 |
+| T2 | [#186](https://github.com/jamon8888/interpreter-workstation/issues/186) | Basemind absent from CI | partially resolved (985ffc4), CI build blocked (ops repo) |
 | T3 | [#183](https://github.com/jamon8888/interpreter-workstation/issues/183) | Ingest-time redaction in basemind | open, unblocked (part of #174) |
 | T4 | [#184](https://github.com/jamon8888/interpreter-workstation/issues/184) | Docs BM25 lane in basemind | open, unblocked (part of #174) |
 
@@ -53,18 +53,20 @@ T4 (#184) — independent (part of parent #174)
   published basemind binary containing `redact_text` MCP tool (v0.29.0
   predates it by 34 commits). Infrastructure ready; only version pinning
   and CI switch remain.
-- **T2** (absent from CI) — blocked by T1; needs the download mechanism.
-  Also depends on #163 (test assertions for tokenized send).
+- **T2** (absent from CI) — resolver fix (`985ffc4`) and download stub
+  fix already landed. CI build step blocked: CI lives in a separate
+  private ops repository, requires coordination. Test assertion update
+  (#163) blocked on CI build.
 - **T3** (ingest-time redaction) — unblocked; Rust submodule work.
   Decisions #177 (pseudonymization mechanism) and #178 (vault key-space
   unification) are closed and feed into this.
 - **T4** (docs BM25 lane) — unblocked; Rust submodule work.
   Decision #179 (document search surface) is closed and feeds into this.
 
-**Frontier (open, unblocked):** T1 (implemented, awaiting release), T3, T4.
-T2 partially unblocked (download infrastructure exists; CI build + test
-wiring can proceed). T2 fully unblocked once a release with `redact_text`
-ships.
+**Frontier (open, unblocked):** T3, T4.
+T1 implemented, awaiting release with `redact_text`.
+T2 partially resolved (resolver + download fix landed); CI build blocked
+(ops repo), test assertion blocked on CI.
 
 ## Decisions so far
 
