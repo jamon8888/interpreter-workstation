@@ -37,6 +37,22 @@ export function resolveVaultBlobPath(docId: string, userDataDir = resolveUserDat
   return path.join(userDataDir, 'vaults', `${sanitizeVaultDocId(docId)}.enc`);
 }
 
+export function deleteVaultBlob(docId: string, userDataDir?: string): void {
+  const safeId = sanitizeVaultDocId(docId);
+  const blobPath = resolveVaultBlobPath(safeId, userDataDir);
+  if (fs.existsSync(blobPath)) {
+    fs.rmSync(blobPath);
+  }
+}
+
+export function listVaultBlobDocIds(userDataDir?: string): string[] {
+  const vaultsDir = path.join(userDataDir ?? resolveUserDataDir(), 'vaults');
+  if (!fs.existsSync(vaultsDir)) return [];
+  return fs.readdirSync(vaultsDir)
+    .filter((f) => f.endsWith('.enc') && f !== '.vault-key.enc')
+    .map((f) => f.slice(0, -4));
+}
+
 function asRecord(value: unknown): Record<string, unknown> | null {
   return typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : null;
 }
