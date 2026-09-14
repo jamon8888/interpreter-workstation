@@ -13,7 +13,7 @@
  */
 
 import { createHash } from 'node:crypto';
-import { execFileSync, execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -157,15 +157,15 @@ function verifyArchiveDigest(assetPath, checksumPath) {
 
 function extractArchive(assetPath, platformDir, assetName) {
   if (assetName.endsWith('.tar.gz')) {
-    execSync(`tar -xzf "${assetPath}" -C "${platformDir}"`, { stdio: 'pipe' });
+    execFileSync('tar', ['-xzf', assetPath, '-C', platformDir], { stdio: 'pipe' });
     return;
   }
 
   if (assetName.endsWith('.zip')) {
     if (process.platform === 'win32') {
-      execSync(`powershell -Command "Expand-Archive -Path '${assetPath}' -DestinationPath '${platformDir}' -Force"`, { stdio: 'pipe' });
+      execFileSync('powershell', ['-Command', `Expand-Archive -Path '${assetPath}' -DestinationPath '${platformDir}' -Force`], { stdio: 'pipe' });
     } else {
-      execSync(`unzip -o "${assetPath}" -d "${platformDir}"`, { stdio: 'pipe' });
+      execFileSync('unzip', ['-o', assetPath, '-d', platformDir], { stdio: 'pipe' });
     }
     return;
   }

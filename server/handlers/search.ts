@@ -147,6 +147,10 @@ export async function basemindSearchCode(params: {
     elapsed_us: number;
   };
 
+  if (!Array.isArray(response.hits)) {
+    throw new Error(`basemind search returned invalid payload: hits is ${typeof response.hits}, expected array`);
+  }
+
   return {
     query: response.query,
     budgeted: response.budgeted,
