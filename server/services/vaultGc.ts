@@ -1,4 +1,5 @@
 import { listVaultBlobDocIds, deleteVaultBlob } from './vault';
+import { threadVaultDocId } from '../../src/lib/pii/vaultScope';
 
 let gcRanThisSession = false;
 
@@ -14,15 +15,12 @@ export function runOrphanBlobGcOnce(options: {
   gcRanThisSession = true;
 
   const { activeThreadIds, userDataDir } = options;
-  const activeSet = new Set(activeThreadIds);
+  const activeBlobIds = new Set(activeThreadIds.map(threadVaultDocId));
   const allDocIds = listVaultBlobDocIds(userDataDir);
 
   let cleaned = 0;
   for (const docId of allDocIds) {
-    // Only clean thread blobs
-    if (!docId.startsWith('thread-')) continue;
-    const threadId = docId.slice('thread-'.length);
-    if (!activeSet.has(threadId)) {
+    if (!activeBlobIds.has(docId)) {
       deleteVaultBlob(docId, userDataDir);
       cleaned++;
     }
