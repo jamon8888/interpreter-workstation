@@ -378,11 +378,6 @@ export interface ElectronAPI {
     onFilesChanged: (callback: (event: WorkspaceFilesChangedEvent) => void) => () => void;
   };
 
-  // Vault IPC methods
-  vault: {
-    onOrphanBlobsCleaned: (callback: (event: { count: number }) => void) => () => void;
-  };
-
   // Tool server CRUD + tool execution
   servers: {
     list: () => Promise<{ servers: any[] }>;
