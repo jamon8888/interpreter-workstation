@@ -156,9 +156,6 @@ afterPack: ./scripts/electron-builder/afterPack.cjs
 
 mac:
   category: public.app-category.productivity
-  extraResources:
-    - from: resources/basemind/darwin-${arch}
-      to: basemind
   hardenedRuntime: true
   gatekeeperAssess: false
   icon: ./resources/icons/app.icns
@@ -174,6 +171,8 @@ mac:
   sign: null
   notarize: false
   extraResources:
+    - from: resources/basemind/darwin-${arch}
+      to: basemind
     - from: resources/oix/darwin-${arch}
       to: oix
     - from: resources/pdfcpu/darwin-${arch}/pdfcpu
@@ -255,15 +254,14 @@ linux:
   icon: ./resources/icons/app.png
   artifactName: ${productName}-linux-${arch}-${buildVersion}.${ext}
   category: Office
-  extraResources:
-    - from: resources/basemind/linux-${arch}
-      to: basemind
   target:
     - target: AppImage
       arch: x64
     - target: deb
       arch: x64
   extraResources:
+    - from: resources/basemind/linux-${arch}
+      to: basemind
     - from: resources/oix/linux-${arch}
       to: oix
     - from: resources/pdfcpu/linux-${arch}/pdfcpu
