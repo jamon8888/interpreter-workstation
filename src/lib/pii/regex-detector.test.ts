@@ -40,4 +40,29 @@ describe('detectRegex', () => {
     expect(detectRegex('4111 1111 1111 1111')[0].category).toBe('credit_card');
     expect(detectRegex('host 192.168.1.10')[0].category).toBe('ipv4');
   });
+
+  test('handles large input without quadratic slowdown', () => {
+    // ~100k chars with 500 emails and many phone-number-like strings. The old
+    // per-pattern + alreadyCovered.some() implementation is O(n * matches)
+    // for each pattern that has the alreadyCovered guard; this should finish
+    // in under 1 second.
+    const emails = Array.from({ length: 500 }, (_, i) => `user${i}@example.com`);
+    // Phone-like strings that will hit the alreadyCovered scan
+    const phones = Array.from({ length: 500 }, (_, i) => `555-010-${String(i).padStart(4, '0')}`);
+    const filler = 'hello world '.repeat(2000);
+    const parts = filler.split(' ');
+    for (let i = 0; i < Math.max(emails.length, phones.length); i++) {
+      if (i < emails.length) parts.splice(i * 8, 0, emails[i]);
+      if (i < phones.length) parts.splice(i * 8 + 4, 0, phones[i]);
+    }
+    const text = parts.join(' ');
+
+    const start = performance.now();
+    const detections = detectRegex(text);
+    const elapsed = performance.now() - start;
+
+    expect(detections.length).toBeGreaterThan(500);
+    // Should complete in under 1 second on any modern machine.
+    expect(elapsed).toBeLessThan(1000);
+  });
 });
