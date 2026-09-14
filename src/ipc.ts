@@ -624,6 +624,49 @@ export interface WorkspaceScanStatus {
   };
 }
 
+export interface SearchHit {
+  path: string;
+  chunkId: string;
+  symbol: string;
+  kind: string;
+  lang: string;
+  lineStart: number;
+  lineEnd: number;
+  byteStart: number;
+  byteEnd: number;
+  distance?: number;
+  score?: number;
+  rerankScore?: number;
+  matchedLanes: string[];
+  keywordRank?: number;
+  vectorRank?: number;
+  exactRank?: number;
+}
+
+export interface SearchCodeParams {
+  query: string;
+  limit?: number;
+  maxTokens?: number;
+  format?: string;
+  lane?: string;
+  rerankerEnabled?: boolean;
+  rerankerPreset?: string;
+  rerankerTopK?: number;
+}
+
+export interface SearchCodeResponse {
+  query: string;
+  budgeted: boolean;
+  hits: SearchHit[];
+  degradedLanes: string[];
+  degradedReason?: string;
+  elapsedUs: number;
+}
+
+export interface SearchIpc {
+  searchCode(params: SearchCodeParams): Promise<SearchCodeResponse>;
+}
+
 export type RehydrationPersistResult =
   | { persisted: true; tokenCount: number }
   | { persisted: false; reason: 'os-store-unavailable' | 'write-failed'; message: string };
@@ -742,6 +785,9 @@ export const vault: VaultIpc = isMarketingDemoMode() ? marketingDemoVaultIpc : c
 export const workspaceScan: WorkspaceScanIpc = isMarketingDemoMode()
   ? { status: async () => { throw new Error('Not available in demo mode'); } }
   : (client.workspaceScan as WorkspaceScanIpc);
+export const search: SearchIpc = isMarketingDemoMode()
+  ? { searchCode: async () => { throw new Error('Not available in demo mode'); } }
+  : (client.search as SearchIpc);
 export const basemind: BasemindIpc = isMarketingDemoMode()
   ? { register: async () => { throw new Error('Not available in demo mode'); }, unregister: async () => { throw new Error('Not available in demo mode'); }, status: async () => { throw new Error('Not available in demo mode'); }, download: async () => { throw new Error('Not available in demo mode'); }, cpuFeatures: async () => ({ arch: 'unknown', avx2: false, avx: false, sse4_1: false, sse4_2: false, neon: false }) }
   : (client.basemind as BasemindIpc);
