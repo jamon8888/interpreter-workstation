@@ -608,6 +608,7 @@ interface VaultIpc {
   getNoteContext(request: { filePath: string }): Promise<VaultNoteContext>;
   getTags(request?: { limit?: number }): Promise<{ tags: VaultTagSummary[] }>;
   searchNotes(request: { query: string; limit?: number }): Promise<{ results: VaultSearchResult[] }>;
+  onOrphanBlobsCleaned(callback: (event: { count: number }) => void): () => void;
 }
 
 export interface WorkspaceScanStatus {
