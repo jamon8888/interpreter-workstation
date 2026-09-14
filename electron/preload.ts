@@ -416,10 +416,6 @@ export interface ElectronAPI {
     onStatusRequested: (callback: (event: import('./ipc/registry').ComputerUseSetupStatusRequestedEvent) => void) => () => void;
   };
 
-  vault: {
-    onOrphanBlobsCleaned: (callback: (event: { count: number }) => void) => () => void;
-  };
-
   overlaySettings: {
     get: () => Promise<{ settings: import('../apps/interpreter-overlay/shared/settings').InterpreterOverlaySettings }>;
     set: (settings: import('../apps/interpreter-overlay/shared/settings').InterpreterOverlaySettings) => Promise<{ success: boolean; settings: import('../apps/interpreter-overlay/shared/settings').InterpreterOverlaySettings }>;
@@ -1005,15 +1001,6 @@ contextBridge.exposeInMainWorld('electron', {
       const listener = (_: any, event: WorkspaceFilesChangedEvent) => callback(event);
       ipcRenderer.on(IPC_CHANNELS.WORKSPACE_FILES_CHANGED, listener);
       return () => ipcRenderer.removeListener(IPC_CHANNELS.WORKSPACE_FILES_CHANGED, listener);
-    },
-  },
-
-  // Vault IPC
-  vault: {
-    onOrphanBlobsCleaned: (callback: (event: { count: number }) => void) => {
-      const listener = (_: any, event: { count: number }) => callback(event);
-      ipcRenderer.on(IPC_CHANNELS.VAULT_ORPHAN_BLOBS_CLEANED, listener);
-      return () => ipcRenderer.removeListener(IPC_CHANNELS.VAULT_ORPHAN_BLOBS_CLEANED, listener);
     },
   },
 
