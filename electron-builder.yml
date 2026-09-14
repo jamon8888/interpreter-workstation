@@ -174,6 +174,10 @@ mac:
   extraResources:
     - from: resources/oix/darwin-${arch}
       to: oix
+    # basemind is the PII redaction engine: the archive is flat, so the binary
+    # ships with the shared libraries it loads at runtime (#190).
+    - from: resources/basemind/darwin-${arch}
+      to: basemind
     - from: resources/pdfcpu/darwin-${arch}/pdfcpu
       to: pdfcpu/pdfcpu
     - from: resources/qwen-asr/darwin-${arch}/qwen_asr
@@ -231,6 +235,10 @@ win:
   extraResources:
     - from: resources/oix/win32-${arch}
       to: oix
+    # basemind is the PII redaction engine: the archive is flat, so the binary
+    # ships with the shared libraries it loads at runtime (#190).
+    - from: resources/basemind/win32-${arch}
+      to: basemind
     # OIX ships the version-matched Codex sandbox helpers. The app also needs
     # them beside the packaged executable for Windows helper discovery.
     - from: resources/oix/win32-${arch}/codex-resources/codex-command-runner.exe
@@ -259,6 +267,10 @@ linux:
   extraResources:
     - from: resources/oix/linux-${arch}
       to: oix
+    # basemind is the PII redaction engine: the archive is flat, so the binary
+    # ships with the shared libraries it loads at runtime (#190).
+    - from: resources/basemind/linux-${arch}
+      to: basemind
     - from: resources/pdfcpu/linux-${arch}/pdfcpu
       to: pdfcpu/pdfcpu
     - from: resources/qwen-asr/linux-${arch}/qwen_asr

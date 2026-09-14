@@ -8,8 +8,31 @@ import { createRequire } from 'node:module';
 // carry the platform suffix, not just the ones that go through PATH or npm.
 const BINARY_NAME = process.platform === 'win32' ? 'basemind.exe' : 'basemind';
 
+/**
+ * Where a shipped basemind lives. Packaging flattens the platform directory
+ * (`extraResources` maps `resources/basemind/<platform>` to `basemind`), so an
+ * installed app and a dev checkout have different shapes.
+ *
+ * The bundled copy is checked before PATH on purpose: it is the version this
+ * build was pinned to and tested against, and a stray basemind on a developer's
+ * PATH should not silently take its place.
+ */
+function bundledBasemindCandidates(): string[] {
+  const candidates: string[] = [];
+  if (process.resourcesPath) {
+    candidates.push(resolve(process.resourcesPath, 'basemind', BINARY_NAME));
+  }
+  const platformKey = `${process.platform}-${process.arch}`;
+  candidates.push(resolve(process.cwd(), 'resources', 'basemind', platformKey, BINARY_NAME));
+  return candidates;
+}
+
 function findBasemindBinary(): string {
   const projectRoot = process.cwd();
+
+  for (const candidate of bundledBasemindCandidates()) {
+    if (existsSync(candidate)) return candidate;
+  }
 
   const pathBin = process.env.PATH?.split(process.platform === 'win32' ? ';' : ':')
     .map(p => resolve(p, BINARY_NAME))
