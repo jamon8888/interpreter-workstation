@@ -214,7 +214,9 @@ async function downloadAndExtract(version, platform) {
       for (const entry of fs.readdirSync(platformDir)) {
         if (entry.endsWith('.dylib') || entry.includes('.so')) {
           const entryPath = path.join(platformDir, entry);
-          try { fs.chmodSync(entryPath, 0o755); } catch {}
+          try { fs.chmodSync(entryPath, 0o755); } catch {
+            // Shared-library permission update is best effort.
+          }
         }
       }
     }
@@ -251,7 +253,10 @@ async function main() {
     : null;
   if (existingVersion && existingVersion !== version) {
     console.log(`Detected basemind version change (${existingVersion} -> ${version}), refreshing binaries...`);
-    for (const platform of platformsToDownload) {
+    // Clean ALL platform directories on version change, not just the ones
+    // being downloaded — otherwise a --current-platform run updates VERSION
+    // while other platforms retain stale binaries from the old version.
+    for (const platform of PLATFORM_KEYS) {
       fs.rmSync(path.join(BASEMIND_DIR, platform), { recursive: true, force: true });
     }
   }

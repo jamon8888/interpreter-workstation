@@ -106,7 +106,6 @@ export async function basemindSearchCode(params: {
 
   if (params.limit !== undefined) args.limit = params.limit;
   if (params.maxTokens !== undefined) args.max_tokens = params.maxTokens;
-  if (params.lane !== undefined) args.lane = params.lane;
   if (params.rerankerEnabled !== undefined) args.reranker_enabled = params.rerankerEnabled;
   if (params.rerankerPreset !== undefined) args.reranker_preset = params.rerankerPreset;
   if (params.rerankerTopK !== undefined) args.reranker_top_k = params.rerankerTopK;
@@ -114,7 +113,7 @@ export async function basemindSearchCode(params: {
   const result = await mcpRequest('tools/call', {
     name: 'code',
     arguments: {
-      mode: 'semantic',
+      mode: params.lane || 'semantic',
       // Pinned regardless of `params.format`: basemind's `wants_toon` falls back
       // to the caller's local `[documents.output] format` config when no format
       // is given, which would silently swap the payload for TOON text on some
