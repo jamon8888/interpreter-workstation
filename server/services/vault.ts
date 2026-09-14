@@ -14,6 +14,7 @@ import { homedir } from 'node:os';
 import { ToolManager } from '../tools/toolManager';
 import { getOrCreateVaultPassphrase } from './vaultKey';
 import { getAppMcpOwnerThreadId } from './appMcpThread';
+export { runOrphanBlobGcOnce, resetGcFlagForTests } from './vaultGc';
 
 export function sanitizeVaultDocId(docId: string): string {
   if (!/^[A-Za-z0-9_-]{1,128}$/.test(docId)) {
