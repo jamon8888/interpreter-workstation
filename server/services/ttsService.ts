@@ -19,9 +19,9 @@ import {
 import { Readable, Transform } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { Worker } from 'node:worker_threads';
-// @ts-expect-error - no type declarations for tar-stream
+// @ts-ignore - no type declarations for tar-stream
 import tar, { type Headers as TarHeader } from 'tar-stream';
-// @ts-expect-error - no type declarations for unbzip2-stream
+// @ts-ignore - no type declarations for unbzip2-stream
 import unbzip2Stream from 'unbzip2-stream';
 import {
   getTtsModelById,
@@ -535,7 +535,7 @@ async function getOrCreateEngine(modelId: TtsModelId, provider: TtsProvider): Pr
   const required = getModelRuntimePaths(modelId);
   await validateModelInstall(modelId);
 
-  // @ts-expect-error - no type declarations for sherpa-onnx
+  // @ts-ignore - no type declarations for sherpa-onnx
   const sherpaOnnx = await import('sherpa-onnx');
   const createOfflineTts = getCreateOfflineTtsFactory(sherpaOnnx);
   const engine = createOfflineTts(buildOfflineTtsConfig(required, provider));
