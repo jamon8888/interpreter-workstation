@@ -106,6 +106,12 @@ export async function basemindSearchCode(params: {
 
   if (params.limit !== undefined) args.limit = params.limit;
   if (params.maxTokens !== undefined) args.max_tokens = params.maxTokens;
+  // `lane` is a sibling field of `mode` on basemind's CodeParams, not an
+  // alternate value for it — `mode` selects the domain operation (symbols,
+  // grep, semantic, ...) and only applies to the "semantic" mode. Folding it
+  // into `mode` (as a prior commit here did) sends basemind an invalid mode
+  // enum value ("keyword", "hybrid") for anything but the default lane.
+  if (params.lane !== undefined) args.lane = params.lane;
   if (params.rerankerEnabled !== undefined) args.reranker_enabled = params.rerankerEnabled;
   if (params.rerankerPreset !== undefined) args.reranker_preset = params.rerankerPreset;
   if (params.rerankerTopK !== undefined) args.reranker_top_k = params.rerankerTopK;
@@ -113,7 +119,7 @@ export async function basemindSearchCode(params: {
   const result = await mcpRequest('tools/call', {
     name: 'code',
     arguments: {
-      mode: params.lane || 'semantic',
+      mode: 'semantic',
       // Pinned regardless of `params.format`: basemind's `wants_toon` falls back
       // to the caller's local `[documents.output] format` config when no format
       // is given, which would silently swap the payload for TOON text on some
