@@ -24,10 +24,10 @@ function findBasemindBinary(): string {
     .find(p => { try { return existsSync(p); } catch { return false; } }) ?? '';
   if (pathBin) return pathBin;
 
-  const localDebug = resolve(projectRoot, 'basemind', 'target', 'debug', BINARY_NAME);
+  const localDebug = resolve(projectRoot, 'submodules', 'basemind', 'target', 'debug', BINARY_NAME);
   if (existsSync(localDebug)) return localDebug;
 
-  const localRelease = resolve(projectRoot, 'basemind', 'target', 'release', BINARY_NAME);
+  const localRelease = resolve(projectRoot, 'submodules', 'basemind', 'target', 'release', BINARY_NAME);
   if (existsSync(localRelease)) return localRelease;
 
   const cargoBin = resolve(homedir(), '.cargo', 'bin', BINARY_NAME);
@@ -40,7 +40,9 @@ function findBasemindBinary(): string {
     const npmPackageJson = createRequire(import.meta.url).resolve('basemind/package.json');
     const npmBin = resolve(npmPackageJson, '..', 'bin', BINARY_NAME);
     if (existsSync(npmBin)) return npmBin;
-  } catch {}
+  } catch {
+    // intentionally empty
+  }
 
   return '';
 }
@@ -201,7 +203,9 @@ export async function unregisterBasemindServer(): Promise<void> {
   const { getToolManager } = await import('../tools/toolManagerAccessor');
   try {
     await getToolManager().removeServer('basemind');
-  } catch {}
+  } catch {
+    // intentionally empty
+  }
 }
 
 export async function getBasemindServerStatus(): Promise<{ status: string }> {
