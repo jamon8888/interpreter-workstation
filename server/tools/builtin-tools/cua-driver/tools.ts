@@ -2301,6 +2301,7 @@ async function getAppIconDataUrl(iconPath: string | null): Promise<string | null
   const cached = appIconDataUrlCache.get(iconPath);
   if (cached !== undefined) return cached;
 
+  // eslint-disable-next-line no-useless-assignment -- initial null needed for try/catch scope
   let dataUrl: string | null = null;
   try {
     const icon = await thumbnailService.getFileIcon(iconPath);
@@ -2594,7 +2595,9 @@ function disableMacAgentActivityOverlay(): void {
   if (isProcessAlive(state.overlay_pid)) {
     try {
       process.kill(state.overlay_pid as number);
-    } catch {}
+    } catch {
+      // intentionally empty
+    }
   }
   macAgentActivityOverlayProcess = null;
   writeMacAgentActivityState({
@@ -2738,7 +2741,9 @@ async function describeWindowsCuaTarget(
     if (appName) return appName;
     const title = typeof match?.title === 'string' ? match.title.trim() : '';
     if (title) return title;
-  } catch {}
+  } catch {
+    // intentionally empty
+  }
 
   return 'the requested app or window';
 }
@@ -3012,6 +3017,7 @@ async function acquireMacCuaDriverProcessLock(lockDir = MAC_CUA_DRIVER_CALL_LOCK
         fs.rmSync(lockDir, { recursive: true, force: true });
         continue;
       }
+      // eslint-disable-next-line preserve-caught-error
       throw new Error(MAC_CUA_DRIVER_CALL_BUSY_MESSAGE);
     }
   }

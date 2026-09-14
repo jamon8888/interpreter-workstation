@@ -26,6 +26,7 @@ export function resolveUserDataDir(): string {
   const override = process.env.INTERPRETER_USER_DATA_DIR?.trim();
   if (override) return override;
   if (process.versions.electron) {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- sync Electron API in lazy-load guard
     const { app } = require('electron') as { app: { getPath(name: 'userData'): string } };
     return app.getPath('userData');
   }

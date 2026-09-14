@@ -57,6 +57,7 @@ export function resolvePiiAuditLogPath(userDataDir = resolveUserDataDir()): stri
 }
 
 function rotateIfNeeded(logPath: string): void {
+  // eslint-disable-next-line no-useless-assignment -- initial value needed for try/catch scope
   let size = 0;
   try {
     size = fs.statSync(logPath).size;

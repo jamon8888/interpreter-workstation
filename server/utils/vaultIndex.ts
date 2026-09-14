@@ -260,7 +260,7 @@ function extractWikilinks(body: string): ParsedWikilink[] {
       continue;
     }
 
-    const matches = line.matchAll(/\[\[([^\[\]\n|]+?)(?:\|([^\[\]\n]+?))?\]\]/g);
+    const matches = line.matchAll(/\[\[([^[\\]\n|]+?)(?:\|([^[\\]\n]+?))?\]\]/g);
     for (const match of matches) {
       const rawTarget = match[1]?.trim();
       if (!rawTarget) {
@@ -485,7 +485,7 @@ function rewriteMarkdownReferences(
     }
 
     let nextLine = line.replace(
-      /\[\[([^\[\]\n|]+?)(?:\|([^\[\]\n]+?))?\]\]/g,
+      /\[\[([^[\\]\n|]+?)(?:\|([^[\\]\n]+?))?\]\]/g,
       (fullMatch, matchedTarget: string, matchedDisplay?: string) => {
         const trimmedTarget = matchedTarget.trim();
         if (!trimmedTarget) {

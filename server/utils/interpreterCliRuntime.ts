@@ -1628,8 +1628,8 @@ function showToolsUsage() {
   process.stderr.write('  interpreter-app tools <server-id>__<tool-name> --help\\n');
   process.stderr.write('  --stdin-arg <key> reads raw stdin as that string argument, no JSON escaping; combine with --json for other fields.\\n');
   process.stderr.write('Examples:\\n');
-  process.stderr.write('  interpreter-app tools builtin-interpreter interpreter_refresh_file --json \\'{\"path\":\"report.pdf\"}\\'\\n');
-  process.stderr.write('  interpreter-app tools builtin-interpreter interpreter_refresh_file --json \\'{\"path\":\"report.xlsx\"}\\'\\n');
+  process.stderr.write('  interpreter-app tools builtin-interpreter interpreter_refresh_file --json \\'{"path":"report.pdf"}\\'\\n');
+  process.stderr.write('  interpreter-app tools builtin-interpreter interpreter_refresh_file --json \\'{"path":"report.xlsx"}\\'\\n');
 }
 
 function showMcpUsage() {
@@ -1639,8 +1639,8 @@ function showMcpUsage() {
   process.stderr.write('  interpreter-app mcp <server-id> <tool-name> [--json <json> | --json-file <path> | --stdin-json] [--stdin-arg <key>] [--save-to-disk [path]]\\n');
   process.stderr.write('\\n');
   process.stderr.write('Examples:\\n');
-  process.stderr.write('  interpreter-app mcp filesystem read_file --json \\'{\"path\":\"README.md\"}\\'\\n');
-  process.stderr.write('  interpreter-app mcp docs search --json \\'{\"query\":\"release notes\"}\\'\\n');
+  process.stderr.write('  interpreter-app mcp filesystem read_file --json \\'{"path":"README.md"}\\'\\n');
+  process.stderr.write('  interpreter-app mcp docs search --json \\'{"query":"release notes"}\\'\\n');
 }
 
 function parseQualifiedToolTarget(value) {
@@ -2368,8 +2368,8 @@ function Show-ToolsUsage {
   [Console]::Error.WriteLine('  interpreter-app tools <server-id> <tool-name> --help')
   [Console]::Error.WriteLine('  interpreter-app tools <server-id>__<tool-name> --help')
   [Console]::Error.WriteLine('Examples:')
-  [Console]::Error.WriteLine('  interpreter-app tools builtin-interpreter interpreter_refresh_file --json ''{\"path\":\"report.pdf\"}''')
-  [Console]::Error.WriteLine('  interpreter-app tools builtin-interpreter interpreter_refresh_file --json ''{\"path\":\"report.xlsx\"}''')
+  [Console]::Error.WriteLine('  interpreter-app tools builtin-interpreter interpreter_refresh_file --json ''{"path":"report.pdf"}''')
+  [Console]::Error.WriteLine('  interpreter-app tools builtin-interpreter interpreter_refresh_file --json ''{"path":"report.xlsx"}''')
 }
 
 function Show-McpUsage {
@@ -2378,8 +2378,8 @@ function Show-McpUsage {
   [Console]::Error.WriteLine('  interpreter-app mcp find <query>')
   [Console]::Error.WriteLine('  interpreter-app mcp <server-id> <tool-name> [--json <json> | --json-file <path> | --stdin-json] [--stdin-arg <key>] [--save-to-disk [path]]')
   [Console]::Error.WriteLine('Examples:')
-  [Console]::Error.WriteLine('  interpreter-app mcp filesystem read_file --json ''{\"path\":\"README.md\"}''')
-  [Console]::Error.WriteLine('  interpreter-app mcp docs search --json ''{\"query\":\"release notes\"}''')
+  [Console]::Error.WriteLine('  interpreter-app mcp filesystem read_file --json ''{"path":"README.md"}''')
+  [Console]::Error.WriteLine('  interpreter-app mcp docs search --json ''{"query":"release notes"}''')
 }
 
 function Parse-QualifiedToolTarget {

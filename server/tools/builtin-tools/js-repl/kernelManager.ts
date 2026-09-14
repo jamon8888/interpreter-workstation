@@ -234,6 +234,7 @@ class JsReplKernel {
     }
 
     if (message.type === 'emit_image') {
+      // eslint-disable-next-line no-useless-assignment -- initial null needed for try/catch scope
       let savedPath: string | null = null;
       let error: string | null = null;
       try {

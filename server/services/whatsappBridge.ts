@@ -212,8 +212,9 @@ function createSessionFromInbound(chatId: string, initialMessage: string): void 
 
 function sanitizeFilenameSegment(input: string): string {
   return input
+    // eslint-disable-next-line no-control-regex -- intentional: strip control characters from filenames
     .replace(/[<>:"/\\|?*\u0000-\u001F]/g, '-')
-    .replace(/[\[\]{}()]/g, '-')
+    .replace(/[[\]{}()]/g, '-')
     .replace(/\s+/g, ' ')
     .trim()
     .replace(/[. ]+$/g, '');
@@ -221,7 +222,7 @@ function sanitizeFilenameSegment(input: string): string {
 
 function sanitizeMentionLabel(label: string): string {
   const cleaned = label
-    .replace(/[\[\]\r\n]/g, ' ')
+    .replace(/[[\]\r\n]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
   return cleaned || 'attachment';

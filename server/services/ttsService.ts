@@ -19,9 +19,7 @@ import {
 import { Readable, Transform } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { Worker } from 'node:worker_threads';
-// @ts-ignore - no type declarations for tar-stream
 import tar, { type Headers as TarHeader } from 'tar-stream';
-// @ts-ignore - no type declarations for unbzip2-stream
 import unbzip2Stream from 'unbzip2-stream';
 import {
   getTtsModelById,
@@ -98,6 +96,7 @@ function getCacheKey(modelId: TtsModelId, provider: TtsProvider): string {
 function getUserDataPath(): string {
   if (process.versions.electron) {
     // Lazy load electron so browser mode can still typecheck.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- sync Electron API in lazy-load guard
     const { app } = require('electron') as { app: { getPath(name: 'userData'): string } };
     return app.getPath('userData');
   }
@@ -534,7 +533,6 @@ async function getOrCreateEngine(modelId: TtsModelId, provider: TtsProvider): Pr
   const required = getModelRuntimePaths(modelId);
   await validateModelInstall(modelId);
 
-  // @ts-ignore - no type declarations for sherpa-onnx
   const sherpaOnnx = await import('sherpa-onnx');
   const createOfflineTts = getCreateOfflineTtsFactory(sherpaOnnx);
   const engine = createOfflineTts(buildOfflineTtsConfig(required, provider));
@@ -640,6 +638,7 @@ function resolveSherpaOnnxModulePath(): string {
     return cachedSherpaOnnxModulePath;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
+    // eslint-disable-next-line preserve-caught-error
     throw new Error(`Failed to resolve sherpa-onnx module path: ${message}`);
   }
 }

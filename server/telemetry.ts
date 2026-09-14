@@ -154,7 +154,9 @@ export async function sendTelemetry(
         try {
           authClaims = JSON.parse(Buffer.from(access_token.split('.')[1], 'base64url').toString()) as DecodedAuthClaims;
           userId = authClaims.sub;
-        } catch {}
+        } catch {
+          // intentionally empty
+        }
       }
     }
 

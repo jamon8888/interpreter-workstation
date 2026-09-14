@@ -23,9 +23,10 @@ export async function getPdfjs(): Promise<typeof import('pdfjs-dist/legacy/build
     try {
       pdfjsModule = await import('pdfjs-dist/legacy/build/pdf.mjs');
     } catch (err: any) {
+      // eslint-disable-next-line preserve-caught-error
       throw new Error(
         'PDF.js not available. This feature requires @napi-rs/canvas native bindings. ' +
-        `Error: ${err.message}`
+        `Error: ${err.message}`,
       );
     }
   }
@@ -45,10 +46,11 @@ export async function getPdfDependencies(): Promise<{
       pdfjsModule = await import('pdfjs-dist/legacy/build/pdf.mjs');
       canvasModule = await import('@napi-rs/canvas');
     } catch (err: any) {
+      // eslint-disable-next-line preserve-caught-error
       throw new Error(
         'PDF rendering dependencies not available. ' +
         'This feature requires @napi-rs/canvas native bindings. ' +
-        `Error: ${err.message}`
+        `Error: ${err.message}`,
       );
     }
   }

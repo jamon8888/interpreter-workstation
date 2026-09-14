@@ -153,6 +153,7 @@ export function normalizeLocalPathInput(value: string): string {
     return fileURLToPath(trimmed);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
+    // eslint-disable-next-line preserve-caught-error
     throw new Error(`Invalid file URL "${value}": ${message}`);
   }
 }
@@ -286,7 +287,7 @@ function isImageExtension(ext: string): boolean {
 }
 
 function endpointStem(endpointId: string): string {
-  return sanitizeFileName(endpointId.replace(/[\/]/g, "_"));
+  return sanitizeFileName(endpointId.replace(/[/]/g, "_"));
 }
 
 function buildOutputFileName(

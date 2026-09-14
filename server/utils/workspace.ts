@@ -81,9 +81,11 @@ export function requireExistingWorkspacePath(
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown workspace error';
     if (message === 'Workspace path does not exist') {
+      // eslint-disable-next-line preserve-caught-error
       throw new Error('The selected folder no longer exists. Pick a new folder and try again.');
     }
     if (message === 'Workspace path must be a directory') {
+      // eslint-disable-next-line preserve-caught-error
       throw new Error('The selected folder is not a directory. Pick a new folder and try again.');
     }
     throw error;

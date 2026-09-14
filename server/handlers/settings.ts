@@ -48,6 +48,7 @@ interface RuntimeConfigResetOptions {
 }
 
 function getElectronModule(): typeof import('electron') {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- sync Electron module resolution
   return require(['electron'].join('')) as typeof import('electron');
 }
 

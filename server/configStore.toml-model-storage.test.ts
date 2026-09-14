@@ -358,7 +358,9 @@ const mockConfigValueWrite = mock(async (keyPath: string, value: unknown) => {
   try {
     const current = await readFile(MODEL_CONFIG_FILE, 'utf-8');
     await writeFile(MODEL_CONFIG_FILE, removeReservedProviderFromToml(current, providerId), 'utf-8');
-  } catch {}
+  } catch {
+    // intentionally empty
+  }
 
   return {
     status: 'ok',
@@ -399,7 +401,9 @@ async function restoreFile(filePath: string, content: string | null) {
 
   try {
     await unlink(filePath);
-  } catch {}
+  } catch {
+    // intentionally empty
+  }
 }
 
 async function removeMatchingFiles(directoryPath: string, pattern: RegExp) {
@@ -410,9 +414,13 @@ async function removeMatchingFiles(directoryPath: string, pattern: RegExp) {
       .map(async (entry) => {
         try {
           await unlink(join(directoryPath, entry));
-        } catch {}
+        } catch {
+          // intentionally empty
+        }
       }));
-  } catch {}
+  } catch {
+    // intentionally empty
+  }
 }
 
 async function backupConfig() {

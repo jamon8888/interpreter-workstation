@@ -89,6 +89,7 @@ export async function trashThread(
     try {
       await service.unarchiveThread(threadId);
     } catch (rollbackError) {
+      // eslint-disable-next-line preserve-caught-error
       throw new Error(
         `Failed to move thread to trash: ${getErrorMessage(error)}. Rolling back the archived thread also failed: ${getErrorMessage(rollbackError)}.`,
       );

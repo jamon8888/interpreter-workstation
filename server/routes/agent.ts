@@ -866,8 +866,6 @@ router.all('/groq-proxy/*', async (req: Request, res: Response) => {
 });
 
 router.post('/chat/stream', async (req: Request, res: Response) => {
-  let body: StreamRequestBody;
-  let request: NormalizedStreamRequest;
   let activeProfileProvider: string | null = null;
   let activeModelId: string | null = null;
   const streamStartedAt = Date.now();
@@ -875,8 +873,8 @@ router.post('/chat/stream', async (req: Request, res: Response) => {
   if (!validateStreamRequestBody(req.body)) {
     return res.status(400).json({ error: 'Invalid request body.' });
   }
-  body = req.body;
-  request = normalizeStreamRequestBody(body);
+  const body: StreamRequestBody = req.body;
+  const request: NormalizedStreamRequest = normalizeStreamRequestBody(body);
   console.log(
     `[AGENT] turn_start selection=${request.selection} profileId=${request.selection === 'stored-profile' ? request.profileId : 'none'} agentId=${request.agentId ?? 'none'} threadId=${request.threadId ?? 'new'} model=${request.model ?? 'default'} attachmentCount=${request.attachments.length} skillCount=${request.skills.length}`,
   );
@@ -1083,12 +1081,10 @@ router.post('/chat/stream', async (req: Request, res: Response) => {
 });
 
 router.post('/chat/stop', async (req: Request, res: Response) => {
-  let body: StopRequestBody;
-
   if (!validateStopRequestBody(req.body)) {
     return res.status(400).json({ error: 'threadId is required.' });
   }
-  body = req.body;
+  const body: StopRequestBody = req.body;
 
   try {
     await getCodexService().interrupt(body.threadId as string, body.turnId);
@@ -1101,12 +1097,10 @@ router.post('/chat/stop', async (req: Request, res: Response) => {
 });
 
 router.post('/chat/steer', async (req: Request, res: Response) => {
-  let body: SteerRequestBody;
-
   if (!validateSteerRequestBody(req.body)) {
     return res.status(400).json({ error: 'threadId, turnId, and message, attachments, or skills are required.' });
   }
-  body = req.body;
+  const body: SteerRequestBody = req.body;
 
   try {
     const turnId = await getCodexService().steer(body.threadId as string, {
@@ -1127,12 +1121,10 @@ router.post('/chat/steer', async (req: Request, res: Response) => {
 });
 
 router.post('/chat/background/stop', async (req: Request, res: Response) => {
-  let body: BackgroundTerminalStopRequestBody;
-
   if (!validateBackgroundTerminalStopRequestBody(req.body)) {
     return res.status(400).json({ error: 'threadId is required.' });
   }
-  body = req.body;
+  const body: BackgroundTerminalStopRequestBody = req.body;
 
   try {
     await getCodexService().cleanBackgroundTerminals(body.threadId as string);
@@ -1155,6 +1147,7 @@ router.get('/voice/moonshine-assets/*', async (req: Request, res: Response) => {
     return res.status(400).json({ error: 'Missing Moonshine asset path.' });
   }
 
+  // eslint-disable-next-line no-useless-assignment -- initial value needed for try/catch scope
   let decodedPath = '';
   try {
     decodedPath = decodeURIComponent(requestedPath);
