@@ -11,6 +11,14 @@ const BINARY_NAME = process.platform === 'win32' ? 'basemind.exe' : 'basemind';
 function findBasemindBinary(): string {
   const projectRoot = process.cwd();
 
+  // Packaged app: electron-builder extraResources places basemind at
+  // <resourcesPath>/basemind/basemind. Check this first so installed
+  // users get the bundled binary without needing a local Rust toolchain.
+  if (process.resourcesPath) {
+    const packaged = resolve(process.resourcesPath, 'basemind', BINARY_NAME);
+    if (existsSync(packaged)) return packaged;
+  }
+
   const pathBin = process.env.PATH?.split(process.platform === 'win32' ? ';' : ':')
     .map(p => resolve(p, BINARY_NAME))
     .find(p => { try { return existsSync(p); } catch { return false; } }) ?? '';
@@ -41,6 +49,8 @@ function basemindCommsDir(): string {
   return resolve(homedir(), '.local', 'share', 'basemind', 'comms');
 }
 
+export { basemindCommsDir };
+
 export function isDaemonRunning(): boolean {
   const sock = resolve(basemindCommsDir(), 'comms.sock');
   if (!existsSync(sock)) return false;
@@ -67,7 +77,7 @@ export function resolveBasemindBinary(): string {
   return _cachedBinary;
 }
 
-function mcpRequest(method: string, params: Record<string, unknown> = {}): Promise<unknown> {
+export function mcpRequest(method: string, params: Record<string, unknown> = {}): Promise<unknown> {
   const sockPath = resolve(basemindCommsDir(), 'comms.sock');
   return new Promise((resolve, reject) => {
     const sock = new Socket();

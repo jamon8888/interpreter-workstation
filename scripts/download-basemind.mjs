@@ -1,0 +1,236 @@
+#!/usr/bin/env node
+/**
+ * Downloads basemind binaries from GitHub releases.
+ *
+ * Usage:
+ *   node scripts/download-basemind.mjs [version] [--current-platform]
+ *   node scripts/download-basemind.mjs [version] --platform darwin-x64
+ *
+ * Options:
+ *   version             Specific version tag (default: pinned version)
+ *   --current-platform  Only download for current OS/arch
+ *   --platform <key>    Download only the specified platform key
+ */
+
+import { execFileSync, execSync } from 'node:child_process';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const ROOT = path.join(__dirname, '..');
+const BASEMIND_DIR = path.join(ROOT, 'resources', 'basemind');
+const BASEMIND_REPO = 'jamon8888/basemind';
+const PINNED_VERSION = 'v0.29.0';
+
+const PLATFORMS = {
+  'darwin-arm64': {
+    target: 'aarch64-apple-darwin',
+    asset: 'basemind-aarch64-apple-darwin.tar.gz',
+    binary: 'basemind',
+  },
+  'darwin-x64': {
+    target: 'x86_64-apple-darwin',
+    asset: 'basemind-x86_64-apple-darwin.tar.gz',
+    binary: 'basemind',
+  },
+  'linux-x64': {
+    target: 'x86_64-unknown-linux-gnu',
+    asset: 'basemind-x86_64-unknown-linux-gnu.tar.gz',
+    binary: 'basemind',
+  },
+  'linux-arm64': {
+    target: 'aarch64-unknown-linux-gnu',
+    asset: 'basemind-aarch64-unknown-linux-gnu.tar.gz',
+    binary: 'basemind',
+  },
+  'win32-x64': {
+    target: 'x86_64-pc-windows-msvc',
+    asset: 'basemind-x86_64-pc-windows-msvc.zip',
+    binary: 'basemind.exe',
+  },
+};
+
+export const BASEMIND_PLATFORMS = PLATFORMS;
+export const PLATFORM_KEYS = Object.keys(PLATFORMS);
+
+export function getPlatformKey(platform = process.platform, arch = process.arch) {
+  const osPlatform = platform === 'win32' ? 'win32' : platform;
+  return `${osPlatform}-${arch}`;
+}
+
+export function parseArgs(args) {
+  const currentPlatformOnly = args.includes('--current-platform');
+  const platformIndex = args.indexOf('--platform');
+  const requestedPlatform = platformIndex !== -1 ? args[platformIndex + 1] : undefined;
+  const version = args.find((arg, index) => !arg.startsWith('--') && args[index - 1] !== '--platform') || PINNED_VERSION;
+
+  return { version, currentPlatformOnly, requestedPlatform };
+}
+
+export function getPlatformsToDownload({ currentPlatformOnly = false, requestedPlatform, currentPlatformKey = getPlatformKey() } = {}) {
+  if (requestedPlatform) {
+    if (!PLATFORM_KEYS.includes(requestedPlatform)) {
+      throw new Error(`No basemind binary available for platform: ${requestedPlatform}`);
+    }
+    return [requestedPlatform];
+  }
+
+  if (currentPlatformOnly) {
+    if (!PLATFORM_KEYS.includes(currentPlatformKey)) {
+      throw new Error(`No basemind binary available for platform: ${currentPlatformKey}`);
+    }
+    return [currentPlatformKey];
+  }
+
+  return [...PLATFORM_KEYS];
+}
+
+function hasGhWithAuth() {
+  try {
+    execFileSync('gh', ['auth', 'status'], { stdio: 'pipe' });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function downloadAsset(version, asset, destinationDir) {
+  const destinationPath = path.join(destinationDir, asset);
+  if (hasGhWithAuth()) {
+    execFileSync('gh', ['release', 'download', version, '--repo', BASEMIND_REPO, '--pattern', asset, '--dir', destinationDir], {
+      stdio: 'pipe',
+    });
+    return;
+  }
+
+  const url = `https://github.com/${BASEMIND_REPO}/releases/download/${version}/${asset}`;
+  execFileSync('curl', ['-L', '--fail', '-o', destinationPath, url], { stdio: 'pipe' });
+}
+
+function extractArchive(assetPath, platformDir, assetName) {
+  if (assetName.endsWith('.tar.gz')) {
+    execSync(`tar -xzf "${assetPath}" -C "${platformDir}"`, { stdio: 'pipe' });
+    return;
+  }
+
+  if (assetName.endsWith('.zip')) {
+    if (process.platform === 'win32') {
+      execSync(`powershell -Command "Expand-Archive -Path '${assetPath}' -DestinationPath '${platformDir}' -Force"`, { stdio: 'pipe' });
+    } else {
+      execSync(`unzip -o "${assetPath}" -d "${platformDir}"`, { stdio: 'pipe' });
+    }
+    return;
+  }
+
+  throw new Error(`Unsupported archive format: ${assetName}`);
+}
+
+async function downloadAndExtract(version, platform) {
+  const config = PLATFORMS[platform];
+  if (!config) {
+    throw new Error(`No basemind binary available for platform: ${platform}`);
+  }
+
+  const platformDir = path.join(BASEMIND_DIR, platform);
+  const binaryPath = path.join(platformDir, config.binary);
+
+  if (fs.existsSync(binaryPath)) {
+    console.log(`ok ${platform}: already exists`);
+    return;
+  }
+
+  console.log(`download ${platform}: ${config.asset}...`);
+  fs.mkdirSync(platformDir, { recursive: true });
+
+  const tmpDir = path.join(BASEMIND_DIR, '.tmp', platform);
+  fs.mkdirSync(tmpDir, { recursive: true });
+
+  try {
+    downloadAsset(version, config.asset, tmpDir);
+    const assetPath = path.join(tmpDir, config.asset);
+    extractArchive(assetPath, platformDir, config.asset);
+
+    if (!fs.existsSync(binaryPath)) {
+      throw new Error(`basemind binary not found after extraction: ${binaryPath}`);
+    }
+
+    if (!platform.startsWith('win32')) {
+      fs.chmodSync(binaryPath, 0o755);
+      // Also chmod any .dylib / .so files that need execute permission
+      for (const entry of fs.readdirSync(platformDir)) {
+        if (entry.endsWith('.dylib') || entry.endsWith('.so') || entry.endsWith('.so.*')) {
+          const entryPath = path.join(platformDir, entry);
+          try { fs.chmodSync(entryPath, 0o755); } catch {}
+        }
+      }
+    }
+
+    console.log(`ok ${platform}: done`);
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+}
+
+async function main() {
+  const { version, currentPlatformOnly, requestedPlatform } = parseArgs(process.argv.slice(2));
+  const versionFilePath = path.join(BASEMIND_DIR, 'VERSION');
+
+  let platformsToDownload;
+  try {
+    platformsToDownload = getPlatformsToDownload({ currentPlatformOnly, requestedPlatform });
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error));
+    console.error(`Available platforms: ${PLATFORM_KEYS.join(', ')}`);
+    process.exit(1);
+  }
+
+  if (requestedPlatform) {
+    console.log(`Downloading basemind ${version} for ${requestedPlatform}...\n`);
+  } else if (currentPlatformOnly) {
+    console.log(`Downloading basemind ${version} for ${platformsToDownload[0]}...\n`);
+  } else {
+    console.log(`Downloading basemind ${version} for all platforms...\n`);
+  }
+
+  const existingVersion = fs.existsSync(versionFilePath)
+    ? fs.readFileSync(versionFilePath, 'utf-8').trim()
+    : null;
+  if (existingVersion && existingVersion !== version) {
+    console.log(`Detected basemind version change (${existingVersion} -> ${version}), refreshing binaries...`);
+    for (const platform of platformsToDownload) {
+      fs.rmSync(path.join(BASEMIND_DIR, platform), { recursive: true, force: true });
+    }
+  }
+
+  const tmpDir = path.join(BASEMIND_DIR, '.tmp');
+  if (fs.existsSync(tmpDir)) {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+
+  for (const platform of platformsToDownload) {
+    try {
+      await downloadAndExtract(version, platform);
+    } catch (error) {
+      console.error(`error ${platform}: ${error instanceof Error ? error.message : String(error)}`);
+      process.exit(1);
+    }
+  }
+
+  fs.mkdirSync(BASEMIND_DIR, { recursive: true });
+  fs.writeFileSync(versionFilePath, `${version}\n`);
+
+  const platformLabel = platformsToDownload.length === 1 ? 'platform' : 'platforms';
+  console.log(`\nok ${platformsToDownload.length} ${platformLabel} downloaded to resources/basemind/`);
+}
+
+function isCliEntryPoint(importMetaUrl, argvPath = process.argv[1]) {
+  return Boolean(argvPath) && path.resolve(fileURLToPath(importMetaUrl)) === path.resolve(argvPath);
+}
+
+if (isCliEntryPoint(import.meta.url)) {
+  main().catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
+}

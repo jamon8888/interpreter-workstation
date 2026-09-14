@@ -30,8 +30,7 @@ asarUnpack:
   - "**/*.dylib"
 
 extraResources:
-  - from: node_modules/@jamon8888/basemind-fork/bin
-    to: basemind/bin
+
   - from: resources/smart-turn
     to: smart-turn
   - from: resources/js-repl-runtime/package.json
@@ -157,6 +156,9 @@ afterPack: ./scripts/electron-builder/afterPack.cjs
 
 mac:
   category: public.app-category.productivity
+  extraResources:
+    - from: resources/basemind/darwin-${arch}
+      to: basemind
   hardenedRuntime: true
   gatekeeperAssess: false
   icon: ./resources/icons/app.icns
@@ -229,6 +231,8 @@ win:
   icon: ./resources/icons/app.ico
   artifactName: ${productName}-win-${arch}-${buildVersion}.${ext}
   extraResources:
+    - from: resources/basemind/win32-${arch}
+      to: basemind
     - from: resources/oix/win32-${arch}
       to: oix
     # OIX ships the version-matched Codex sandbox helpers. The app also needs
@@ -251,6 +255,9 @@ linux:
   icon: ./resources/icons/app.png
   artifactName: ${productName}-linux-${arch}-${buildVersion}.${ext}
   category: Office
+  extraResources:
+    - from: resources/basemind/linux-${arch}
+      to: basemind
   target:
     - target: AppImage
       arch: x64
