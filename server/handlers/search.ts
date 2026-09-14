@@ -1,5 +1,4 @@
-import { resolve } from 'node:path';
-import { basemindCommsDir, isDaemonRunning, mcpRequest } from '../utils/basemindManager';
+import { isDaemonRunning, mcpRequest } from '../utils/basemindManager';
 
 export interface SearchHit {
   path: string;
