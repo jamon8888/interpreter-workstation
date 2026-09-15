@@ -68,7 +68,7 @@ async function ensureWarmupWorkspace(needGit: boolean): Promise<string> {
       const gitEnv = { ...process.env, GIT_AUTHOR_NAME: 'basemind-warmup', GIT_AUTHOR_EMAIL: 'basemind-warmup@local', GIT_COMMITTER_NAME: 'basemind-warmup', GIT_COMMITTER_EMAIL: 'basemind-warmup@local' };
       await execFileAsync('git', ['init', '-q'], { cwd: dir });
       await execFileAsync('git', ['add', '-A'], { cwd: dir });
-      await execFileAsync('git', ['commit', '-q', '-m', 'warmup'], { cwd: dir, env: gitEnv });
+      await execFileAsync('git', ['commit', '-q', '--no-gpg-sign', '-m', 'warmup'], { cwd: dir, env: gitEnv });
     }
     return dir;
   } catch (err) {
