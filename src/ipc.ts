@@ -735,7 +735,7 @@ interface BasemindIpc {
   register(): Promise<{ serverId: string }>;
   unregister(): Promise<{ success: boolean }>;
   status(): Promise<{ status: string }>;
-  download(): Promise<BasemindDownloadResult>;
+  download(stage?: 'embeddings' | 'reranker' | 'nerModel'): Promise<BasemindDownloadResult>;
   cpuFeatures(): Promise<CpuFeatures>;
 }
 

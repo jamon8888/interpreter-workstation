@@ -16,10 +16,11 @@ export const MODEL_RESOURCE_REPOS: Record<ModelResource, string[]> = {
 
 /**
  * Resolve the Hugging Face hub cache directory basemind downloads models into.
- * basemind overrides hf-hub's default to ~/.local/share/basemind/hub, so the
- * hub-specific HF cache env vars win (test and distribution overrides), then
- * the hub override used by the PII-ready probe, and finally basemind's XDG
- * data home.
+ * Empirically confirmed (2026-09-15, real `basemind memory documents` run):
+ * with no override, xberg/hf-hub falls back to the standard hf-hub default,
+ * ~/.cache/huggingface/hub — basemind does NOT redirect it to its own XDG
+ * data home. The hub-specific HF cache env vars still win when set (test and
+ * distribution overrides), then INTERPRETER_USER_DATA_DIR, then that default.
  */
 export function resolveHubBaseDir(): string {
   return (
@@ -28,34 +29,43 @@ export function resolveHubBaseDir(): string {
     (process.env.INTERPRETER_USER_DATA_DIR?.trim()
       ? path.join(process.env.INTERPRETER_USER_DATA_DIR.trim(), 'basemind-hub')
       : '') ||
-    path.join(homedir(), '.local', 'share', 'basemind', 'hub')
+    path.join(homedir(), '.cache', 'huggingface', 'hub')
   );
 }
 
+const MAX_ARTIFACT_SEARCH_DEPTH = 4;
+
 /**
- * The hub stores weights at <repo>/snapshots/<revision>/model.onnx, so a
- * downloaded model has no .onnx directly under the repo directory. Check the
- * repo root and one snapshot level down; hf-hub links blobs from the snapshot
- * dir, so symlinks count as cached artifacts.
+ * Recursively look for a `.onnx` file under `dir`, up to `depth` levels down.
+ * A real download landed at
+ * snapshots/<rev>/<preset-name>/model.onnx — one level deeper than a plain
+ * <repo>/snapshots/<rev>/model.onnx guess, so this can't stop at a fixed
+ * depth. hf-hub links blobs from the snapshot dir, so symlinks count.
  */
-export function hubRepoHasArtifact(baseDir: string, repoDir: string): boolean {
-  const dir = path.join(baseDir, repoDir);
-  if (!existsSync(dir)) return false;
+function hasOnnxFile(dir: string, depth: number): boolean {
+  let entries;
   try {
-    if (readdirSync(dir).some((entry) => entry.endsWith('.onnx'))) return true;
-    const snapshots = path.join(dir, 'snapshots');
-    if (!existsSync(snapshots)) return false;
-    return readdirSync(snapshots).some((revision) => {
-      const revisionDir = path.join(snapshots, revision);
-      try {
-        return readdirSync(revisionDir).some((entry) => entry.endsWith('.onnx'));
-      } catch {
-        return false;
-      }
-    });
+    entries = readdirSync(dir, { withFileTypes: true });
   } catch {
     return false;
   }
+  for (const entry of entries) {
+    if (entry.name.endsWith('.onnx')) return true;
+  }
+  if (depth <= 0) return false;
+  for (const entry of entries) {
+    if (entry.isDirectory() || entry.isSymbolicLink()) {
+      if (hasOnnxFile(path.join(dir, entry.name), depth - 1)) return true;
+    }
+  }
+  return false;
+}
+
+/** True when the repo directory (root or nested under snapshots/<rev>/...) has a cached .onnx artifact. */
+export function hubRepoHasArtifact(baseDir: string, repoDir: string): boolean {
+  const dir = path.join(baseDir, repoDir);
+  if (!existsSync(dir)) return false;
+  return hasOnnxFile(dir, MAX_ARTIFACT_SEARCH_DEPTH);
 }
 
 /** True when the resource's model weights are cached in the hub. */

@@ -105,7 +105,7 @@ export function BasemindSetupScreen({ onNext }: BasemindSetupScreenProps) {
       let success = false;
       while (retries <= MAX_RETRIES && !success) {
         try {
-          const result = await basemind.download();
+          const result = await basemind.download(stage);
           const stageResult = result.stages.find((s: { stage: string; success: boolean; skipped?: boolean; error?: string }) => s.stage === stage);
           if (stageResult?.skipped) {
             setStageStates(prev => ({
