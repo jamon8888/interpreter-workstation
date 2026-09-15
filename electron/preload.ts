@@ -378,6 +378,11 @@ export interface ElectronAPI {
     onFilesChanged: (callback: (event: WorkspaceFilesChangedEvent) => void) => () => void;
   };
 
+  // Vault IPC methods (implementation in electron/preload/misc.ts, spread in below)
+  vault: {
+    onOrphanBlobsCleaned: (callback: (event: { count: number }) => void) => () => void;
+  };
+
   // Tool server CRUD + tool execution
   servers: {
     list: () => Promise<{ servers: any[] }>;
