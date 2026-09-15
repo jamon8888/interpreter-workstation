@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { promisify } from 'node:util';
@@ -34,38 +34,51 @@ const WARMUP_QUERY = 'quarterly report renewable energy';
  * embeddings/NER document pipeline — plain .txt isn't a recognized document
  * MIME type and falls back to code parsing) and a source file (for `code
  * semantic`, which the reranker warmup runs through).
+ *
+ * Each call creates an isolated private temp dir (mkdtemp, 0700) so a
+ * pre-existing /tmp path can't be used for symlink attacks. Caller must
+ * remove it via cleanupWarmupWorkspace in a finally block.
+ * Only the reranker stage needs git (basemind's `code` domain enumerates
+ * files via git); embeddings/NER work without a Git executable, which
+ * packaged builds don't ship.
  */
-async function ensureWarmupWorkspace(): Promise<string> {
-  const dir = path.join(tmpdir(), 'basemind-model-warmup');
-  const gitDir = path.join(dir, '.git');
-  const alreadyInitialized = existsSync(gitDir);
-  mkdirSync(dir, { recursive: true });
-  const docPath = path.join(dir, 'warmup.html');
-  writeFileSync(
-    docPath,
-    '<html><body><p>Contact Jane Doe at jane.doe@example.com about the quarterly '
-    + 'report on renewable energy adoption in rural communities.</p></body></html>\n',
-  );
-  const codePath = path.join(dir, 'warmup.js');
-  writeFileSync(
-    codePath,
-    '// Sums renewable energy output for a quarterly report.\n'
-    + 'function sumQuarterlyReport(values) {\n'
-    + '  return values.reduce((total, value) => total + value, 0);\n'
-    + '}\n'
-    + 'module.exports = { sumQuarterlyReport };\n',
-  );
+async function ensureWarmupWorkspace(needGit: boolean): Promise<string> {
+  const dir = mkdtempSync(path.join(tmpdir(), 'basemind-model-warmup-'));
+  try {
+    const docPath = path.join(dir, 'warmup.html');
+    writeFileSync(
+      docPath,
+      '<html><body><p>Contact Jane Doe at jane.doe@example.com about the quarterly '
+      + 'report on renewable energy adoption in rural communities.</p></body></html>\n',
+    );
+    const codePath = path.join(dir, 'warmup.js');
+    writeFileSync(
+      codePath,
+      '// Sums renewable energy output for a quarterly report.\n'
+      + 'function sumQuarterlyReport(values) {\n'
+      + '  return values.reduce((total, value) => total + value, 0);\n'
+      + '}\n'
+      + 'module.exports = { sumQuarterlyReport };\n',
+    );
 
-  // basemind's `code` domain (used by the reranker warmup) enumerates files
-  // via git and returns an empty corpus outside one — `memory documents`
-  // (the embeddings warmup) doesn't need this, but code semantic does.
-  if (!alreadyInitialized) {
-    const gitEnv = { ...process.env, GIT_AUTHOR_NAME: 'basemind-warmup', GIT_AUTHOR_EMAIL: 'basemind-warmup@local', GIT_COMMITTER_NAME: 'basemind-warmup', GIT_COMMITTER_EMAIL: 'basemind-warmup@local' };
-    await execFileAsync('git', ['init', '-q'], { cwd: dir });
-    await execFileAsync('git', ['add', '-A'], { cwd: dir });
-    await execFileAsync('git', ['commit', '-q', '-m', 'warmup'], { cwd: dir, env: gitEnv });
+    // basemind's `code` domain (used by the reranker warmup) enumerates files
+    // via git and returns an empty corpus outside one — `memory documents`
+    // (the embeddings warmup) doesn't need this, but code semantic does.
+    if (needGit) {
+      const gitEnv = { ...process.env, GIT_AUTHOR_NAME: 'basemind-warmup', GIT_AUTHOR_EMAIL: 'basemind-warmup@local', GIT_COMMITTER_NAME: 'basemind-warmup', GIT_COMMITTER_EMAIL: 'basemind-warmup@local' };
+      await execFileAsync('git', ['init', '-q'], { cwd: dir });
+      await execFileAsync('git', ['add', '-A'], { cwd: dir });
+      await execFileAsync('git', ['commit', '-q', '-m', 'warmup'], { cwd: dir, env: gitEnv });
+    }
+    return dir;
+  } catch (err) {
+    cleanupWarmupWorkspace(dir);
+    throw err;
   }
-  return dir;
+}
+
+function cleanupWarmupWorkspace(dir: string): void {
+  rmSync(dir, { recursive: true, force: true });
 }
 
 function stageArgs(stage: BasemindDownloadStage, workspace: string): string[] {
@@ -141,8 +154,20 @@ export async function* basemindDownload(onlyStage?: BasemindDownloadStage): Asyn
       continue;
     }
 
-    const workspace = await ensureWarmupWorkspace();
-    const result = await runWarmup(binary, stage, workspace);
+    let workspace: string;
+    try {
+      workspace = await ensureWarmupWorkspace(stage === 'reranker');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      yield { stage, progress: 0, done: false, error: `warmup workspace setup failed: ${message}` };
+      continue;
+    }
+    let result: { ok: boolean; error?: string };
+    try {
+      result = await runWarmup(binary, stage, workspace);
+    } finally {
+      cleanupWarmupWorkspace(workspace);
+    }
 
     // The warmup command downloads the model, then immediately exercises it
     // (embeds/reranks/detects on the sample doc). A machine-local failure in
