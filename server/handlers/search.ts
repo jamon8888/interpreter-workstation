@@ -106,6 +106,9 @@ export async function basemindSearchCode(params: {
   if (params.limit !== undefined && (typeof params.limit !== 'number' || params.limit <= 0)) {
     throw new Error('limit must be a positive number');
   }
+  if (params.maxTokens !== undefined && (typeof params.maxTokens !== 'number' || params.maxTokens <= 0)) {
+    throw new Error('maxTokens must be a positive number');
+  }
   if (params.rerankerTopK !== undefined && (typeof params.rerankerTopK !== 'number' || params.rerankerTopK <= 0)) {
     throw new Error('rerankerTopK must be a positive number');
   }
