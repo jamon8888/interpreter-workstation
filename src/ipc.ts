@@ -441,11 +441,19 @@ function createElectronClient(): any {
     {},
     {
       get(_, namespace: string) {
-        // If namespace exists in window.electron, use it (proper IPC)
-        if (window.electron && (window.electron as any)[namespace]) {
-          return (window.electron as any)[namespace];
+        const preloadNs = window.electron && (window.electron as any)[namespace];
+        if (preloadNs) {
+          const fallback = createElectronFallbackProxy(namespace);
+          // Merge preload methods (e.g. event subscriptions) with fallback proxy
+          // so methods not in the preload still route through apiRequest.
+          return new Proxy(preloadNs, {
+            get(target, method: string | symbol) {
+              if (method in target) return Reflect.get(target, method);
+              return Reflect.get(fallback, method);
+            },
+          });
         }
-        // Otherwise, use fallback that routes through apiRequest
+        // No preload namespace — pure fallback
         return createElectronFallbackProxy(namespace);
       },
     }
