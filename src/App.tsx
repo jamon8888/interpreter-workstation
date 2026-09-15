@@ -17,7 +17,7 @@ import { LowerLeftNoticeViewport } from "./components/LowerLeftNoticeViewport";
 import { preloadOnboardingTourVideos, disposeOnboardingTourVideos } from "./components/onboarding/tourVideos";
 import { getOnboardingState } from "./api";
 import { shouldShowOnboarding } from "./lib/onboardingGate";
-import { appToasts, backgroundOpacity as backgroundOpacityIpc, theme as themeIpc, primaryColor as primaryColorIpc, windowIpc, locale as localeIpc, profiles as profilesIpc, openPath, getRuntimeSystemInfo } from "@/ipc";
+import { appToasts, backgroundOpacity as backgroundOpacityIpc, theme as themeIpc, primaryColor as primaryColorIpc, windowIpc, locale as localeIpc, profiles as profilesIpc, openPath, getRuntimeSystemInfo, vault } from "@/ipc";
 import { getTabBarClosedPadding as computeTabBarClosedPadding, getTabBarRightPadding as computeTabBarRightPadding } from "./utils/titlebarLayout";
 import { I18nextProvider } from 'react-i18next';
 import i18n from './i18n';
@@ -118,6 +118,14 @@ function AppContent() {
   useEffect(() => {
     return appToasts.onShow((event: { message: string; variant: 'info' | 'success' | 'error'; autoDismissMs?: number }) => {
       showToast(event.message, event.variant, event.autoDismissMs);
+    });
+  }, [showToast]);
+
+  useEffect(() => {
+    return vault.onOrphanBlobsCleaned((event) => {
+      if (event.count > 0) {
+        showToast(`${event.count} orphan blob${event.count === 1 ? '' : 's'} cleaned`, 'info', 5000);
+      }
     });
   }, [showToast]);
 

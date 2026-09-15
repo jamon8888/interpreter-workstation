@@ -34,6 +34,7 @@ export function getOsSecureStore(): OsSecureStore | null {
   if (osSecureStoreForTests !== undefined) return osSecureStoreForTests;
   if (!process.versions.electron) return null;
   // Lazy load electron so browser mode can still typecheck.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- sync Electron API in lazy-load guard
   const electron = require('electron') as { safeStorage?: OsSecureStore };
   const store = electron.safeStorage;
   if (!store || typeof store.isEncryptionAvailable !== 'function') return null;

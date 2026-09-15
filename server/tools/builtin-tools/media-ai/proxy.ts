@@ -159,6 +159,7 @@ async function parseStreamEvent(line: string): Promise<StreamEvent> {
     return JSON.parse(line) as StreamEvent;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
+    // eslint-disable-next-line preserve-caught-error
     throw new Error(
       `Hosted media proxy returned invalid stream JSON: ${message}`,
     );

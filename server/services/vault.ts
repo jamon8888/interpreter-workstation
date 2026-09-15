@@ -14,6 +14,28 @@ import { homedir } from 'node:os';
 import { ToolManager } from '../tools/toolManager';
 import { getOrCreateVaultPassphrase } from './vaultKey';
 import { getAppMcpOwnerThreadId } from './appMcpThread';
+import { runOrphanBlobGcOnce } from './vaultGc';
+import { broadcastEvent } from '../handlers/broadcast';
+import { listAllThreadIds } from '../handlers/agentThreads';
+import { getCodexService, THREAD_LIST_DEFAULTS } from '../../src/lib/codex/service';
+export { runOrphanBlobGcOnce, resetGcFlagForTests } from './vaultGc';
+
+let gcTriggered = false;
+
+async function triggerOrphanGcIfFirstAccess(): Promise<void> {
+  if (gcTriggered) return;
+  gcTriggered = true;
+  try {
+    const service = getCodexService();
+    const threadIds = await listAllThreadIds(service, THREAD_LIST_DEFAULTS);
+    const { cleaned } = runOrphanBlobGcOnce({ activeThreadIds: threadIds });
+    if (cleaned > 0) {
+      broadcastEvent('vault:orphan-blobs-cleaned', { count: cleaned });
+    }
+  } catch {
+    // GC failure is non-fatal; swallow silently
+  }
+}
 
 export function sanitizeVaultDocId(docId: string): string {
   if (!/^[A-Za-z0-9_-]{1,128}$/.test(docId)) {
@@ -26,6 +48,7 @@ export function resolveUserDataDir(): string {
   const override = process.env.INTERPRETER_USER_DATA_DIR?.trim();
   if (override) return override;
   if (process.versions.electron) {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- sync Electron API in lazy-load guard
     const { app } = require('electron') as { app: { getPath(name: 'userData'): string } };
     return app.getPath('userData');
   }
@@ -34,6 +57,22 @@ export function resolveUserDataDir(): string {
 
 export function resolveVaultBlobPath(docId: string, userDataDir = resolveUserDataDir()): string {
   return path.join(userDataDir, 'vaults', `${sanitizeVaultDocId(docId)}.enc`);
+}
+
+export function deleteVaultBlob(docId: string, userDataDir?: string): void {
+  const safeId = sanitizeVaultDocId(docId);
+  const blobPath = resolveVaultBlobPath(safeId, userDataDir);
+  if (fs.existsSync(blobPath)) {
+    fs.rmSync(blobPath);
+  }
+}
+
+export function listVaultBlobDocIds(userDataDir?: string): string[] {
+  const vaultsDir = path.join(userDataDir ?? resolveUserDataDir(), 'vaults');
+  if (!fs.existsSync(vaultsDir)) return [];
+  return fs.readdirSync(vaultsDir)
+    .filter((f) => f.endsWith('.enc') && f !== '.vault-key.enc')
+    .map((f) => f.slice(0, -4));
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -113,6 +152,7 @@ async function decrypt(
   explicitPassphrase?: string,
   toolManager?: VaultToolCaller,
 ): Promise<Record<string, string>> {
+  await triggerOrphanGcIfFirstAccess();
   const passphrase = explicitPassphrase || getOrCreateVaultPassphrase();
   if (!passphrase) throw new Error('[vault] No vault key available to decrypt a rehydration map');
   const blobPath = resolveVaultBlobPath(docId);
@@ -181,6 +221,9 @@ async function encrypt(
 /** Write an encrypted blob to `{userData}/vaults/{docId}.enc`; returns the path. */
 export function persistEncryptedBlob(docId: string, blob: string, userDataDir = resolveUserDataDir()): string {
   if (!blob) throw new Error('[vault] Cannot persist an empty encrypted blob');
+  // Fire-and-forget: GC is async but this method is sync.
+  // The gcTriggered flag ensures it runs at most once per session.
+  triggerOrphanGcIfFirstAccess();
   const blobPath = resolveVaultBlobPath(docId, userDataDir);
   fs.mkdirSync(path.dirname(blobPath), { recursive: true });
   fs.writeFileSync(blobPath, blob, 'utf8');

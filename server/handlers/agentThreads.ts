@@ -1,6 +1,8 @@
 import { trashFile } from './files';
 import { getCodexService, THREAD_LIST_DEFAULTS } from '../../src/lib/codex/service';
 import { deleteRuntimeRehydrationMap } from '../services/runtimeRedaction';
+import { deleteVaultBlob } from '../services/vault';
+import { threadVaultDocId } from '../../src/lib/pii/vaultScope';
 import type { v2 } from './codex-generated-types/index';
 
 type ThreadListService = {
@@ -75,6 +77,7 @@ export async function trashThread(
     const archivedThread = await service.readThread(threadId);
     if (!archivedThread.path) {
       deleteRuntimeRehydrationMap(threadId);
+      deleteVaultBlob(threadVaultDocId(threadId));
       return;
     }
 
@@ -85,10 +88,12 @@ export async function trashThread(
       throw new Error(result.error ?? 'Failed to move thread to trash.');
     }
     deleteRuntimeRehydrationMap(threadId);
+    deleteVaultBlob(threadVaultDocId(threadId));
   } catch (error) {
     try {
       await service.unarchiveThread(threadId);
     } catch (rollbackError) {
+      // eslint-disable-next-line preserve-caught-error
       throw new Error(
         `Failed to move thread to trash: ${getErrorMessage(error)}. Rolling back the archived thread also failed: ${getErrorMessage(rollbackError)}.`,
       );

@@ -1,10 +1,12 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import {
+  deleteVaultBlob,
   extractRehydrationMap,
+  listVaultBlobDocIds,
   resolveVaultBlobPath,
   sanitizeVaultDocId,
   vaultManager,
@@ -144,5 +146,49 @@ describe('vault rehydration round-trip', () => {
     await expect(
       vaultManager.encrypt({ '[EMAIL_0]': 'a@b.c' }, { passphrase: 'test-passphrase', toolManager: emptyVault }),
     ).rejects.toThrow('no blob');
+  });
+});
+
+describe('deleteVaultBlob', () => {
+  test('removes the .enc file for a valid doc id', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'vault-gc-'));
+    const blobPath = join(dir, 'vaults', 'thread-abc.enc');
+    mkdirSync(join(dir, 'vaults'), { recursive: true });
+    writeFileSync(blobPath, 'encrypted');
+    deleteVaultBlob('thread-abc', dir);
+    expect(existsSync(blobPath)).toBe(false);
+    rmSync(dir, { recursive: true });
+  });
+
+  test('is a no-op when the blob does not exist', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'vault-gc-'));
+    mkdirSync(join(dir, 'vaults'), { recursive: true });
+    expect(() => deleteVaultBlob('thread-nonexistent', dir)).not.toThrow();
+    rmSync(dir, { recursive: true });
+  });
+
+  test('rejects invalid doc ids', () => {
+    expect(() => deleteVaultBlob('../escape', '/tmp')).toThrow();
+  });
+});
+
+describe('listVaultBlobDocIds', () => {
+  test('returns doc ids from .enc files in the vaults directory', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'vault-gc-'));
+    const vaultsDir = join(dir, 'vaults');
+    mkdirSync(vaultsDir, { recursive: true });
+    writeFileSync(join(vaultsDir, 'thread-aaa.enc'), 'a');
+    writeFileSync(join(vaultsDir, 'thread-bbb.enc'), 'b');
+    writeFileSync(join(vaultsDir, '.vault-key.enc'), 'k');
+    writeFileSync(join(vaultsDir, 'not-a-blob.txt'), 'x');
+    const ids = listVaultBlobDocIds(dir);
+    expect(ids.sort()).toEqual(['thread-aaa', 'thread-bbb']);
+    rmSync(dir, { recursive: true });
+  });
+
+  test('returns empty array when vaults directory does not exist', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'vault-gc-'));
+    expect(listVaultBlobDocIds(dir)).toEqual([]);
+    rmSync(dir, { recursive: true });
   });
 });

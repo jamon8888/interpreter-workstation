@@ -84,7 +84,9 @@ async function restoreFile(filePath: string, content: string | null) {
 
   try {
     await unlink(filePath);
-  } catch {}
+  } catch {
+    // intentionally empty
+  }
 }
 
 async function backupConfig() {
@@ -109,7 +111,9 @@ async function writeCorruptConfig(content: string) {
 async function writeLegacyConfig(content: string) {
   try {
     await unlink(CONFIG_FILE);
-  } catch {}
+  } catch {
+    // intentionally empty
+  }
 
   await mkdir(LEGACY_CONFIG_DIR, { recursive: true });
   await writeFile(LEGACY_CONFIG_FILE, content, 'utf-8');
@@ -927,11 +931,17 @@ describe('loadConfig migrates stale configs', () => {
     try {
       await access(backupPath);
       backupExists = true;
-    } catch {}
+    } catch {
+      // intentionally empty
+    }
     expect(backupExists).toBe(true);
 
     // Cleanup backup
-    try { await unlink(backupPath); } catch {}
+    try {
+      await unlink(backupPath);
+    } catch {
+      // intentionally empty
+    }
   });
 
   test('should not create backup when config is already current version', async () => {
@@ -950,7 +960,11 @@ describe('loadConfig migrates stale configs', () => {
     await writeCorruptConfig(JSON.stringify(currentConfig));
 
     // Remove any leftover backup
-    try { await unlink(backupPath); } catch {}
+    try {
+      await unlink(backupPath);
+    } catch {
+      // intentionally empty
+    }
 
     await loadConfig();
 
@@ -958,7 +972,9 @@ describe('loadConfig migrates stale configs', () => {
     try {
       await access(backupPath);
       backupExists = true;
-    } catch {}
+    } catch {
+      // intentionally empty
+    }
     expect(backupExists).toBe(false);
   });
 
@@ -1013,7 +1029,11 @@ describe('loadConfig migrates stale configs', () => {
 
 describe('loadConfig migrates legacy MCP OAuth state', () => {
   test('writes matching legacy OAuth entries to the Codex fallback credentials file and removes mcpOAuth from config', async () => {
-    try { await unlink(CREDENTIALS_FILE); } catch {}
+    try {
+      await unlink(CREDENTIALS_FILE);
+    } catch {
+      // intentionally empty
+    }
 
     await writeCorruptConfig(JSON.stringify({
       agents: {},

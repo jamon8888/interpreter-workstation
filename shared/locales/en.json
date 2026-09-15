@@ -1308,6 +1308,7 @@
   "help.explorer.search.title": "Search",
   "help.explorer.search.description": "Find files in the current workspace and any open browser tabs. Use arrow keys and Enter to open a result.",
   "help.explorer.search.placeholder": "Search files and tabs",
+  "titlebar.search.placeholder": "Search workspace (code, docs, notes)...",
   "help.explorer.search.agentSearchDescription": "Uses your Fast model, if selected, to search with an agent.",
   "help.explorer.changeFolder.title": "Change folder",
   "help.explorer.changeFolder.description": "Open a different workspace folder. Search, files, and agents will use that folder.",

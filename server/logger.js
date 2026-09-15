@@ -1,3 +1,4 @@
+/* globals console */
 import fs from 'node:fs';
 import path from 'node:path';
 import util from 'node:util';
@@ -20,7 +21,7 @@ function writeToFile(level, message) {
     try {
         fs.appendFileSync(LOG_FILE, logLine);
     }
-    catch (err) {
+    catch {
         // Silent fail - don't create infinite loop
     }
 }

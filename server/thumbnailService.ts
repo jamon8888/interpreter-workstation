@@ -29,6 +29,7 @@ let electronNativeImage: typeof Electron.nativeImage | null = null;
 
 if (isElectron) {
   try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- sync lazy-load for Electron guard
     const electron = require('electron');
     electronApp = electron.app;
     electronNativeImage = electron.nativeImage;
@@ -45,7 +46,7 @@ interface ThumbnailCacheEntry {
   kind: FileThumbnailKind;
 }
 
-export interface ThumbnailResult extends FileThumbnailData {}
+export type ThumbnailResult = FileThumbnailData;
 
 export interface DimensionResult {
   width: number;

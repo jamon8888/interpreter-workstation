@@ -867,7 +867,9 @@ async function moveInvalidModelConfigFileAside(filePath: string): Promise<string
   try {
     await rename(filePath, backupPath);
     return backupPath;
-  } catch {}
+  } catch {
+    // intentionally empty
+  }
 
   try {
     await copyFile(filePath, backupPath);

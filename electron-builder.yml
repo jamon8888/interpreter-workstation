@@ -30,8 +30,7 @@ asarUnpack:
   - "**/*.dylib"
 
 extraResources:
-  - from: node_modules/@jamon8888/basemind-fork/bin
-    to: basemind/bin
+
   - from: resources/smart-turn
     to: smart-turn
   - from: resources/js-repl-runtime/package.json
@@ -172,6 +171,8 @@ mac:
   sign: null
   notarize: false
   extraResources:
+    - from: resources/basemind/darwin-${arch}
+      to: basemind
     - from: resources/oix/darwin-${arch}
       to: oix
     - from: resources/pdfcpu/darwin-${arch}/pdfcpu
@@ -229,6 +230,8 @@ win:
   icon: ./resources/icons/app.ico
   artifactName: ${productName}-win-${arch}-${buildVersion}.${ext}
   extraResources:
+    - from: resources/basemind/win32-${arch}
+      to: basemind
     - from: resources/oix/win32-${arch}
       to: oix
     # OIX ships the version-matched Codex sandbox helpers. The app also needs
@@ -257,6 +260,8 @@ linux:
     - target: deb
       arch: x64
   extraResources:
+    - from: resources/basemind/linux-${arch}
+      to: basemind
     - from: resources/oix/linux-${arch}
       to: oix
     - from: resources/pdfcpu/linux-${arch}/pdfcpu

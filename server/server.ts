@@ -206,7 +206,7 @@ if (serveBuiltRendererFromServer) {
     }
 
     // Determine file path
-    let filePath = req.path === '/' ? '/index.html' : req.path;
+    const filePath = req.path === '/' ? '/index.html' : req.path;
     const fullPath = pathJoin(distPath, filePath);
 
     try {

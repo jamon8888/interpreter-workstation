@@ -19,6 +19,7 @@ export function isPackagedElectronApp(): boolean {
   }
 
   try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- sync Electron API in packaged-app check
     return require('electron').app.isPackaged;
   } catch {
     return false;

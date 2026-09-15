@@ -6,103 +6,80 @@ export interface PiiDetection {
   confidence: number;
 }
 
+/**
+ * Individual patterns — kept readable for maintenance. Combined into a single
+ * alternation at module init so `detectRegex` makes one pass over the input.
+ *
+ * IBAN comes first: it matches the same digit runs as credit_card, and the
+ * alternation order lets it win ties at the same position.
+ */
+const PATTERNS = {
+  email: /[\w.+-]+@[\w-]+\.[\w.]+/g,
+  iban: /\b[A-Z]{2}\d{2}(?:[ ]?[A-Z0-9]{4}){2,7}(?:[ ]?[A-Z0-9]{1,3})?\b/g,
+  phone: /(\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/g,
+  ipv4: /\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/g,
+  credit_card: /\b\d{4}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4}\b/g,
+} as const;
+
+/**
+ * Single alternation regex built at module load. Named groups identify which
+ * pattern matched. IBAN is first so it wins digit-run ties with credit_card.
+ */
+const COMBINED = (() => {
+  const parts: string[] = [];
+  for (const [category, regex] of Object.entries(PATTERNS)) {
+    parts.push(`(?<${category}>${regex.source})`);
+  }
+  return new RegExp(parts.join('|'), 'g');
+})();
+
 export function detectRegex(text: string): PiiDetection[] {
   const detections: PiiDetection[] = [];
+  // Regex objects with the `g` flag carry mutable state across calls; reset it
+  // so a throw mid-scan on a previous call can't leave a stale lastIndex here.
+  COMBINED.lastIndex = 0;
 
-  // Email pattern
-  const emailRegex = /[\w.+-]+@[\w-]+\.[\w.]+/g;
   let match: RegExpExecArray | null;
-  while ((match = emailRegex.exec(text)) !== null) {
-    const m = match; // help TS narrow the type
+  while ((match = COMBINED.exec(text)) !== null) {
+    const m = match;
+    // Find which named group matched.
+    let category: string | null = null;
+    for (const name of Object.keys(PATTERNS)) {
+      if (m.groups?.[name] !== undefined) { category = name; break; }
+    }
+    if (!category) { COMBINED.lastIndex = m.index + 1; continue; }
+
+    const start = m.index;
+    const end = start + m[0].length;
+
+    // Matches arrive in increasing `start` order, and accepted detections are
+    // kept disjoint by this same check — so their `end` values are
+    // non-decreasing and the last accepted detection always has the greatest
+    // `end` seen so far. Comparing against it alone is enough; no need to
+    // scan the whole accepted list.
+    const last = detections[detections.length - 1];
+    if (last && last.start < end && start < last.end) {
+      COMBINED.lastIndex = m.index + 1;
+      continue;
+    }
+
     detections.push({
-      category: 'email',
-      start: m.index,
-      end: m.index + m[0].length,
+      category,
+      start,
+      end,
       text: m[0],
       confidence: 1.0,
     });
-    emailRegex.lastIndex = m.index + 1;
+
+    // Skip straight past the accepted span: anything the regex would find
+    // inside it necessarily overlaps and would be rejected above anyway.
+    COMBINED.lastIndex = end;
   }
 
-  // IBAN. `iban` already has a colour, a token label and normalization tests,
-  // but no pattern produced one, so the category could never be detected. It runs
-  // before the digit-based patterns so their alreadyCovered guards skip digits
-  // that belong to an IBAN.
-  const ibanRegex = /\b[A-Z]{2}\d{2}(?:[ ]?[A-Z0-9]{4}){2,7}(?:[ ]?[A-Z0-9]{1,3})?\b/g;
-  while ((match = ibanRegex.exec(text)) !== null) {
-    const m = match;
-    detections.push({
-      category: 'iban',
-      start: m.index,
-      end: m.index + m[0].length,
-      text: m[0],
-      confidence: 1.0,
-    });
-    ibanRegex.lastIndex = m.index + 1;
-  }
-
-  // Phone pattern
-  const phoneRegex = /(\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/g;
-  while ((match = phoneRegex.exec(text)) !== null) {
-    const m = match;
-    const alreadyCovered = detections.some(d => d.start <= m.index && m.index + m[0].length <= d.end);
-    if (!alreadyCovered) {
-      detections.push({
-        category: 'phone',
-        start: m.index,
-        end: m.index + m[0].length,
-        text: m[0],
-        confidence: 1.0,
-      });
-    }
-    phoneRegex.lastIndex = m.index + 1;
-  }
-
-  // IPv4 pattern
-  const ipv4Regex = /\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/g;
-  while ((match = ipv4Regex.exec(text)) !== null) {
-    const m = match;
-    const alreadyCovered = detections.some(d => d.start <= m.index && m.index + m[0].length <= d.end);
-    if (!alreadyCovered) {
-      detections.push({
-        category: 'ipv4',
-        start: m.index,
-        end: m.index + m[0].length,
-        text: m[0],
-        confidence: 1.0,
-      });
-    }
-    ipv4Regex.lastIndex = m.index + 1;
-  }
-
-  // Credit card pattern
-  const ccRegex = /\b\d{4}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4}\b/g;
-  while ((match = ccRegex.exec(text)) !== null) {
-    const m = match;
-    const alreadyCovered = detections.some(d => d.start <= m.index && m.index + m[0].length <= d.end);
-    if (!alreadyCovered) {
-      detections.push({
-        category: 'credit_card',
-        start: m.index,
-        end: m.index + m[0].length,
-        text: m[0],
-        confidence: 1.0,
-      });
-    }
-    ccRegex.lastIndex = m.index + 1;
-  }
-
-  // Sort by start position
-  detections.sort((a, b) => a.start - b.start);
-
-  // Merge overlapping/adjacent detections
+  // Merge overlapping/adjacent detections within the same category
   const merged: PiiDetection[] = [];
   for (const d of detections) {
     const last = merged[merged.length - 1];
-    // `last.end >= d.start - 1` also merged detections separated by a single
-    // character, so "a@b.com 555-0100" became one email detection covering the
-    // phone number too — which then rehydrated under a single [EMAIL_n] token.
-    // Merge only real overlaps, and only within the same category.
     if (last && last.category === d.category && last.end >= d.start) {
       merged[merged.length - 1] = {
         category: last.category,

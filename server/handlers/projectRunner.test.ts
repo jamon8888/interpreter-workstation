@@ -102,7 +102,9 @@ async function readPidFile(filePath: string): Promise<number | null> {
 function killPid(pid: number): void {
   try {
     process.kill(pid, 'SIGKILL');
-  } catch {}
+  } catch {
+    // intentionally empty
+  }
 }
 
 async function waitForCondition(

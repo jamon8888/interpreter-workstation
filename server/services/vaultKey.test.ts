@@ -36,7 +36,9 @@ afterEach(() => {
   for (const dir of dirs.splice(0)) {
     try {
       chmodSync(path.join(dir, 'vaults'), 0o700);
-    } catch {}
+    } catch {
+      // intentionally empty
+    }
     rmSync(dir, { recursive: true, force: true });
   }
 });

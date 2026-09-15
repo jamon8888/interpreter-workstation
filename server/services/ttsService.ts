@@ -98,6 +98,7 @@ function getCacheKey(modelId: TtsModelId, provider: TtsProvider): string {
 function getUserDataPath(): string {
   if (process.versions.electron) {
     // Lazy load electron so browser mode can still typecheck.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- sync Electron API in lazy-load guard
     const { app } = require('electron') as { app: { getPath(name: 'userData'): string } };
     return app.getPath('userData');
   }
@@ -640,6 +641,7 @@ function resolveSherpaOnnxModulePath(): string {
     return cachedSherpaOnnxModulePath;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
+    // eslint-disable-next-line preserve-caught-error
     throw new Error(`Failed to resolve sherpa-onnx module path: ${message}`);
   }
 }

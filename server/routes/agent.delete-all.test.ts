@@ -1,4 +1,7 @@
 import { describe, expect, test } from 'bun:test';
+import { mkdtempSync, mkdirSync, writeFileSync, existsSync, rmSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 
 import {
   archiveThreadForHistory,
@@ -287,5 +290,74 @@ describe('agent thread handlers', () => {
     })).rejects.toThrow('Permission denied');
 
     expect(Object.keys(getRuntimeRehydrationMap('thread-map-keep')).length).toBeGreaterThan(0);
+  });
+
+  test('trashThread deletes the vault blob file', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'trash-blob-'));
+    process.env.INTERPRETER_USER_DATA_DIR = dir;
+    try {
+      const vaultsDir = join(dir, 'vaults');
+      mkdirSync(vaultsDir, { recursive: true });
+      const blobPath = join(vaultsDir, 'thread-test123.enc');
+      writeFileSync(blobPath, 'encrypted');
+
+      const service = {
+        readThread: async (threadId: string) => ({
+          id: threadId,
+          preview: '',
+          modelProvider: 'openai',
+          createdAt: 0,
+          updatedAt: 0,
+          status: { type: 'idle' as const },
+          path: '/archived/thread-test123.jsonl',
+          cwd: '/workspace',
+          cliVersion: '0.0.0',
+          source: 'appServer' as const,
+          agentNickname: null,
+          agentRole: null,
+          gitInfo: null,
+          name: null,
+          turns: [],
+        }),
+        archiveThread: async () => {},
+        unarchiveThread: async () => {
+          throw new Error('should not unarchive on success');
+        },
+      };
+
+      await trashThread('test123', {
+        service,
+        trashFileImpl: async () => ({ success: true }),
+      });
+
+      expect(existsSync(blobPath)).toBe(false);
+    } finally {
+      delete process.env.INTERPRETER_USER_DATA_DIR;
+      rmSync(dir, { recursive: true });
+    }
+  });
+
+  test('trashThread deletes vault blob even when thread has no path', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'trash-nopath-'));
+    process.env.INTERPRETER_USER_DATA_DIR = dir;
+    try {
+      const vaultsDir = join(dir, 'vaults');
+      mkdirSync(vaultsDir, { recursive: true });
+      const blobPath = join(vaultsDir, 'thread-nopath123.enc');
+      writeFileSync(blobPath, 'encrypted');
+
+      const service = {
+        readThread: async () => ({ id: 'nopath123', path: null }),
+        archiveThread: async () => {},
+        unarchiveThread: async () => {},
+      };
+
+      await trashThread('nopath123', { service });
+
+      expect(existsSync(blobPath)).toBe(false);
+    } finally {
+      delete process.env.INTERPRETER_USER_DATA_DIR;
+      rmSync(dir, { recursive: true });
+    }
   });
 });

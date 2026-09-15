@@ -2486,6 +2486,7 @@ export async function getAllProfileStatuses(isAuthenticated?: boolean): Promise<
   for (const profile of profiles) {
     const id = profile.id;
     let ready = false;
+    // eslint-disable-next-line no-useless-assignment -- 'detail' serves as default for the switch below
     let detail = 'Not configured';
     let badge: string | undefined;
 

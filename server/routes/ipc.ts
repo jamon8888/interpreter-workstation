@@ -179,6 +179,23 @@ const handlers: Record<string, Record<string, HandlerFn>> = {
     },
   },
 
+  // ========== Search (basemind code/document search) ==========
+  search: {
+    searchCode: async ([params]: [{
+      query: string;
+      limit?: number;
+      maxTokens?: number;
+      format?: string;
+      lane?: string;
+      rerankerEnabled?: boolean;
+      rerankerPreset?: string;
+      rerankerTopK?: number;
+    }]) => {
+      const { basemindSearchCode } = await import('../handlers/search');
+      return basemindSearchCode(params);
+    },
+  },
+
   // ========== PII redaction and rehydration ==========
   // The renderer redacts at the send boundary, so this namespace has to exist
   // for `pii.detectPii` in `src/ipc.ts` to reach anything. Without it the

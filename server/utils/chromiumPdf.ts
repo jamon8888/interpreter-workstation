@@ -55,6 +55,7 @@ function getElectronForPdf(): { BrowserWindow: any } {
   if (override && typeof override === 'object') {
     return override;
   }
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- sync Electron API for PDF generation
   return require('electron');
 }
 

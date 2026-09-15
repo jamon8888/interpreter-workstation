@@ -433,6 +433,7 @@ export function getFileAccessDeniedMessage(
   const permissions = toRuntimeFileAccessPolicy(permissionsData);
   const workspace = workspaceOverride ?? getCurrentWorkspace();
 
+  // eslint-disable-next-line no-useless-assignment -- initial value needed for try/catch scope
   let resolvedPath = inputPath;
   try {
     resolvedPath = resolvePathWithWorkspace(inputPath, workspace);

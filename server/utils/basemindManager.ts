@@ -11,15 +11,32 @@ const BINARY_NAME = process.platform === 'win32' ? 'basemind.exe' : 'basemind';
 function findBasemindBinary(): string {
   const projectRoot = process.cwd();
 
+  // Packaged app: electron-builder extraResources places basemind at
+  // <resourcesPath>/basemind/basemind. Check this first so installed
+  // users get the bundled binary without needing a local Rust toolchain.
+  if (process.resourcesPath) {
+    const packaged = resolve(process.resourcesPath, 'basemind', BINARY_NAME);
+    if (existsSync(packaged)) return packaged;
+  }
+
+  // Dev checkout and CI: `pnpm download:basemind` stages the binary at
+  // resources/basemind/<platform>-<arch>/ (the layout `download-basemind.mjs`
+  // writes and `extraResources` reads for packaging). Checked before PATH for
+  // the same reason as the packaged path above: a stray basemind on a
+  // developer's PATH should not silently take the place of the pinned build.
+  const devPlatformKey = `${process.platform}-${process.arch}`;
+  const devStaged = resolve(projectRoot, 'resources', 'basemind', devPlatformKey, BINARY_NAME);
+  if (existsSync(devStaged)) return devStaged;
+
   const pathBin = process.env.PATH?.split(process.platform === 'win32' ? ';' : ':')
     .map(p => resolve(p, BINARY_NAME))
     .find(p => { try { return existsSync(p); } catch { return false; } }) ?? '';
   if (pathBin) return pathBin;
 
-  const localDebug = resolve(projectRoot, 'basemind', 'target', 'debug', BINARY_NAME);
+  const localDebug = resolve(projectRoot, 'submodules', 'basemind', 'target', 'debug', BINARY_NAME);
   if (existsSync(localDebug)) return localDebug;
 
-  const localRelease = resolve(projectRoot, 'basemind', 'target', 'release', BINARY_NAME);
+  const localRelease = resolve(projectRoot, 'submodules', 'basemind', 'target', 'release', BINARY_NAME);
   if (existsSync(localRelease)) return localRelease;
 
   const cargoBin = resolve(homedir(), '.cargo', 'bin', BINARY_NAME);
@@ -32,7 +49,9 @@ function findBasemindBinary(): string {
     const npmPackageJson = createRequire(import.meta.url).resolve('basemind/package.json');
     const npmBin = resolve(npmPackageJson, '..', 'bin', BINARY_NAME);
     if (existsSync(npmBin)) return npmBin;
-  } catch {}
+  } catch {
+    // intentionally empty
+  }
 
   return '';
 }
@@ -40,6 +59,8 @@ function findBasemindBinary(): string {
 function basemindCommsDir(): string {
   return resolve(homedir(), '.local', 'share', 'basemind', 'comms');
 }
+
+export { basemindCommsDir };
 
 export function isDaemonRunning(): boolean {
   const sock = resolve(basemindCommsDir(), 'comms.sock');
@@ -67,7 +88,7 @@ export function resolveBasemindBinary(): string {
   return _cachedBinary;
 }
 
-function mcpRequest(method: string, params: Record<string, unknown> = {}): Promise<unknown> {
+export function mcpRequest(method: string, params: Record<string, unknown> = {}): Promise<unknown> {
   const sockPath = resolve(basemindCommsDir(), 'comms.sock');
   return new Promise((resolve, reject) => {
     const sock = new Socket();
@@ -191,7 +212,9 @@ export async function unregisterBasemindServer(): Promise<void> {
   const { getToolManager } = await import('../tools/toolManagerAccessor');
   try {
     await getToolManager().removeServer('basemind');
-  } catch {}
+  } catch {
+    // intentionally empty
+  }
 }
 
 export async function getBasemindServerStatus(): Promise<{ status: string }> {
