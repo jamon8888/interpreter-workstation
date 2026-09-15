@@ -249,10 +249,10 @@ const handlers: Record<string, Record<string, HandlerFn>> = {
         return { status: 'disconnected' };
       }
     },
-    download: async () => {
+    download: async ([stage]: [import('../handlers/basemindDownload').BasemindDownloadStage?] = []) => {
       const { basemindDownload } = await import('../handlers/basemindDownload');
       const results: Array<{ stage: string; success: boolean; error?: string }> = [];
-      for await (const update of basemindDownload()) {
+      for await (const update of basemindDownload(stage)) {
         if (update.done || update.error) {
           results.push({
             stage: update.stage,
