@@ -19,16 +19,17 @@ export const MODEL_RESOURCE_REPOS: Record<ModelResource, string[]> = {
  * Empirically confirmed (2026-09-15, real `basemind memory documents` run):
  * with no override, xberg/hf-hub falls back to the standard hf-hub default,
  * ~/.cache/huggingface/hub — basemind does NOT redirect it to its own XDG
- * data home. The hub-specific HF cache env vars still win when set (test and
- * distribution overrides), then INTERPRETER_USER_DATA_DIR, then that default.
+ * data home and does NOT read INTERPRETER_USER_DATA_DIR (that variable only
+ * exists in this server process, so a branch honoring it points the readiness
+ * check at a directory the binary never writes to and every download reports
+ * "no model artifact found" forever). The hub-specific HF cache env vars
+ * still win when set, since the spawned binary inherits this process env and
+ * hf-hub honors them on both sides.
  */
 export function resolveHubBaseDir(): string {
   return (
     process.env.HF_HUB_CACHE?.trim() ||
     process.env.HUGGINGFACE_HUB_CACHE?.trim() ||
-    (process.env.INTERPRETER_USER_DATA_DIR?.trim()
-      ? path.join(process.env.INTERPRETER_USER_DATA_DIR.trim(), 'basemind-hub')
-      : '') ||
     path.join(homedir(), '.cache', 'huggingface', 'hub')
   );
 }
