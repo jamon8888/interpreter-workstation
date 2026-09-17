@@ -23,7 +23,7 @@ const STAGE_CONFIG: Record<Stage, StageConfig> = {
     description: 'Helps the app understand what your code and documents mean, so you can search by concept instead of exact words.',
     size: '113 MB',
     model: 'bge-base-en-v1.5',
-    requiresAvx2: false,
+    requiresAvx2: true,
   },
   reranker: {
     label: 'Better results',
@@ -65,11 +65,11 @@ export function BasemindSetupScreen({ onNext }: BasemindSetupScreenProps) {
   const [currentStage, setCurrentStage] = useState<Stage | null>(null);
   const [isDownloading, setIsDownloading] = useState(false);
   const [isSkipped, setIsSkipped] = useState(false);
-  const [cpuFeatures, setCpuFeatures] = useState<{ arch: string; avx2: boolean } | null>(null);
+  const [cpuFeatures, setCpuFeatures] = useState<{ arch: string; avx2: boolean; noavx2Build: boolean } | null>(null);
 
   useEffect(() => {
     basemind.cpuFeatures().then(setCpuFeatures).catch(() => {
-      setCpuFeatures({ arch: 'unknown', avx2: false });
+      setCpuFeatures({ arch: 'unknown', avx2: false, noavx2Build: false });
     });
   }, []);
 
@@ -77,9 +77,10 @@ export function BasemindSetupScreen({ onNext }: BasemindSetupScreenProps) {
     const config = STAGE_CONFIG[stage];
     if (!config.requiresAvx2) return true;
     if (!cpuFeatures) return true;
+    // The SSE2-baseline binary runs AVX2-gated models on any x86_64 CPU.
+    if (cpuFeatures.noavx2Build) return true;
     if (cpuFeatures.arch === 'aarch64') return true;
-    if (cpuFeatures.arch === 'x86_64') return cpuFeatures.avx2;
-    return true;
+    return cpuFeatures.avx2;
   }, [cpuFeatures]);
 
   const runDownload = useCallback(async (onlyStage: Stage | null = null) => {

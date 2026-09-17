@@ -46,6 +46,15 @@ const PLATFORMS = {
     asset: 'basemind-x86_64-unknown-linux-gnu.tar.gz',
     binary: 'basemind',
   },
+  // SSE2-baseline build for pre-Haswell CPUs without AVX2 (e.g. Sandy Bridge):
+  // same `full` feature set, ONNX Runtime built from source + loaded via
+  // ort-dynamic. Selected automatically by --current-platform on AVX2-less
+  // linux-x64; outros platforms have no AVX2-less variant.
+  'linux-x64-noavx2': {
+    target: 'x86_64-unknown-linux-gnu',
+    asset: 'basemind-x86_64-unknown-linux-gnu-noavx2.tar.gz',
+    binary: 'basemind',
+  },
   'linux-arm64': {
     target: 'aarch64-unknown-linux-gnu',
     asset: 'basemind-aarch64-unknown-linux-gnu.tar.gz',
@@ -66,6 +75,23 @@ export function getPlatformKey(platform = process.platform, arch = process.arch)
   return `${osPlatform}-${arch}`;
 }
 
+/**
+ * True when the CPU supports AVX2. Only linux-x64 has a noavx2 variant, so
+ * every other platform short-circuits to true. Unknown/unreadable → true
+ * (preserve current behavior; a truly incompatible CPU fails later with the
+ * download handler's explicit "CPU may lack AVX2" error).
+ */
+export function hasAvx2({ platform = process.platform, cpuinfo } = {}) {
+  if (platform !== 'linux') return true;
+  try {
+    const text = cpuinfo ?? fs.readFileSync('/proc/cpuinfo', 'utf8');
+    const flags = text.split('\n').find((line) => line.startsWith('flags'))?.split(':')[1] ?? '';
+    return flags.trim().split(/\s+/).includes('avx2');
+  } catch {
+    return true;
+  }
+}
+
 export function parseArgs(args) {
   const currentPlatformOnly = args.includes('--current-platform');
   const platformIndex = args.indexOf('--platform');
@@ -75,7 +101,7 @@ export function parseArgs(args) {
   return { version, currentPlatformOnly, requestedPlatform };
 }
 
-export function getPlatformsToDownload({ currentPlatformOnly = false, requestedPlatform, currentPlatformKey = getPlatformKey() } = {}) {
+export function getPlatformsToDownload({ currentPlatformOnly = false, requestedPlatform, currentPlatformKey = getPlatformKey(), avx2 = hasAvx2() } = {}) {
   if (requestedPlatform) {
     if (!PLATFORM_KEYS.includes(requestedPlatform)) {
       throw new Error(`No basemind binary available for platform: ${requestedPlatform}`);
@@ -84,10 +110,13 @@ export function getPlatformsToDownload({ currentPlatformOnly = false, requestedP
   }
 
   if (currentPlatformOnly) {
-    if (!PLATFORM_KEYS.includes(currentPlatformKey)) {
-      throw new Error(`No basemind binary available for platform: ${currentPlatformKey}`);
+    // On AVX2-less linux-x64 the stock ONNX Runtime SIGILL-crashes; take the
+    // SSE2-baseline build instead.
+    const key = currentPlatformKey === 'linux-x64' && !avx2 ? 'linux-x64-noavx2' : currentPlatformKey;
+    if (!PLATFORM_KEYS.includes(key)) {
+      throw new Error(`No basemind binary available for platform: ${key}`);
     }
-    return [currentPlatformKey];
+    return [key];
   }
 
   return [...PLATFORM_KEYS];

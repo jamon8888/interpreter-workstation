@@ -5,6 +5,7 @@ import {
   getPlatformKey,
   parseArgs,
   getPlatformsToDownload,
+  hasAvx2,
   PLATFORM_KEYS,
   BASEMIND_PLATFORMS,
 } from './download-basemind.mjs';
@@ -46,8 +47,33 @@ test('getPlatformsToDownload returns single platform for --platform', () => {
 });
 
 test('getPlatformsToDownload returns current platform for --current-platform', () => {
-  const platforms = getPlatformsToDownload({ currentPlatformOnly: true, currentPlatformKey: 'linux-x64' });
+  const platforms = getPlatformsToDownload({ currentPlatformOnly: true, currentPlatformKey: 'linux-x64', avx2: true });
   assert.deepEqual(platforms, ['linux-x64']);
+});
+
+test('getPlatformsToDownload selects noavx2 on AVX2-less linux-x64', () => {
+  const platforms = getPlatformsToDownload({ currentPlatformOnly: true, currentPlatformKey: 'linux-x64', avx2: false });
+  assert.deepEqual(platforms, ['linux-x64-noavx2']);
+});
+
+test('getPlatformsToDownload keeps stock build on AVX2 linux-x64', () => {
+  const platforms = getPlatformsToDownload({ currentPlatformOnly: true, currentPlatformKey: 'linux-x64', avx2: true });
+  assert.deepEqual(platforms, ['linux-x64']);
+});
+
+test('getPlatformsToDownload accepts explicit --platform linux-x64-noavx2', () => {
+  const platforms = getPlatformsToDownload({ requestedPlatform: 'linux-x64-noavx2' });
+  assert.deepEqual(platforms, ['linux-x64-noavx2']);
+});
+
+test('hasAvx2 detects flags from cpuinfo text', () => {
+  assert.equal(hasAvx2({ platform: 'linux', cpuinfo: 'flags\t\t: fpu avx avx2 sse4_1\n' }), true);
+  assert.equal(hasAvx2({ platform: 'linux', cpuinfo: 'flags\t\t: fpu avx sse4_1\n' }), false);
+});
+
+test('hasAvx2 is true off-linux (no noavx2 variant elsewhere)', () => {
+  assert.equal(hasAvx2({ platform: 'darwin' }), true);
+  assert.equal(hasAvx2({ platform: 'win32' }), true);
 });
 
 test('getPlatformsToDownload throws on unknown platform', () => {

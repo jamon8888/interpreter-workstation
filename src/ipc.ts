@@ -729,6 +729,8 @@ interface CpuFeatures {
   sse4_1: boolean;
   sse4_2: boolean;
   neon: boolean;
+  /** True when the resolved basemind binary is the SSE2-baseline build, which runs AVX2-gated models on any x86_64 CPU. */
+  noavx2Build: boolean;
 }
 
 interface BasemindIpc {
@@ -798,7 +800,7 @@ export const search: SearchIpc = isMarketingDemoMode()
   ? { searchCode: async () => { throw new Error('Not available in demo mode'); } }
   : (client.search as SearchIpc);
 export const basemind: BasemindIpc = isMarketingDemoMode()
-  ? { register: async () => { throw new Error('Not available in demo mode'); }, unregister: async () => { throw new Error('Not available in demo mode'); }, status: async () => { throw new Error('Not available in demo mode'); }, download: async () => { throw new Error('Not available in demo mode'); }, cpuFeatures: async () => ({ arch: 'unknown', avx2: false, avx: false, sse4_1: false, sse4_2: false, neon: false }) }
+  ? { register: async () => { throw new Error('Not available in demo mode'); }, unregister: async () => { throw new Error('Not available in demo mode'); }, status: async () => { throw new Error('Not available in demo mode'); }, download: async () => { throw new Error('Not available in demo mode'); }, cpuFeatures: async () => ({ arch: 'unknown', avx2: false, avx: false, sse4_1: false, sse4_2: false, neon: false, noavx2Build: false }) }
   : (client.basemind as BasemindIpc);
 export const pii: PiiIpc = isMarketingDemoMode()
   ? {

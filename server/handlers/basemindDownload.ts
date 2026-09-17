@@ -125,6 +125,13 @@ async function runWarmup(binary: string, stage: BasemindDownloadStage, workspace
   } catch (err) {
     const stderr = err && typeof err === 'object' && 'stderr' in err ? String((err as { stderr?: unknown }).stderr ?? '') : '';
     const tail = stderr.trim().split('\n').slice(-3).join(' ').slice(0, 300);
+    // A signal kill (e.g. SIGILL on CPUs without AVX2, which the stock ONNX
+    // Runtime requires) leaves no stderr — surface a clear cause instead of
+    // the cryptic "Command failed" line.
+    const signal = err && typeof err === 'object' && 'signal' in err ? String((err as { signal?: unknown }).signal ?? '') : '';
+    if (signal) {
+      return { ok: false, error: `warmup command killed by ${signal} — this CPU may lack AVX2, which the bundled ONNX Runtime requires` };
+    }
     const message = err instanceof Error ? err.message : String(err);
     return { ok: false, error: tail || message };
   }

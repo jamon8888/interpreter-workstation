@@ -262,6 +262,11 @@ linux:
   extraResources:
     - from: resources/basemind/linux-${arch}
       to: basemind
+    # SSE2-baseline build for pre-Haswell CPUs without AVX2. Only linux-x64
+    # has two variants; the runtime resolver (findBasemindBinary) picks this
+    # one on AVX2-less machines. ~300MB extra in the Linux package.
+    - from: resources/basemind/linux-x64-noavx2
+      to: basemind-noavx2
     - from: resources/oix/linux-${arch}
       to: oix
     - from: resources/pdfcpu/linux-${arch}/pdfcpu

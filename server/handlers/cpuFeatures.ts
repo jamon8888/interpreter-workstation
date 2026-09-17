@@ -1,5 +1,7 @@
 import { resolveBasemindBinary } from '../utils/basemindManager';
 import { spawn } from 'node:child_process';
+import { readFileSync } from 'node:fs';
+import { arch } from 'node:os';
 
 const DEFAULT_FEATURES = { arch: 'unknown', avx2: false, avx: false, sse4_1: false, sse4_2: false, neon: false };
 
@@ -23,23 +25,48 @@ function isCpuFeatures(value: unknown): value is CpuFeatures {
   return FEATURE_FLAGS.every((flag) => typeof record[flag] === 'boolean');
 }
 
+function detectFromProcCpuinfo(): CpuFeatures {
+  try {
+    const cpuinfo = readFileSync('/proc/cpuinfo', 'utf-8');
+    const flags = cpuinfo
+      .split('\n')
+      .find(line => line.startsWith('flags'))
+      ?.split(':')?.[1]
+      ?.trim()
+      ?.split(/\s+/) ?? [];
+
+    const hostArch = arch();
+    const mapped = hostArch === 'x64' ? 'x86_64' : hostArch === 'arm64' ? 'aarch64' : hostArch;
+
+    return {
+      arch: mapped,
+      avx2: flags.includes('avx2'),
+      avx: flags.includes('avx'),
+      sse4_1: flags.includes('sse4_1'),
+      sse4_2: flags.includes('sse4_2'),
+      neon: flags.includes('asimd') || flags.includes('neon'),
+    };
+  } catch {
+    return DEFAULT_FEATURES;
+  }
+}
+
 /**
  * Detect CPU feature flags by shelling out to `basemind cpu-features`.
- * Returns a safe fallback on any error — the UI decides what to do.
+ * Falls back to reading `/proc/cpuinfo` on Linux when the subcommand
+ * is unavailable, then to a safe default.
  */
 export async function cpuFeatures(): Promise<{ arch: string; avx2: boolean; avx: boolean; sse4_1: boolean; sse4_2: boolean; neon: boolean }> {
   const binary = resolveBasemindBinary();
-  if (!binary) return DEFAULT_FEATURES;
+  if (!binary) return detectFromProcCpuinfo();
 
   return new Promise((resolve) => {
     const child = spawn(binary, ['cpu-features'], { stdio: 'pipe' });
     let stdout = '';
     let settled = false;
-    // A hung child emits neither `close` nor `error`, and onboarding awaits this
-    // promise, so without a deadline the flow waits forever.
     const timer = setTimeout(() => {
       child.kill('SIGKILL');
-      settle(DEFAULT_FEATURES);
+      settle(detectFromProcCpuinfo());
     }, DETECTION_TIMEOUT_MS);
     function settle(features: CpuFeatures): void {
       if (settled) return;
@@ -52,12 +79,12 @@ export async function cpuFeatures(): Promise<{ arch: string; avx2: boolean; avx:
       if (code === 0) {
         try {
           const parsed: unknown = JSON.parse(stdout.trim());
-          settle(isCpuFeatures(parsed) ? parsed : DEFAULT_FEATURES);
-        } catch { settle(DEFAULT_FEATURES); }
+          settle(isCpuFeatures(parsed) ? parsed : detectFromProcCpuinfo());
+        } catch { settle(detectFromProcCpuinfo()); }
       } else {
-        settle(DEFAULT_FEATURES);
+        settle(detectFromProcCpuinfo());
       }
     });
-    child.on('error', () => settle(DEFAULT_FEATURES));
+    child.on('error', () => settle(detectFromProcCpuinfo()));
   });
 }
