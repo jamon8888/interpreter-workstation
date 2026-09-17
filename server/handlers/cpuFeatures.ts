@@ -25,29 +25,35 @@ function isCpuFeatures(value: unknown): value is CpuFeatures {
   return FEATURE_FLAGS.every((flag) => typeof record[flag] === 'boolean');
 }
 
+function hostArchMapped(): string {
+  const hostArch = arch();
+  return hostArch === 'x64' ? 'x86_64' : hostArch === 'arm64' ? 'aarch64' : hostArch;
+}
+
 function detectFromProcCpuinfo(): CpuFeatures {
+  const mapped = hostArchMapped();
   try {
     const cpuinfo = readFileSync('/proc/cpuinfo', 'utf-8');
-    const flags = cpuinfo
+    // x86 reports `flags:`, ARM reports `Features:` — match both.
+    const flagLines = cpuinfo
       .split('\n')
-      .find(line => line.startsWith('flags'))
-      ?.split(':')?.[1]
-      ?.trim()
-      ?.split(/\s+/) ?? [];
-
-    const hostArch = arch();
-    const mapped = hostArch === 'x64' ? 'x86_64' : hostArch === 'arm64' ? 'aarch64' : hostArch;
-
+      .filter((line) => line.startsWith('flags') || line.startsWith('Features'));
+    if (flagLines.length === 0) {
+      return { ...DEFAULT_FEATURES, arch: mapped };
+    }
+    // Require the feature on every core — the process can migrate.
+    const perCore = flagLines.map((line) => (line.split(':')[1] ?? '').trim().split(/\s+/));
+    const has = (flag: string): boolean => perCore.every((flags) => flags.includes(flag));
     return {
       arch: mapped,
-      avx2: flags.includes('avx2'),
-      avx: flags.includes('avx'),
-      sse4_1: flags.includes('sse4_1'),
-      sse4_2: flags.includes('sse4_2'),
-      neon: flags.includes('asimd') || flags.includes('neon'),
+      avx2: has('avx2'),
+      avx: has('avx'),
+      sse4_1: has('sse4_1'),
+      sse4_2: has('sse4_2'),
+      neon: has('asimd') || has('neon'),
     };
   } catch {
-    return DEFAULT_FEATURES;
+    return { ...DEFAULT_FEATURES, arch: mapped };
   }
 }
 

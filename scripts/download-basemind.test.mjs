@@ -47,18 +47,18 @@ test('getPlatformsToDownload returns single platform for --platform', () => {
 });
 
 test('getPlatformsToDownload returns current platform for --current-platform', () => {
-  const platforms = getPlatformsToDownload({ currentPlatformOnly: true, currentPlatformKey: 'linux-x64', avx2: true });
-  assert.deepEqual(platforms, ['linux-x64']);
+  const platforms = getPlatformsToDownload({ currentPlatformOnly: true, currentPlatformKey: 'darwin-arm64', avx2: true });
+  assert.deepEqual(platforms, ['darwin-arm64']);
 });
 
-test('getPlatformsToDownload selects noavx2 on AVX2-less linux-x64', () => {
+test('getPlatformsToDownload stages both linux variants (AVX2 host)', () => {
+  const platforms = getPlatformsToDownload({ currentPlatformOnly: true, currentPlatformKey: 'linux-x64', avx2: true });
+  assert.deepEqual(platforms, ['linux-x64', 'linux-x64-noavx2']);
+});
+
+test('getPlatformsToDownload stages noavx2 first on AVX2-less linux-x64', () => {
   const platforms = getPlatformsToDownload({ currentPlatformOnly: true, currentPlatformKey: 'linux-x64', avx2: false });
-  assert.deepEqual(platforms, ['linux-x64-noavx2']);
-});
-
-test('getPlatformsToDownload keeps stock build on AVX2 linux-x64', () => {
-  const platforms = getPlatformsToDownload({ currentPlatformOnly: true, currentPlatformKey: 'linux-x64', avx2: true });
-  assert.deepEqual(platforms, ['linux-x64']);
+  assert.deepEqual(platforms, ['linux-x64-noavx2', 'linux-x64']);
 });
 
 test('getPlatformsToDownload accepts explicit --platform linux-x64-noavx2', () => {
@@ -69,6 +69,15 @@ test('getPlatformsToDownload accepts explicit --platform linux-x64-noavx2', () =
 test('hasAvx2 detects flags from cpuinfo text', () => {
   assert.equal(hasAvx2({ platform: 'linux', cpuinfo: 'flags\t\t: fpu avx avx2 sse4_1\n' }), true);
   assert.equal(hasAvx2({ platform: 'linux', cpuinfo: 'flags\t\t: fpu avx sse4_1\n' }), false);
+});
+
+test('hasAvx2 returns true when flags line is missing', () => {
+  assert.equal(hasAvx2({ platform: 'linux', cpuinfo: 'processor\t: 0\nvendor_id\t: GenuineIntel\n' }), true);
+});
+
+test('hasAvx2 requires avx2 on every flags line', () => {
+  const mixed = 'flags\t\t: fpu avx avx2\nflags\t\t: fpu avx sse4_1\n';
+  assert.equal(hasAvx2({ platform: 'linux', cpuinfo: mixed }), false);
 });
 
 test('hasAvx2 is true off-linux (no noavx2 variant elsewhere)', () => {

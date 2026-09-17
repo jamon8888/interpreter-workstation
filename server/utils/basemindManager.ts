@@ -18,8 +18,9 @@ export function cpuHasAvx2(): boolean {
   if (process.platform !== 'linux' || process.arch !== 'x64') return true;
   try {
     const text = readFileSync('/proc/cpuinfo', 'utf8');
-    const flags = text.split('\n').find((line) => line.startsWith('flags'))?.split(':')[1] ?? '';
-    return flags.trim().split(/\s+/).includes('avx2');
+    const flagLines = text.split('\n').filter((line) => line.startsWith('flags'));
+    if (flagLines.length === 0) return true;
+    return flagLines.every((line) => (line.split(':')[1] ?? '').trim().split(/\s+/).includes('avx2'));
   } catch {
     return true;
   }
@@ -27,7 +28,7 @@ export function cpuHasAvx2(): boolean {
 
 /** True when the path is the SSE2-baseline build (staged `linux-x64-noavx2/` dir or packaged `basemind-noavx2/`). */
 export function isNoAvx2BasemindBinary(binaryPath: string): boolean {
-  return binaryPath.includes('noavx2');
+  return binaryPath.includes('/noavx2/') || binaryPath.includes('\\noavx2\\') || binaryPath.includes('linux-x64-noavx2');
 }
 
 function findBasemindBinary(): string {

@@ -131,12 +131,21 @@ async function runWarmup(binary: string, stage: BasemindDownloadStage, workspace
   } catch (err) {
     const stderr = err && typeof err === 'object' && 'stderr' in err ? String((err as { stderr?: unknown }).stderr ?? '') : '';
     const tail = stderr.trim().split('\n').slice(-3).join(' ').slice(0, 300);
-    // A signal kill (e.g. SIGILL on CPUs without AVX2, which the stock ONNX
-    // Runtime requires) leaves no stderr — surface a clear cause instead of
-    // the cryptic "Command failed" line.
-    const signal = err && typeof err === 'object' && 'signal' in err ? String((err as { signal?: unknown }).signal ?? '') : '';
+    // Only SIGILL indicates the stock ONNX Runtime hitting a missing
+    // instruction (AVX2 on pre-Haswell CPUs) — it leaves no stderr, so
+    // surface a clear cause. SIGTERM is the warmup timeout, anything else
+    // keeps the generic message.
+    const signal = err && typeof err === 'object' && 'signal' in err
+      ? (err as { signal?: unknown }).signal
+      : undefined;
+    if (signal === 'SIGILL') {
+      return { ok: false, error: `warmup command killed by SIGILL — this CPU may lack AVX2, which the bundled ONNX Runtime requires` };
+    }
+    if (signal === 'SIGTERM') {
+      return { ok: false, error: `warmup command timed out after ${WARMUP_TIMEOUT_MS / 1000}s` };
+    }
     if (signal) {
-      return { ok: false, error: `warmup command killed by ${signal} — this CPU may lack AVX2, which the bundled ONNX Runtime requires` };
+      return { ok: false, error: `warmup command killed by ${String(signal)}` };
     }
     const message = err instanceof Error ? err.message : String(err);
     return { ok: false, error: tail || message };
@@ -182,8 +191,8 @@ export async function* basemindDownload(onlyStage?: BasemindDownloadStage): Asyn
     try {
       result = await runWarmup(binary, stage, workspace, commsDir);
     } finally {
-      cleanupWarmupWorkspace(workspace);
-      cleanupWarmupWorkspace(commsDir);
+      try { cleanupWarmupWorkspace(workspace); } catch { /* best effort */ }
+      try { cleanupWarmupWorkspace(commsDir); } catch { /* best effort */ }
     }
 
     // The warmup command downloads the model, then immediately exercises it

@@ -21,6 +21,6 @@ Build basemind with pure-Rust features only (no ONNX Runtime dependency) as a si
 - ORT-backed late interaction (ColBERT) — no pure-Rust replacement
 - ORT-backed transcription (Whisper) — no pure-Rust replacement
 
-**Blocked by**: none (can build independently)
+**Blocked by**: pinned manifest (feature set), dispatcher changes, and safetensors model-format support — not independently buildable as-is.
 
 **This is the "good enough" path** — simpler build, no ORT at all, but missing reranker and some ML features.

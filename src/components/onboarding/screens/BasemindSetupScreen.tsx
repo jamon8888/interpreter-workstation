@@ -80,7 +80,8 @@ export function BasemindSetupScreen({ onNext }: BasemindSetupScreenProps) {
     // The SSE2-baseline binary runs AVX2-gated models on any x86_64 CPU.
     if (cpuFeatures.noavx2Build) return true;
     if (cpuFeatures.arch === 'aarch64') return true;
-    return cpuFeatures.avx2;
+    if (cpuFeatures.arch === 'x86_64') return cpuFeatures.avx2;
+    return true;
   }, [cpuFeatures]);
 
   const runDownload = useCallback(async (onlyStage: Stage | null = null) => {

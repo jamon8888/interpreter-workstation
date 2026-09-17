@@ -20,10 +20,11 @@
 # Usage: ./build-basemind-avxfree.sh
 set -euo pipefail
 
-ORT_BUILD=/home/jamin/ort-build/build/Release
-BASEMIND=/home/jamin/Documents/interpreter-workstation/submodules/basemind
-WORKSTATION=/home/jamin/Documents/interpreter-workstation
-STAGED=$WORKSTATION/resources/basemind/linux-x64
+ORT_BUILD=${ORT_BUILD:-/home/jamin/ort-build/build/Release}
+BASEMIND=${BASEMIND:-/home/jamin/Documents/interpreter-workstation/submodules/basemind}
+WORKSTATION=${WORKSTATION:-/home/jamin/Documents/interpreter-workstation}
+STAGED=${STAGED:-$WORKSTATION/resources/basemind/linux-x64-noavx2}
+mkdir -p "$STAGED"
 
 echo "==> 1/5 verify custom libonnxruntime has no AVX2 instructions"
 if objdump -d "$ORT_BUILD/libonnxruntime.so.1.28.0" | grep -qm1 -E "vpbroadcast|vpadd|ymm[0-9]|zmm[0-9]"; then
@@ -34,6 +35,10 @@ else
 fi
 
 echo "==> 2/5 install libonnxruntime system-wide"
+if ! sudo -n true 2>/dev/null; then
+  echo "ERROR: passwordless sudo required for system-wide install. Run with sudo or configure NOPASSWD for cp/ln/ldconfig." >&2
+  exit 1
+fi
 sudo cp "$ORT_BUILD/libonnxruntime.so.1.28.0" /usr/local/lib/
 sudo ln -sf libonnxruntime.so.1.28.0 /usr/local/lib/libonnxruntime.so.1
 sudo ln -sf libonnxruntime.so.1 /usr/local/lib/libonnxruntime.so
@@ -47,14 +52,16 @@ cargo build --release --features full,ort-dynamic --bin basemind
 echo "==> 4/5 smoke test on this CPU (no AVX2)"
 export ORT_DYLIB_PATH=/usr/local/lib/libonnxruntime.so.1.28.0
 ./target/release/basemind --version
-mkdir -p /tmp/bm-avxfree-test && cd /tmp/bm-avxfree-test
-echo '<html><body><p>Contact Jane Doe at jane.doe@example.com about quarterly renewable energy.</p></body></html>' > warmup.html
-echo 'function sumQuarterlyReport(values) { return values.reduce((t, v) => t + v, 0); }' > warmup.js
+AVXFREE_TEST_DIR=$(mktemp -d /tmp/bm-avxfree-test-XXXXXX)
+trap 'rm -rf "$AVXFREE_TEST_DIR"' EXIT INT TERM
+echo '<html><body><p>Contact Jane Doe at jane.doe@example.com about quarterly renewable energy.</p></body></html>' > "$AVXFREE_TEST_DIR/warmup.html"
+echo 'function sumQuarterlyReport(values) { return values.reduce((t, v) => t + v, 0); }' > "$AVXFREE_TEST_DIR/warmup.js"
 export BASEMIND_ALLOW_ANY_ROOT=1
-"$BASEMIND/target/release/basemind" memory documents "quarterly report" --root /tmp/bm-avxfree-test --limit 1
+"$BASEMIND/target/release/basemind" memory documents "quarterly report" --root "$AVXFREE_TEST_DIR" --limit 1
+trap - EXIT INT TERM
+rm -rf "$AVXFREE_TEST_DIR"
 
-echo "==> 5/5 stage into workstation (backup old binary first)"
-cp "$STAGED/basemind" "$STAGED/basemind.stock-avx2.bak"
+echo "==> 5/5 stage into workstation (leave stock linux-x64 untouched)"
 cp "$BASEMIND/target/release/basemind" "$STAGED/basemind"
 cp /usr/local/lib/libonnxruntime.so.1.28.0 "$STAGED/"
 ln -sf libonnxruntime.so.1.28.0 "$STAGED/libonnxruntime.so.1"
