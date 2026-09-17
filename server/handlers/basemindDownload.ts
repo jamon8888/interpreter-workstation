@@ -114,11 +114,17 @@ function stageArgs(stage: BasemindDownloadStage, workspace: string): string[] {
  * `BASEMIND_ALLOW_ANY_ROOT` is scoped to this one invocation via env — the
  * warmup workspace is a plain throwaway git repo, not a real project, and
  * would otherwise be refused as an accidentally-inherited scan root.
+ * `BASEMIND_COMMS_DIR` points the warmup at a private comms socket so it
+ * never collides with a user-running daemon (e.g. an editor-integrated
+ * basemind of another version holding ~/.local/share/basemind/comms):
+ * without isolation the warmup fails with "a previous/incompatible daemon
+ * holds the socket" instead of downloading anything. Model downloads still
+ * land in the shared Hugging Face hub cache — only the socket is isolated.
  */
-async function runWarmup(binary: string, stage: BasemindDownloadStage, workspace: string): Promise<{ ok: boolean; error?: string }> {
+async function runWarmup(binary: string, stage: BasemindDownloadStage, workspace: string, commsDir: string): Promise<{ ok: boolean; error?: string }> {
   try {
     await execFileAsync(binary, stageArgs(stage, workspace), {
-      env: { ...process.env, BASEMIND_ALLOW_ANY_ROOT: '1' },
+      env: { ...process.env, BASEMIND_ALLOW_ANY_ROOT: '1', BASEMIND_COMMS_DIR: commsDir },
       timeout: WARMUP_TIMEOUT_MS,
     });
     return { ok: true };
@@ -169,11 +175,15 @@ export async function* basemindDownload(onlyStage?: BasemindDownloadStage): Asyn
       yield { stage, progress: 0, done: false, error: `warmup workspace setup failed: ${message}` };
       continue;
     }
+    // Private comms socket for this warmup (see runWarmup). Created beside
+    // the workspace so both are throwaway and cleaned together.
+    const commsDir = mkdtempSync(path.join(tmpdir(), 'basemind-warmup-comms-'));
     let result: { ok: boolean; error?: string };
     try {
-      result = await runWarmup(binary, stage, workspace);
+      result = await runWarmup(binary, stage, workspace, commsDir);
     } finally {
       cleanupWarmupWorkspace(workspace);
+      cleanupWarmupWorkspace(commsDir);
     }
 
     // The warmup command downloads the model, then immediately exercises it
