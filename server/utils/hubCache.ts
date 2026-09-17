@@ -15,23 +15,30 @@ export const MODEL_RESOURCE_REPOS: Record<ModelResource, string[]> = {
 };
 
 /**
- * Resolve the Hugging Face hub cache directory basemind downloads models into.
- * Empirically confirmed (2026-09-15, real `basemind memory documents` run):
- * with no override, xberg/hf-hub falls back to the standard hf-hub default,
- * ~/.cache/huggingface/hub — basemind does NOT redirect it to its own XDG
- * data home and does NOT read INTERPRETER_USER_DATA_DIR (that variable only
- * exists in this server process, so a branch honoring it points the readiness
- * check at a directory the binary never writes to and every download reports
- * "no model artifact found" forever). The hub-specific HF cache env vars
- * still win when set, since the spawned binary inherits this process env and
- * hf-hub honors them on both sides.
+ * Candidate Hugging Face hub cache directories, in the order basemind
+ * resolves them. Empirically confirmed (2026-09-17) against basemind 0.30.0:
+ * the binary downloads into its XDG data home
+ * (~/.local/share/basemind/hub) and falls back to the legacy standard cache
+ * (~/.cache/huggingface/hub) on reads — an embeddings model cached only in
+ * the legacy dir is used without re-download, while fresh downloads land in
+ * the data-home dir. Checking a single dir (either one, or the
+ * INTERPRETER_USER_DATA_DIR-based path the server sets at startup, which the
+ * binary never reads) yields false "no model artifact found" failures, so
+ * readiness must consult every candidate.
  */
+export function resolveHubBaseDirs(): string[] {
+  const dirs: string[] = [];
+  const override = process.env.HF_HUB_CACHE?.trim() || process.env.HUGGINGFACE_HUB_CACHE?.trim();
+  if (override) dirs.push(override);
+  const dataHome = process.env.XDG_DATA_HOME?.trim() || path.join(homedir(), '.local', 'share');
+  dirs.push(path.join(dataHome, 'basemind', 'hub'));
+  dirs.push(path.join(homedir(), '.cache', 'huggingface', 'hub'));
+  return dirs;
+}
+
+/** Backward-compatible single-dir resolution: the highest-priority candidate. */
 export function resolveHubBaseDir(): string {
-  return (
-    process.env.HF_HUB_CACHE?.trim() ||
-    process.env.HUGGINGFACE_HUB_CACHE?.trim() ||
-    path.join(homedir(), '.cache', 'huggingface', 'hub')
-  );
+  return resolveHubBaseDirs()[0];
 }
 
 const MAX_ARTIFACT_SEARCH_DEPTH = 4;
@@ -69,8 +76,9 @@ export function hubRepoHasArtifact(baseDir: string, repoDir: string): boolean {
   return hasOnnxFile(dir, MAX_ARTIFACT_SEARCH_DEPTH);
 }
 
-/** True when the resource's model weights are cached in the hub. */
+/** True when the resource's model weights are cached in any hub candidate dir. */
 export function isModelResourceReady(resource: ModelResource): boolean {
-  const baseDir = resolveHubBaseDir();
-  return MODEL_RESOURCE_REPOS[resource].some((repo) => hubRepoHasArtifact(baseDir, repo));
+  return resolveHubBaseDirs().some((baseDir) =>
+    MODEL_RESOURCE_REPOS[resource].some((repo) => hubRepoHasArtifact(baseDir, repo)),
+  );
 }
