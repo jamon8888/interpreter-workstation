@@ -734,13 +734,15 @@ interface BasemindDownloadResult {
   success: boolean;
 }
 
-interface CpuFeatures {
+export interface CpuFeatures {
   arch: string;
   avx2: boolean;
   avx: boolean;
   sse4_1: boolean;
   sse4_2: boolean;
   neon: boolean;
+  /** True when the resolved basemind binary is the SSE2-baseline build, which runs AVX2-gated models on any x86_64 CPU. */
+  noavx2Build: boolean;
 }
 
 interface BasemindIpc {
