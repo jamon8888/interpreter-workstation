@@ -43,6 +43,12 @@ describe('resolveRerankerDefault', () => {
     expect(resolveRerankerDefault({ totalMemBytes: 16 * GB, arch: 'aarch64', avx2: false, noavx2Build: false })).toBe(true);
   });
 
+  test('OFF on unknown architectures (fail-closed)', () => {
+    for (const arch of ['arm', 'riscv64', 'ppc64', 'unknown']) {
+      expect(resolveRerankerDefault({ totalMemBytes: 16 * GB, arch, avx2: true, noavx2Build: false })).toBe(false);
+    }
+  });
+
   test('RERANKER_MIN_TOTAL_MEM_BYTES is 8 GiB', () => {
     expect(RERANKER_MIN_TOTAL_MEM_BYTES).toBe(8 * GB);
   });

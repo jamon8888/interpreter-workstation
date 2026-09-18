@@ -117,7 +117,8 @@ export async function basemindSearchCode(params: {
     query: params.query,
   };
 
-  if (params.limit !== undefined) args.limit = params.limit;  if (params.maxTokens !== undefined) args.max_tokens = params.maxTokens;
+  if (params.limit !== undefined) args.limit = params.limit;
+  if (params.maxTokens !== undefined) args.max_tokens = params.maxTokens;
   // `lane` is a sibling field of `mode` on basemind's CodeParams, not an
   // alternate value for it — `mode` selects the domain operation (symbols,
   // grep, semantic, ...) and only applies to the "semantic" mode. Folding it

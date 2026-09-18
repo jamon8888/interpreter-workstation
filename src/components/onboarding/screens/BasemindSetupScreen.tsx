@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Download, Check, AlertCircle, Loader2, SkipForward } from 'lucide-react';
 import { basemind, search } from '../../../ipc';
@@ -78,6 +78,9 @@ export function BasemindSetupScreen({ onNext }: BasemindSetupScreenProps) {
   // Persisted as an explicit override only when the user touches the checkbox.
   const [rerankerWanted, setRerankerWanted] = useState(true);
   const [rerankerTouched, setRerankerTouched] = useState(false);
+  // Ref mirror of rerankerTouched: the default-fetch effect below runs once
+  // on mount and must not overwrite a choice the user made before it resolves.
+  const rerankerTouchedRef = useRef(false);
   // Stale v2-m3 weights from before the GTE migration (#228): offered for
   // cleanup, never removed without the button below.
   const [staleRerankerBytes, setStaleRerankerBytes] = useState(0);
@@ -86,10 +89,10 @@ export function BasemindSetupScreen({ onNext }: BasemindSetupScreenProps) {
   useEffect(() => {
     search.getRerankerDefault()
       .then(({ enabled }) => {
-        setRerankerWanted((current) => (rerankerTouched ? current : enabled));
+        if (!rerankerTouchedRef.current) setRerankerWanted(enabled);
       })
       .catch(() => { /* keep the checked default on IPC failure */ });
-  }, [rerankerTouched]);
+  }, []);
 
   useEffect(() => {
     basemind.getStaleRerankerCache()
@@ -251,6 +254,7 @@ export function BasemindSetupScreen({ onNext }: BasemindSetupScreenProps) {
             checked={rerankerWanted}
             onCheckedChange={(checked) => {
               setRerankerWanted(checked);
+              rerankerTouchedRef.current = true;
               setRerankerTouched(true);
             }}
           />

@@ -41,7 +41,9 @@ export function resolveRerankerDefault(facts: Pick<RerankerMachineFacts, 'totalM
   if (facts.noavx2Build) return true;
   if (facts.arch === 'aarch64') return true;
   if (facts.arch === 'x86_64') return facts.avx2;
-  return true;
+  // Fail closed on untested architectures (arm, riscv64, …): the ONNX model
+  // is only proven on aarch64 and x86_64.
+  return false;
 }
 
 /** Effective state: explicit override wins, otherwise the machine default — and never without the model. */
