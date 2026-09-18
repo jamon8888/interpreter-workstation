@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Download, Check, AlertCircle, Loader2, SkipForward } from 'lucide-react';
-import { basemind } from '../../../ipc';
+import { basemind, search } from '../../../ipc';
 import type { CpuFeatures } from '../../../ipc';
 import { OnboardingHeading, OnboardingScreenShell } from '../components/OnboardingScreenShell';
 import { Button } from '../../ui/button';
+import { Switch } from '../../ui/switch';
 import { useOnboarding } from '../OnboardingContext';
 
 const STAGES = ['embeddings', 'reranker', 'nerModel'] as const;
@@ -67,6 +68,18 @@ export function BasemindSetupScreen({ onNext }: BasemindSetupScreenProps) {
   const [isDownloading, setIsDownloading] = useState(false);
   const [isSkipped, setIsSkipped] = useState(false);
   const [cpuFeatures, setCpuFeatures] = useState<CpuFeatures | null>(null);
+  // Reranker opt-in, pre-checked from the per-machine default (RAM/CPU/model).
+  // Persisted as an explicit override only when the user touches the checkbox.
+  const [rerankerWanted, setRerankerWanted] = useState(true);
+  const [rerankerTouched, setRerankerTouched] = useState(false);
+
+  useEffect(() => {
+    search.getRerankerDefault()
+      .then(({ enabled }) => {
+        setRerankerWanted((current) => (rerankerTouched ? current : enabled));
+      })
+      .catch(() => { /* keep the checked default on IPC failure */ });
+  }, [rerankerTouched]);
 
   useEffect(() => {
     basemind.cpuFeatures().then(setCpuFeatures).catch(() => {
@@ -89,6 +102,14 @@ export function BasemindSetupScreen({ onNext }: BasemindSetupScreenProps) {
     setIsDownloading(true);
     for (const stage of STAGES) {
       if (onlyStage !== null && stage !== onlyStage) continue;
+
+      if (stage === 'reranker' && !rerankerWanted) {
+        setStageStates(prev => ({
+          ...prev,
+          [stage]: { status: 'skipped', progress: 100, skipReason: t('onboarding.basemind.rerankSkipped', 'Skipped — search without reranking') },
+        }));
+        continue;
+      }
 
       if (!isCompatible(stage)) {
         setStageStates(prev => ({
@@ -142,7 +163,14 @@ export function BasemindSetupScreen({ onNext }: BasemindSetupScreenProps) {
     }
     setIsDownloading(false);
     setCurrentStage(null);
-  }, [isCompatible]);
+  }, [isCompatible, rerankerWanted, t]);
+
+  const persistRerankerChoice = useCallback(() => {
+    if (!rerankerTouched) return;
+    void search.setRerankerEnabled(rerankerWanted).catch((err) => {
+      console.error('Failed to save reranker choice:', err);
+    });
+  }, [rerankerTouched, rerankerWanted]);
 
   const handleSkipIncompatible = useCallback(() => {
     setIsSkipped(true);
@@ -151,14 +179,16 @@ export function BasemindSetupScreen({ onNext }: BasemindSetupScreenProps) {
 
   const handleSkipAll = useCallback(() => {
     setIsSkipped(true);
+    persistRerankerChoice();
     updateUserChoices({ basemindSetupComplete: true });
     onNext();
-  }, [onNext, updateUserChoices]);
+  }, [onNext, persistRerankerChoice, updateUserChoices]);
 
   const handleContinue = useCallback(() => {
+    persistRerankerChoice();
     updateUserChoices({ basemindSetupComplete: true });
     onNext();
-  }, [onNext, updateUserChoices]);
+  }, [onNext, persistRerankerChoice, updateUserChoices]);
 
   // Completion has to mean "everything worked", not "nothing is still running".
   // The old allHandled counted `error` as handled, which made the footer's
@@ -186,6 +216,24 @@ export function BasemindSetupScreen({ onNext }: BasemindSetupScreenProps) {
       />
 
       <div className="mt-6 space-y-3">
+        <label className="flex items-center gap-3 rounded-[10px] border px-4 py-3" style={{ borderColor: 'var(--oa-border)', background: 'var(--oa-bg-app)' }}>
+          <Switch
+            size="sm"
+            checked={rerankerWanted}
+            onCheckedChange={(checked) => {
+              setRerankerWanted(checked);
+              setRerankerTouched(true);
+            }}
+          />
+          <span className="flex-1 min-w-0">
+            <span className="block text-ui-sm font-medium text-foreground">
+              {t('onboarding.basemind.rerankOptIn', 'More accurate results (reranking)')}
+            </span>
+            <span className="block text-ui-xs text-muted-foreground mt-0.5">
+              {t('onboarding.basemind.rerankOptInHint', 'Slower on smaller computers — you can change this later in Settings.')}
+            </span>
+          </span>
+        </label>
         {STAGES.map((stage) => {
           const state = stageStates[stage];
           const config = STAGE_CONFIG[stage];

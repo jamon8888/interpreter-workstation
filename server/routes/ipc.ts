@@ -194,6 +194,18 @@ const handlers: Record<string, Record<string, HandlerFn>> = {
       const { basemindSearchCode } = await import('../handlers/search');
       return basemindSearchCode(params);
     },
+    getRerankerEnabled: async () => {
+      const { getRerankerState } = await import('../handlers/rerankerPreference');
+      return getRerankerState();
+    },
+    getRerankerDefault: async () => {
+      const { getRerankerDefault } = await import('../handlers/rerankerPreference');
+      return { enabled: await getRerankerDefault() };
+    },
+    setRerankerEnabled: async ([value]: [boolean | null]) => {
+      const { setRerankerEnabled } = await import('../handlers/rerankerPreference');
+      return setRerankerEnabled(value);
+    },
   },
 
   // ========== PII redaction and rehydration ==========
