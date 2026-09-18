@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Download, Check, AlertCircle, Loader2, SkipForward } from 'lucide-react';
 import { basemind } from '../../../ipc';
+import type { CpuFeatures } from '../../../ipc';
 import { OnboardingHeading, OnboardingScreenShell } from '../components/OnboardingScreenShell';
 import { Button } from '../../ui/button';
 import { useOnboarding } from '../OnboardingContext';
@@ -65,11 +66,11 @@ export function BasemindSetupScreen({ onNext }: BasemindSetupScreenProps) {
   const [currentStage, setCurrentStage] = useState<Stage | null>(null);
   const [isDownloading, setIsDownloading] = useState(false);
   const [isSkipped, setIsSkipped] = useState(false);
-  const [cpuFeatures, setCpuFeatures] = useState<{ arch: string; avx2: boolean; noavx2Build: boolean } | null>(null);
+  const [cpuFeatures, setCpuFeatures] = useState<CpuFeatures | null>(null);
 
   useEffect(() => {
     basemind.cpuFeatures().then(setCpuFeatures).catch(() => {
-      setCpuFeatures({ arch: 'unknown', avx2: false, noavx2Build: false });
+      setCpuFeatures({ arch: 'unknown', avx2: false, avx: false, sse4_1: false, sse4_2: false, neon: false, noavx2Build: false });
     });
   }, []);
 

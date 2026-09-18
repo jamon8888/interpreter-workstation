@@ -21,7 +21,10 @@ export function cpuHasAvx2(): boolean {
   if (process.platform !== 'linux' || process.arch !== 'x64') return true;
   try {
     const text = readFileSync('/proc/cpuinfo', 'utf8');
-    const flagLines = text.split('\n').filter((line) => line.startsWith('flags'));
+    // x86 reports `flags:`, ARM reports `Features:` — match both for
+    // consistency with the cpuFeatures handler (unreachable on ARM here
+    // given the short-circuit above, but harmless if platforms expand).
+    const flagLines = text.split('\n').filter((line) => line.startsWith('flags') || line.startsWith('Features'));
     if (flagLines.length === 0) return false;
     return flagLines.every((line) => (line.split(':')[1] ?? '').trim().split(/\s+/).includes('avx2'));
   } catch {
@@ -30,13 +33,14 @@ export function cpuHasAvx2(): boolean {
 }
 
 /**
- * True when the path is the SSE2-baseline build: a `basemind-noavx2` path
- * segment (packaged layout) or the staged `linux-x64-noavx2` directory.
- * Segment-boundary-aware so similarly named paths never match.
+ * True when the path is the SSE2-baseline build: a `basemind-noavx2` or
+ * `linux-x64-noavx2` path segment (packaged vs staged layout).
+ * Segment-boundary-aware on normalized slashes so similarly named paths
+ * (e.g. `my-linux-x64-noavx2-project/`) never match.
  */
 export function isNoAvx2BasemindBinary(binaryPath: string): boolean {
   const normalized = binaryPath.replace(/\\/g, '/');
-  return /(^|\/)basemind-noavx2(\/|$)/.test(normalized) || normalized.includes('linux-x64-noavx2');
+  return /(^|\/)(basemind-noavx2|linux-x64-noavx2)(\/|$)/.test(normalized);
 }
 
 function findBasemindBinary(): string {

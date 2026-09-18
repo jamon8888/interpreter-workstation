@@ -56,6 +56,15 @@ export const GLINER_FILES: PreseedFile[] = [
 
 const DEFAULT_FILE_TIMEOUT_MS = 120 * 60_000;
 
+/** Download attempts per file: resume continues the partial, so retries are cheap. */
+const DEFAULT_MAX_ATTEMPTS = 3;
+
+/** Global-fetch adapter: shapes the native Response into PreseedFetchFn without casts. */
+async function nodeFetch(url: string, init?: { headers?: Record<string, string>; signal?: AbortSignal }): Promise<PreseedResponse> {
+  const res = await fetch(url, init);
+  return { ok: res.ok, status: res.status, headers: res.headers, body: res.body };
+}
+
 function repoDirName(repo: string): string {
   return `models--${repo.replace('/', '--')}`;
 }
@@ -141,6 +150,7 @@ export interface PreseedOptions {
   rev?: string;
   files?: PreseedFile[];
   fileTimeoutMs?: number;
+  maxAttempts?: number;
 }
 
 /**
@@ -157,8 +167,9 @@ export async function preseedNerModel(opts: PreseedOptions = {}): Promise<{ ok: 
   const repo = opts.repo ?? GLINER_REPO;
   const rev = opts.rev ?? GLINER_REV;
   const files = opts.files ?? GLINER_FILES;
-  const fetchFn = opts.fetchFn ?? (fetch as unknown as PreseedFetchFn);
+  const fetchFn = opts.fetchFn ?? nodeFetch;
   const timeoutMs = opts.fileTimeoutMs ?? DEFAULT_FILE_TIMEOUT_MS;
+  const maxAttempts = opts.maxAttempts ?? DEFAULT_MAX_ATTEMPTS;
 
   const repoDir = path.join(baseDir, repoDirName(repo));
   mkdirSync(path.join(repoDir, 'blobs'), { recursive: true });
@@ -178,23 +189,42 @@ export async function preseedNerModel(opts: PreseedOptions = {}): Promise<{ ok: 
         if (!complete) rmSync(blobPath, { force: true });
       }
       if (!complete) {
-        let startByte = 0;
-        if (existsSync(incompletePath)) {
-          try {
-            const size = statSync(incompletePath).size;
-            startByte = size < file.size ? size : 0;
-            if (startByte === 0) rmSync(incompletePath, { force: true });
-          } catch {
-            startByte = 0;
+        // Retry transient failures (reset connections, timeouts): resume
+        // continues the partial file, so retries are cheap. A sha mismatch
+        // is terminal — redownloading the same bytes would fail identically.
+        let lastError = '';
+        for (let attempt = 1; attempt <= maxAttempts && !complete; attempt++) {
+          let startByte = 0;
+          if (existsSync(incompletePath)) {
+            try {
+              const size = statSync(incompletePath).size;
+              startByte = size < file.size ? size : 0;
+              if (startByte === 0) rmSync(incompletePath, { force: true });
+            } catch {
+              startByte = 0;
+            }
           }
+          try {
+            await downloadFile(fileUrl(repo, rev, file.path), incompletePath, startByte, fetchFn, timeoutMs);
+          } catch (err) {
+            lastError = err instanceof Error ? err.message : String(err);
+            continue;
+          }
+          try {
+            complete = (await sha256File(incompletePath)) === file.sha256;
+          } catch (err) {
+            lastError = err instanceof Error ? err.message : String(err);
+            continue;
+          }
+          if (!complete) {
+            rmSync(incompletePath, { force: true });
+            return { ok: false, error: `sha256 mismatch for ${file.path} (xberg would reject these weights)` };
+          }
+          renameSync(incompletePath, blobPath);
         }
-        await downloadFile(fileUrl(repo, rev, file.path), incompletePath, startByte, fetchFn, timeoutMs);
-        const digest = await sha256File(incompletePath);
-        if (digest !== file.sha256) {
-          rmSync(incompletePath, { force: true });
-          return { ok: false, error: `sha256 mismatch for ${file.path} (xberg would reject these weights)` };
+        if (!complete) {
+          return { ok: false, error: `${file.path}: ${lastError || 'download failed'} (after ${maxAttempts} attempts)` };
         }
-        renameSync(incompletePath, blobPath);
       }
       // refs/main pins the revision; snapshot entries symlink to the blob,
       // mirroring exactly what hf-hub clients write. Windows without symlink
@@ -218,11 +248,12 @@ export async function preseedNerModel(opts: PreseedOptions = {}): Promise<{ ok: 
           copyFileSync(blobPath, snapshotFile);
         }
       }
-      writeFileSync(path.join(repoDir, 'refs', 'main'), rev);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       return { ok: false, error: `${file.path}: ${message}` };
     }
   }
+  // refs/main pins the revision once, after all files land — not per file.
+  writeFileSync(path.join(repoDir, 'refs', 'main'), rev);
   return { ok: true };
 }

@@ -722,7 +722,7 @@ interface BasemindDownloadResult {
   success: boolean;
 }
 
-interface CpuFeatures {
+export interface CpuFeatures {
   arch: string;
   avx2: boolean;
   avx: boolean;

@@ -36,11 +36,6 @@ export function resolveHubBaseDirs(): string[] {
   return dirs;
 }
 
-/** Backward-compatible single-dir resolution: the highest-priority candidate. */
-export function resolveHubBaseDir(): string {
-  return resolveHubBaseDirs()[0];
-}
-
 const MAX_ARTIFACT_SEARCH_DEPTH = 4;
 
 /**

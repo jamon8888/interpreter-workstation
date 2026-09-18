@@ -200,13 +200,18 @@ export async function* basemindDownload(onlyStage?: BasemindDownloadStage): Asyn
         continue;
       }
       // Private comms socket for this warmup (see runWarmup). Created beside
-      // the workspace so both are throwaway and cleaned together.
-      const commsDir = mkdtempSync(path.join(tmpdir(), 'basemind-warmup-comms-'));
+      // the workspace with a matching name so both are throwaway, listed
+      // together, and cleaned together.
+      const commsDir = mkdtempSync(path.join(tmpdir(), 'basemind-model-warmup-comms-'));
       try {
         result = await runWarmup(binary, stage, workspace, commsDir);
       } finally {
-        try { cleanupTempDir(workspace); } catch { /* best effort */ }
-        try { cleanupTempDir(commsDir); } catch { /* best effort */ }
+        try { cleanupTempDir(workspace); } catch (err) {
+          console.warn(`[basemindDownload] warmup workspace cleanup failed for ${workspace}: ${err instanceof Error ? err.message : String(err)}`);
+      }
+      try { cleanupTempDir(commsDir); } catch (err) {
+        console.warn(`[basemindDownload] warmup comms cleanup failed for ${commsDir}: ${err instanceof Error ? err.message : String(err)}`);
+      }
       }
     }
 
