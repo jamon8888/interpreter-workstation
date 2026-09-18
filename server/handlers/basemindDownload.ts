@@ -38,9 +38,9 @@ const WARMUP_QUERY = 'quarterly report renewable energy';
  * Each call creates an isolated private temp dir (mkdtemp, 0700) so a
  * pre-existing /tmp path can't be used for symlink attacks. Caller must
  * remove it via cleanupTempDir in a finally block.
- * Only the reranker stage needs git (basemind's `code` domain enumerates
- * files via git); embeddings/NER work without a Git executable, which
- * packaged builds don't ship.
+ * `needGit` stays for documentation: no current stage needs git anymore
+ * (reranker/NER are pre-seeded; embeddings warm up via `memory documents`,
+ * which doesn't enumerate via git), which keeps packaged builds git-free.
  */
 async function ensureWarmupWorkspace(needGit: boolean): Promise<string> {
   const dir = mkdtempSync(path.join(tmpdir(), 'basemind-model-warmup-'));
@@ -86,21 +86,8 @@ function stageArgs(stage: BasemindDownloadStage, workspace: string): string[] {
     case 'embeddings':
       return ['memory', 'documents', WARMUP_QUERY, '--root', workspace, '--limit', '1'];
     case 'reranker':
-      return [
-        'code', 'semantic', WARMUP_QUERY,
-        '--root', workspace,
-        '--limit', '1',
-        '--rerank',
-        '--rerank-preset', 'bge-reranker-v2-m3',
-      ];
     case 'nerModel':
-      return [
-        'scan', '--root', workspace,
-        '--documents-enabled', 'true',
-        '--documents-ner-enabled', 'true',
-        '--documents-redaction-enabled', 'true',
-        '-q',
-      ];
+      throw new Error(`${stage} is pre-seeded directly, never warmed up`);
   }
 }
 
@@ -177,23 +164,30 @@ export async function* basemindDownload(onlyStage?: BasemindDownloadStage): Asyn
     }
 
     let result: { ok: boolean; error?: string };
-    if (stage === 'nerModel') {
-      // No basemind one-shot CLI command exercises the NER backend (scan
-      // never initializes it, redact uses the pattern engine) — NER otherwise
-      // arrives only via the persistent daemon's document lane on first real
-      // use. Pre-seed the weights directly so onboarding actually delivers
-      // "models downloaded" (see basemindPreseed.ts).
-      const { preseedNerModel } = await import('./basemindPreseed');
+    if (stage === 'nerModel' || stage === 'reranker') {
+      // No basemind one-shot CLI command exercises these backends the way
+      // onboarding needs (scan never initializes NER; `code --rerank` only
+      // knows compiled-in presets, not the GTE Custom model) — pre-seed the
+      // weights directly so onboarding actually delivers "models downloaded"
+      // (see basemindPreseed.ts). nerModel = gliner-pii-edge (engine #231),
+      // reranker = GTE-multilingual int8 (decision #228).
+      const { preseedNerModel, EDGE_REPO, EDGE_REV, EDGE_FILES, GTE_REPO, GTE_REV, GTE_FILES } =
+        await import('./basemindPreseed');
+      const opts = stage === 'nerModel'
+        ? { repo: EDGE_REPO, rev: EDGE_REV, files: EDGE_FILES }
+        : { repo: GTE_REPO, rev: GTE_REV, files: GTE_FILES };
       try {
-        result = await preseedNerModel();
+        result = await preseedNerModel(opts);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
-        result = { ok: false, error: `NER model cache setup failed: ${message}` };
+        result = { ok: false, error: `${stage} model cache setup failed: ${message}` };
       }
     } else {
       let workspace: string;
       try {
-        workspace = await ensureWarmupWorkspace(stage === 'reranker');
+        // Only the embeddings stage still warms up (no git needed: `memory
+        // documents` doesn't enumerate via git). Reranker/NER are pre-seeded.
+        workspace = await ensureWarmupWorkspace(false);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         yield { stage, progress: 0, done: false, error: `warmup workspace setup failed: ${message}` };

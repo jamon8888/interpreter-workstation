@@ -34,12 +34,10 @@ export const GLINER_REPO = 'xberg-io/gliner-models';
 /** Pinned revision xberg resolves (see xberg GlineBackend GLINER_MODELS_REVISION). */
 export const GLINER_REV = 'afb0faaa3c8e7d0de7796bd37e625026ff635fe0';
 /**
- * gliner_small-v2.5 artifacts (the model the onboarding downloads: ~673 MB).
- * SHAs mirror xberg's checked-in gliner-models.sha256 manifest — trust
- * attaches to the manifest, so a tampered upstream file fails verification
- * here instead of feeding wrong weights into inference. When xberg bumps
- * GLINER_MODELS_REVISION or the fleet, update GLINER_REV + these entries
- * from xberg-io/gliner-models at that revision (same file paths).
+ * gliner_small-v2.5 artifacts (legacy onboarding model, ~673 MB).
+ * Kept for reference; the NER engine decision (#231) is gliner-pii-edge,
+ * see EDGE_* below. SHAs mirror xberg's checked-in gliner-models.sha256
+ * manifest.
  */
 export const GLINER_FILES: PreseedFile[] = [
   {
@@ -51,6 +49,52 @@ export const GLINER_FILES: PreseedFile[] = [
     path: 'models/gliner_small-v2.5/span/fp32/tokenizer.json',
     sha256: '91cf35efa9ec3549c6c52a415cdd7531fd172858d7d9eecef720bc4a3f1f8699',
     size: 8_649_232,
+  },
+];
+
+/** Knowledgator GLiNER-PII edge repo (NER engine decision #231). */
+export const EDGE_REPO = 'knowledgator/gliner-pii-edge-v1.0';
+/** Floating `main` (Knowledgator ships no pinned rev; SHAs pin the bytes). */
+export const EDGE_REV = 'main';
+/** Edge artifacts (~181 MB ONNX). SHAs verified 2026-09-18 (LFS oids match). */
+export const EDGE_FILES: PreseedFile[] = [
+  {
+    path: 'onnx/model.onnx',
+    sha256: '4ca588722e6d79447ad4c9c230eeba3d9d472c672a9598184a34e9f77fc35836',
+    size: 181_078_966,
+  },
+  {
+    path: 'tokenizer.json',
+    sha256: '84b3a9b18f04a0ccd03b72d9f871b7e0bec40fd7021ef50bc30a7c3693c11205',
+    size: 3_583_593,
+  },
+  {
+    path: 'gliner_config.json',
+    sha256: '77e6b57335c4bfd461e9041682196dd6c373a0b09bbd9269ef9e95b807915340',
+    size: 4_316,
+  },
+];
+
+/** GTE-multilingual reranker int8 repo (reranker decision #228). */
+export const GTE_REPO = 'onnx-community/gte-multilingual-reranker-base';
+/** Floating `main` (SHAs pin the bytes; LFS oid match verified 2026-09-18). */
+export const GTE_REV = 'main';
+/** GTE int8 artifacts (~341 MB ONNX). */
+export const GTE_FILES: PreseedFile[] = [
+  {
+    path: 'onnx/model_int8.onnx',
+    sha256: 'ccf51dba7f8aa9205753761cfaa68c55f741792501463a3bf25d7e5bcdac7c35',
+    size: 340_858_200,
+  },
+  {
+    path: 'tokenizer.json',
+    sha256: '3ffb37461c391f096759f4a9bbbc329da0f36952f88bab061fcf84940c022e98',
+    size: 17_082_999,
+  },
+  {
+    path: 'config.json',
+    sha256: 'dfa5713436ecb4616eaa576795c8d3efd1f03122031a1ad4973d0b6b7e7edfd3',
+    size: 1_578,
   },
 ];
 
