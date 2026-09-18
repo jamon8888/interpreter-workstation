@@ -176,23 +176,33 @@ export async function* basemindDownload(onlyStage?: BasemindDownloadStage): Asyn
       continue;
     }
 
-    let workspace: string;
-    try {
-      workspace = await ensureWarmupWorkspace(stage === 'reranker');
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      yield { stage, progress: 0, done: false, error: `warmup workspace setup failed: ${message}` };
-      continue;
-    }
-    // Private comms socket for this warmup (see runWarmup). Created beside
-    // the workspace so both are throwaway and cleaned together.
-    const commsDir = mkdtempSync(path.join(tmpdir(), 'basemind-warmup-comms-'));
     let result: { ok: boolean; error?: string };
-    try {
-      result = await runWarmup(binary, stage, workspace, commsDir);
-    } finally {
-      try { cleanupWarmupWorkspace(workspace); } catch { /* best effort */ }
-      try { cleanupWarmupWorkspace(commsDir); } catch { /* best effort */ }
+    if (stage === 'nerModel') {
+      // No basemind one-shot CLI command exercises the NER backend (scan
+      // never initializes it, redact uses the pattern engine) — NER otherwise
+      // arrives only via the persistent daemon's document lane on first real
+      // use. Pre-seed the weights directly so onboarding actually delivers
+      // "models downloaded" (see basemindPreseed.ts).
+      const { preseedNerModel } = await import('./basemindPreseed');
+      result = await preseedNerModel();
+    } else {
+      let workspace: string;
+      try {
+        workspace = await ensureWarmupWorkspace(stage === 'reranker');
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        yield { stage, progress: 0, done: false, error: `warmup workspace setup failed: ${message}` };
+        continue;
+      }
+      // Private comms socket for this warmup (see runWarmup). Created beside
+      // the workspace so both are throwaway and cleaned together.
+      const commsDir = mkdtempSync(path.join(tmpdir(), 'basemind-warmup-comms-'));
+      try {
+        result = await runWarmup(binary, stage, workspace, commsDir);
+      } finally {
+        try { cleanupWarmupWorkspace(workspace); } catch { /* best effort */ }
+        try { cleanupWarmupWorkspace(commsDir); } catch { /* best effort */ }
+      }
     }
 
     // The warmup command downloads the model, then immediately exercises it
