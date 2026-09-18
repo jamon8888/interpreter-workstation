@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { createReadStream, createWriteStream, existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
+import { copyFileSync, createReadStream, createWriteStream, existsSync, linkSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
 import { resolveHubBaseDirs } from '../utils/hubCache';
@@ -103,16 +103,14 @@ async function downloadFile(
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
       const res = await fetchFn(url, { headers, signal: controller.signal });
-      if (from > 0 && res.status === 200) {
-        // Server ignored Range: restart from zero rather than appending a
-        // duplicate prefix onto the partial file.
-        await attempt(0);
-        return;
-      }
+      // A 200 to a ranged request means the server ignored Range: this body
+      // already starts at byte zero, so overwrite the partial file with it
+      // instead of abandoning the response for a second download.
+      const writeFrom = from > 0 && res.status === 200 ? 0 : from;
       if (!res.ok) throw new Error(`HTTP ${res.status} for ${url}`);
       if (!res.body) throw new Error(`empty body for ${url}`);
       await new Promise<void>((resolve, reject) => {
-        const out = createWriteStream(destIncomplete, { flags: from > 0 ? 'a' : 'w' });
+        const out = createWriteStream(destIncomplete, { flags: writeFrom > 0 ? 'a' : 'w' });
         out.on('error', reject);
         out.on('finish', resolve);
         (async () => {
@@ -197,7 +195,9 @@ export async function preseedNerModel(opts: PreseedOptions = {}): Promise<{ ok: 
         renameSync(incompletePath, blobPath);
       }
       // refs/main pins the revision; snapshot entries symlink to the blob,
-      // mirroring exactly what hf-hub clients write.
+      // mirroring exactly what hf-hub clients write. Windows without symlink
+      // privileges raises EPERM: fall back to a hardlink, then a plain copy —
+      // content is identical either way, only space efficiency differs.
       mkdirSync(path.join(repoDir, 'snapshots', rev, path.dirname(file.path)), { recursive: true });
       const snapshotFile = path.join(repoDir, 'snapshots', rev, file.path);
       try {
@@ -205,7 +205,17 @@ export async function preseedNerModel(opts: PreseedOptions = {}): Promise<{ ok: 
       } catch {
         // intentionally empty
       }
-      symlinkSync(path.relative(path.dirname(snapshotFile), blobPath), snapshotFile);
+      try {
+        symlinkSync(path.relative(path.dirname(snapshotFile), blobPath), snapshotFile);
+      } catch (err) {
+        const code = (err as NodeJS.ErrnoException)?.code;
+        if (code !== 'EPERM' && code !== 'EACCES') throw err;
+        try {
+          linkSync(blobPath, snapshotFile);
+        } catch {
+          copyFileSync(blobPath, snapshotFile);
+        }
+      }
       writeFileSync(path.join(repoDir, 'refs', 'main'), rev);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);

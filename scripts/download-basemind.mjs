@@ -70,6 +70,17 @@ const PLATFORMS = {
 export const BASEMIND_PLATFORMS = PLATFORMS;
 export const PLATFORM_KEYS = Object.keys(PLATFORMS);
 
+// Platforms whose release asset may legitimately not exist yet (shipped by a
+// newer fork release than the pinned one). A missing asset warns and skips;
+// anything else (checksum mismatch, extraction failure) still fails hard.
+const OPTIONAL_PLATFORMS = new Set(['linux-x64-noavx2']);
+
+export function isMissingAssetError(platform, error) {
+  if (!OPTIONAL_PLATFORMS.has(platform)) return false;
+  const message = error instanceof Error ? error.message : String(error);
+  return message.includes('No checksum found for') || /error: 404\b/.test(message);
+}
+
 export function getPlatformKey(platform = process.platform, arch = process.arch) {
   const osPlatform = platform === 'win32' ? 'win32' : platform;
   return `${osPlatform}-${arch}`;
@@ -310,7 +321,12 @@ async function main() {
     try {
       await downloadAndExtract(version, platform);
     } catch (error) {
-      console.error(`error ${platform}: ${error instanceof Error ? error.message : String(error)}`);
+      const message = error instanceof Error ? error.message : String(error);
+      if (isMissingAssetError(platform, error)) {
+        console.error(`warn ${platform}: ${message} (asset not published yet, skipping)`);
+        continue;
+      }
+      console.error(`error ${platform}: ${message}`);
       process.exit(1);
     }
   }

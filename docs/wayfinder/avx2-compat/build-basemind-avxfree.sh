@@ -26,13 +26,14 @@ WORKSTATION=${WORKSTATION:-/home/jamin/Documents/interpreter-workstation}
 STAGED=${STAGED:-$WORKSTATION/resources/basemind/linux-x64-noavx2}
 mkdir -p "$STAGED"
 
-echo "==> 1/5 verify custom libonnxruntime has no AVX2 instructions"
-if objdump -d "$ORT_BUILD/libonnxruntime.so.1.28.0" | grep -qm1 -E "vpbroadcast|vpadd|ymm[0-9]|zmm[0-9]"; then
-  echo "WARN: AVX vector instructions found in libonnxruntime (may be CPUID-guarded MLAS kernels)"
-  objdump -d "$ORT_BUILD/libonnxruntime.so.1.28.0" | grep -c -E "vpbroadcast|vpadd|ymm[0-9]|zmm[0-9]" || true
-else
-  echo "OK: no AVX vector instructions"
-fi
+echo "==> 1/5 inspect custom libonnxruntime for AVX2 instructions (diagnostic only)"
+# NOTE: a bare presence check canNOT gate here — MLAS ships CPUID-dispatched
+# AVX2 kernels (safe: never executed without AVX2) alongside the SSE2
+# baseline, so a known-good build contains tens of thousands of VEX hits.
+# The hard gate is step 4's smoke test on AVX2-less hardware (set -euo
+# pipefail aborts on its SIGILL/nonzero exit); this count is diagnostic.
+AVX_HITS=$(objdump -d "$ORT_BUILD/libonnxruntime.so.1.28.0" | grep -c -E "vpbroadcast|vpadd|ymm[0-9]|zmm[0-9]" || true)
+echo "info: $AVX_HITS AVX vector instructions (expected: MLAS CPUID-dispatched kernels)"
 
 echo "==> 2/5 install libonnxruntime system-wide"
 if ! sudo -n true 2>/dev/null; then

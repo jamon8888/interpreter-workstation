@@ -6,6 +6,7 @@ import {
   parseArgs,
   getPlatformsToDownload,
   hasAvx2,
+  isMissingAssetError,
   PLATFORM_KEYS,
   BASEMIND_PLATFORMS,
 } from './download-basemind.mjs';
@@ -83,6 +84,13 @@ test('hasAvx2 requires avx2 on every flags line', () => {
 test('hasAvx2 is true off-linux (no noavx2 variant elsewhere)', () => {
   assert.equal(hasAvx2({ platform: 'darwin' }), true);
   assert.equal(hasAvx2({ platform: 'win32' }), true);
+});
+
+test('isMissingAssetError skips only unpublished noavx2 assets', () => {
+  assert.equal(isMissingAssetError('linux-x64-noavx2', new Error('No checksum found for basemind-x.noavx2.tar.gz in x_checksums.txt')), true);
+  assert.equal(isMissingAssetError('linux-x64-noavx2', new Error('Command failed: curl: (22) The requested URL returned error: 404')), true);
+  assert.equal(isMissingAssetError('linux-x64-noavx2', new Error('Checksum mismatch for basemind-x.noavx2.tar.gz')), false);
+  assert.equal(isMissingAssetError('linux-x64', new Error('No checksum found for basemind-x.tar.gz')), false);
 });
 
 test('getPlatformsToDownload throws on unknown platform', () => {

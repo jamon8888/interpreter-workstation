@@ -184,7 +184,12 @@ export async function* basemindDownload(onlyStage?: BasemindDownloadStage): Asyn
       // use. Pre-seed the weights directly so onboarding actually delivers
       // "models downloaded" (see basemindPreseed.ts).
       const { preseedNerModel } = await import('./basemindPreseed');
-      result = await preseedNerModel();
+      try {
+        result = await preseedNerModel();
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        result = { ok: false, error: `NER model cache setup failed: ${message}` };
+      }
     } else {
       let workspace: string;
       try {

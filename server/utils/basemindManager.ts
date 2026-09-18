@@ -10,25 +10,33 @@ const BINARY_NAME = process.platform === 'win32' ? 'basemind.exe' : 'basemind';
 
 /**
  * True when the CPU reports AVX2. Only linux-x64 ships a noavx2 variant, so
- * every other platform short-circuits to true. Unreadable cpuinfo → true
- * (preserve stock-binary behavior; an actually incompatible CPU fails later
- * with the download handler's explicit error).
+ * every other platform short-circuits to true. Unknown state (unreadable
+ * cpuinfo, no flags lines) fails CLOSED to false: the noavx2 build runs on
+ * any x86_64 CPU (SSE2 baseline + runtime dispatch), so preferring it when
+ * in doubt is safe, while the stock build SIGILL-crashes on AVX2-less CPUs.
+ * Callers always fall through to the stock binary when no noavx2 build is
+ * staged, so fail-closed only ever adds a preference, never removes one.
  */
 export function cpuHasAvx2(): boolean {
   if (process.platform !== 'linux' || process.arch !== 'x64') return true;
   try {
     const text = readFileSync('/proc/cpuinfo', 'utf8');
     const flagLines = text.split('\n').filter((line) => line.startsWith('flags'));
-    if (flagLines.length === 0) return true;
+    if (flagLines.length === 0) return false;
     return flagLines.every((line) => (line.split(':')[1] ?? '').trim().split(/\s+/).includes('avx2'));
   } catch {
-    return true;
+    return false;
   }
 }
 
-/** True when the path is the SSE2-baseline build (staged `linux-x64-noavx2/` dir or packaged `basemind-noavx2/`). */
+/**
+ * True when the path is the SSE2-baseline build: a `basemind-noavx2` path
+ * segment (packaged layout) or the staged `linux-x64-noavx2` directory.
+ * Segment-boundary-aware so similarly named paths never match.
+ */
 export function isNoAvx2BasemindBinary(binaryPath: string): boolean {
-  return binaryPath.includes('/noavx2/') || binaryPath.includes('\\noavx2\\') || binaryPath.includes('linux-x64-noavx2');
+  const normalized = binaryPath.replace(/\\/g, '/');
+  return /(^|\/)basemind-noavx2(\/|$)/.test(normalized) || normalized.includes('linux-x64-noavx2');
 }
 
 function findBasemindBinary(): string {
