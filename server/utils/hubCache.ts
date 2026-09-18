@@ -11,7 +11,12 @@ export const MODEL_RESOURCE_REPOS: Record<ModelResource, string[]> = {
     'models--xberg-io--gliner-models',
   ],
   embeddings: ['models--xberg-io--embedding-models'],
-  reranker: ['models--xberg-io--reranker-models'],
+  reranker: [
+    'models--xberg-io--reranker-models',
+    // GTE-multilingual int8 (FR decision #228): xberg lazy-downloads it on
+    // first Custom use; the preseed below writes this same layout.
+    'models--onnx-community--gte-multilingual-reranker-base',
+  ],
 };
 
 /**

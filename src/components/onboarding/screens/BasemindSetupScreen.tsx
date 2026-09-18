@@ -30,15 +30,15 @@ const STAGE_CONFIG: Record<Stage, StageConfig> = {
   reranker: {
     label: 'Better results',
     description: 'Reorders search results by relevance, so the most useful answers appear first.',
-    size: '1.1 GB',
-    model: 'bge-reranker-v2-m3',
+    size: '341 MB',
+    model: 'onnx-community/gte-multilingual-reranker-base (int8)',
     requiresAvx2: true,
   },
   nerModel: {
     label: 'Privacy protection',
     description: 'Detects names, emails, and personal info in documents so it can be automatically redacted.',
-    size: '673 MB',
-    model: 'gliner_small-v2.5',
+    size: '181 MB',
+    model: 'knowledgator/gliner-pii-edge-v1.0',
     requiresAvx2: true,
   },
 };
