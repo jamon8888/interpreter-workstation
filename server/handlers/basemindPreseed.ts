@@ -139,7 +139,7 @@ function sha256File(filePath: string): Promise<string> {
     const hash = createHash('sha256');
     const stream = createReadStream(filePath);
     stream.on('error', reject);
-    stream.on('data', (chunk: Buffer) => hash.update(chunk));
+    stream.on('data', (chunk: Buffer | string) => hash.update(chunk));
     stream.on('end', () => resolve(hash.digest('hex')));
   });
 }

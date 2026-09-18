@@ -52,6 +52,12 @@ interface StageState {
 
 const MAX_RETRIES = 2;
 
+/** Human cache size for the stale-weights notice (GB with one decimal, else MB). */
+function formatCacheBytes(bytes: number): string {
+  if (bytes >= 1_000_000_000) return `${(bytes / 1_000_000_000).toFixed(1)} GB`;
+  return `${Math.max(1, Math.round(bytes / 1_000_000))} MB`;
+}
+
 export interface BasemindSetupScreenProps {
   onNext: () => void;
 }
@@ -72,6 +78,10 @@ export function BasemindSetupScreen({ onNext }: BasemindSetupScreenProps) {
   // Persisted as an explicit override only when the user touches the checkbox.
   const [rerankerWanted, setRerankerWanted] = useState(true);
   const [rerankerTouched, setRerankerTouched] = useState(false);
+  // Stale v2-m3 weights from before the GTE migration (#228): offered for
+  // cleanup, never removed without the button below.
+  const [staleRerankerBytes, setStaleRerankerBytes] = useState(0);
+  const [isClearingStale, setIsClearingStale] = useState(false);
 
   useEffect(() => {
     search.getRerankerDefault()
@@ -80,6 +90,12 @@ export function BasemindSetupScreen({ onNext }: BasemindSetupScreenProps) {
       })
       .catch(() => { /* keep the checked default on IPC failure */ });
   }, [rerankerTouched]);
+
+  useEffect(() => {
+    basemind.getStaleRerankerCache()
+      .then(({ bytes }) => setStaleRerankerBytes(bytes))
+      .catch(() => { /* stale check is advisory; the stages stand alone */ });
+  }, []);
 
   useEffect(() => {
     basemind.cpuFeatures().then(setCpuFeatures).catch(() => {
@@ -169,6 +185,21 @@ export function BasemindSetupScreen({ onNext }: BasemindSetupScreenProps) {
       console.error('Failed to save reranker choice:', err);
     });
   }, [rerankerTouched, rerankerWanted]);
+
+  const handleClearStaleReranker = useCallback(async () => {
+    setIsClearingStale(true);
+    try {
+      const { freedBytes } = await basemind.clearStaleRerankerCache();
+      if (freedBytes > 0) {
+        const { bytes } = await basemind.getStaleRerankerCache();
+        setStaleRerankerBytes(bytes);
+      }
+    } catch (err) {
+      console.error('Failed to clear stale reranker cache:', err);
+    } finally {
+      setIsClearingStale(false);
+    }
+  }, []);
 
   const handleSkipIncompatible = useCallback(() => {
     setIsSkipped(true);
@@ -294,6 +325,21 @@ export function BasemindSetupScreen({ onNext }: BasemindSetupScreenProps) {
                 )}
                 {state.status === 'skipped' && state.skipReason && (
                   <p className="mt-1 text-ui-xs text-muted-foreground">{state.skipReason}</p>
+                )}
+                {stage === 'reranker' && staleRerankerBytes > 0 && (
+                  <p className="mt-1 text-ui-xs text-muted-foreground">
+                    {t('onboarding.basemind.staleReranker', { size: formatCacheBytes(staleRerankerBytes) })}{' '}
+                    <button
+                      type="button"
+                      onClick={handleClearStaleReranker}
+                      disabled={isClearingStale}
+                      className="underline transition-colors hover:text-foreground disabled:opacity-50"
+                    >
+                      {isClearingStale
+                        ? t('onboarding.basemind.freeingSpace', 'Freeing…')
+                        : t('onboarding.basemind.freeSpace', 'Free space')}
+                    </button>
+                  </p>
                 )}
               </div>
 

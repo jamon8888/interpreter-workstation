@@ -275,6 +275,23 @@ const handlers: Record<string, Record<string, HandlerFn>> = {
       }
       return { stages: results, success: results.every(r => r.success) };
     },
+    cpuFeatures: async () => {
+      const { cpuFeatures } = await import('../handlers/cpuFeatures');
+      const { isNoAvx2BasemindBinary, resolveBasemindBinary } = await import('../utils/basemindManager');
+      const features = await cpuFeatures();
+      // The UI gates AVX2-only model downloads on cpuFeatures.avx2. A staged
+      // noavx2 binary runs those models on any x86_64 CPU, so report it and
+      // let the UI stand down the gate.
+      return { ...features, noavx2Build: isNoAvx2BasemindBinary(resolveBasemindBinary()) };
+    },
+    getStaleRerankerCache: async () => {
+      const { getStaleRerankerCacheBytes } = await import('../handlers/rerankerWorkspace');
+      return { bytes: await getStaleRerankerCacheBytes() };
+    },
+    clearStaleRerankerCache: async () => {
+      const { clearStaleRerankerCache } = await import('../handlers/rerankerWorkspace');
+      return { freedBytes: await clearStaleRerankerCache() };
+    },
   },
 
   // ========== Settings ==========
