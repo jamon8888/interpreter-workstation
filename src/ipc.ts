@@ -672,8 +672,20 @@ export interface SearchCodeResponse {
   elapsedUs: number;
 }
 
+export interface RerankerState {
+  enabled: boolean;
+  /** Explicit user choice; null means automatic (per-machine default). */
+  override: boolean | null;
+}
+
 export interface SearchIpc {
   searchCode(params: SearchCodeParams): Promise<SearchCodeResponse>;
+  /** Effective state: override or per-machine default, never without the model. */
+  getRerankerEnabled(): Promise<RerankerState>;
+  /** Machine default without the model gate (onboarding pre-check). */
+  getRerankerDefault(): Promise<{ enabled: boolean }>;
+  /** Persist explicit choice; null returns to automatic. Resolves the effective state. */
+  setRerankerEnabled(value: boolean | null): Promise<{ enabled: boolean }>;
 }
 
 export type RehydrationPersistResult =
@@ -795,7 +807,12 @@ export const workspaceScan: WorkspaceScanIpc = isMarketingDemoMode()
   ? { status: async () => { throw new Error('Not available in demo mode'); } }
   : (client.workspaceScan as WorkspaceScanIpc);
 export const search: SearchIpc = isMarketingDemoMode()
-  ? { searchCode: async () => { throw new Error('Not available in demo mode'); } }
+  ? {
+    searchCode: async () => { throw new Error('Not available in demo mode'); },
+    getRerankerEnabled: async () => ({ enabled: false, override: null }),
+    getRerankerDefault: async () => ({ enabled: false }),
+    setRerankerEnabled: async () => { throw new Error('Not available in demo mode'); },
+  }
   : (client.search as SearchIpc);
 export const basemind: BasemindIpc = isMarketingDemoMode()
   ? { register: async () => { throw new Error('Not available in demo mode'); }, unregister: async () => { throw new Error('Not available in demo mode'); }, status: async () => { throw new Error('Not available in demo mode'); }, download: async () => { throw new Error('Not available in demo mode'); }, cpuFeatures: async () => ({ arch: 'unknown', avx2: false, avx: false, sse4_1: false, sse4_2: false, neon: false }) }
