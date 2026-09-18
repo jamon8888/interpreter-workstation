@@ -37,7 +37,9 @@ export const GLINER_REV = 'afb0faaa3c8e7d0de7796bd37e625026ff635fe0';
  * gliner_small-v2.5 artifacts (the model the onboarding downloads: ~673 MB).
  * SHAs mirror xberg's checked-in gliner-models.sha256 manifest — trust
  * attaches to the manifest, so a tampered upstream file fails verification
- * here instead of feeding wrong weights into inference.
+ * here instead of feeding wrong weights into inference. When xberg bumps
+ * GLINER_MODELS_REVISION or the fleet, update GLINER_REV + these entries
+ * from xberg-io/gliner-models at that revision (same file paths).
  */
 export const GLINER_FILES: PreseedFile[] = [
   {

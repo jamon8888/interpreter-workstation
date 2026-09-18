@@ -72,8 +72,10 @@ test('hasAvx2 detects flags from cpuinfo text', () => {
   assert.equal(hasAvx2({ platform: 'linux', cpuinfo: 'flags\t\t: fpu avx sse4_1\n' }), false);
 });
 
-test('hasAvx2 returns true when flags line is missing', () => {
-  assert.equal(hasAvx2({ platform: 'linux', cpuinfo: 'processor\t: 0\nvendor_id\t: GenuineIntel\n' }), true);
+test('hasAvx2 fails closed when flags are missing', () => {
+  assert.equal(hasAvx2({ platform: 'linux', cpuinfo: 'processor\t: 0\nmodel name\t: Unknown CPU\n' }), false);
+  assert.equal(hasAvx2({ platform: 'linux', cpuinfo: '' }), false);
+  assert.equal(hasAvx2({ platform: 'linux', cpuinfo: 'processor\t: 0\nvendor_id\t: GenuineIntel\n' }), false);
 });
 
 test('hasAvx2 requires avx2 on every flags line', () => {

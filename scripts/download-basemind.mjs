@@ -88,21 +88,22 @@ export function getPlatformKey(platform = process.platform, arch = process.arch)
 
 /**
  * True when the CPU supports AVX2. Only linux-x64 has a noavx2 variant, so
- * every other platform short-circuits to true. Unknown/unreadable → true
- * (preserve current behavior; a truly incompatible CPU fails later with the
- * download handler's explicit "CPU may lack AVX2" error).
+ * every other platform short-circuits to true. Unknown state (unreadable
+ * cpuinfo, no flags lines) fails CLOSED to false, matching cpuHasAvx2() in
+ * the server: the noavx2 binary runs anywhere, the stock one SIGILL-crashes
+ * without AVX2. This only affects download ordering (both variants stage).
  */
 export function hasAvx2({ platform = process.platform, cpuinfo } = {}) {
   if (platform !== 'linux') return true;
   try {
     const text = cpuinfo ?? fs.readFileSync('/proc/cpuinfo', 'utf8');
     const flagLines = text.split('\n').filter((line) => line.startsWith('flags'));
-    if (flagLines.length === 0) return true;
-    // Require AVX2 on every core — the process can migrate, so one
-    // AVX2-less core means the stock build can SIGILL.
+    if (flagLines.length === 0) return false;
+    // Require AVX2 on every core — the process can migrate, so one AVX2-less
+    // core means the stock build can SIGILL. Mirrors cpuHasAvx2() server-side.
     return flagLines.every((line) => (line.split(':')[1] ?? '').trim().split(/\s+/).includes('avx2'));
   } catch {
-    return true;
+    return false;
   }
 }
 

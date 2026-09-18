@@ -37,7 +37,7 @@ const WARMUP_QUERY = 'quarterly report renewable energy';
  *
  * Each call creates an isolated private temp dir (mkdtemp, 0700) so a
  * pre-existing /tmp path can't be used for symlink attacks. Caller must
- * remove it via cleanupWarmupWorkspace in a finally block.
+ * remove it via cleanupTempDir in a finally block.
  * Only the reranker stage needs git (basemind's `code` domain enumerates
  * files via git); embeddings/NER work without a Git executable, which
  * packaged builds don't ship.
@@ -72,12 +72,12 @@ async function ensureWarmupWorkspace(needGit: boolean): Promise<string> {
     }
     return dir;
   } catch (err) {
-    cleanupWarmupWorkspace(dir);
+    cleanupTempDir(dir);
     throw err;
   }
 }
 
-function cleanupWarmupWorkspace(dir: string): void {
+function cleanupTempDir(dir: string): void {
   rmSync(dir, { recursive: true, force: true });
 }
 
@@ -205,8 +205,8 @@ export async function* basemindDownload(onlyStage?: BasemindDownloadStage): Asyn
       try {
         result = await runWarmup(binary, stage, workspace, commsDir);
       } finally {
-        try { cleanupWarmupWorkspace(workspace); } catch { /* best effort */ }
-        try { cleanupWarmupWorkspace(commsDir); } catch { /* best effort */ }
+        try { cleanupTempDir(workspace); } catch { /* best effort */ }
+        try { cleanupTempDir(commsDir); } catch { /* best effort */ }
       }
     }
 
