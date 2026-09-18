@@ -1838,6 +1838,9 @@
   "onboarding.basemind.title": "Set up Basemind",
   "onboarding.basemind.description": "Download the local knowledge base for enhanced context.",
   "onboarding.basemind.startDownload": "Start Download",
+  "onboarding.basemind.staleReranker": "{{size}} of previous reranker weights can be freed.",
+  "onboarding.basemind.freeSpace": "Free space",
+  "onboarding.basemind.freeingSpace": "Freeing…",
   "onboarding.basemind.continue": "Continue",
   "titlebar.search.placeholder": "Search workspace (code, docs, notes)..."
 }

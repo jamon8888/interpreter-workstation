@@ -751,6 +751,10 @@ interface BasemindIpc {
   status(): Promise<{ status: string }>;
   download(stage?: 'embeddings' | 'reranker' | 'nerModel'): Promise<BasemindDownloadResult>;
   cpuFeatures(): Promise<CpuFeatures>;
+  /** Stale v2-m3 footprint in bytes (0 when migrated/clean). */
+  getStaleRerankerCache(): Promise<{ bytes: number }>;
+  /** Remove stale v2-m3 preset dirs; resolves the freed estimate. */
+  clearStaleRerankerCache(): Promise<{ freedBytes: number }>;
 }
 
 interface ProjectRunnerIpc {
@@ -817,7 +821,7 @@ export const search: SearchIpc = isMarketingDemoMode()
   }
   : (client.search as SearchIpc);
 export const basemind: BasemindIpc = isMarketingDemoMode()
-  ? { register: async () => { throw new Error('Not available in demo mode'); }, unregister: async () => { throw new Error('Not available in demo mode'); }, status: async () => { throw new Error('Not available in demo mode'); }, download: async () => { throw new Error('Not available in demo mode'); }, cpuFeatures: async () => ({ arch: 'unknown', avx2: false, avx: false, sse4_1: false, sse4_2: false, neon: false, noavx2Build: false }) }
+  ? { register: async () => { throw new Error('Not available in demo mode'); }, unregister: async () => { throw new Error('Not available in demo mode'); }, status: async () => { throw new Error('Not available in demo mode'); }, download: async () => { throw new Error('Not available in demo mode'); }, cpuFeatures: async () => ({ arch: 'unknown', avx2: false, avx: false, sse4_1: false, sse4_2: false, neon: false, noavx2Build: false }), getStaleRerankerCache: async () => ({ bytes: 0 }), clearStaleRerankerCache: async () => { throw new Error('Not available in demo mode'); } }
   : (client.basemind as BasemindIpc);
 export const pii: PiiIpc = isMarketingDemoMode()
   ? {

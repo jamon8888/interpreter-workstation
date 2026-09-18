@@ -284,6 +284,14 @@ const handlers: Record<string, Record<string, HandlerFn>> = {
       // let the UI stand down the gate.
       return { ...features, noavx2Build: isNoAvx2BasemindBinary(resolveBasemindBinary()) };
     },
+    getStaleRerankerCache: async () => {
+      const { getStaleRerankerCacheBytes } = await import('../handlers/rerankerWorkspace');
+      return { bytes: await getStaleRerankerCacheBytes() };
+    },
+    clearStaleRerankerCache: async () => {
+      const { clearStaleRerankerCache } = await import('../handlers/rerankerWorkspace');
+      return { freedBytes: await clearStaleRerankerCache() };
+    },
   },
 
   // ========== Settings ==========
