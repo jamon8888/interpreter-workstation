@@ -171,6 +171,96 @@ const handlers: Record<string, Record<string, HandlerFn>> = {
     },
   },
 
+  // ========== Workspace Scan (basemind) ==========
+  workspaceScan: {
+    status: async () => {
+      const { getWorkspaceScanStatus } = await import('../handlers/workspaceScan');
+      return getWorkspaceScanStatus();
+    },
+  },
+
+  // ========== Search (basemind code/document search) ==========
+  search: {
+    searchCode: async ([params]: [{
+      query: string;
+      limit?: number;
+      maxTokens?: number;
+      format?: string;
+      lane?: string;
+      rerankerEnabled?: boolean;
+      rerankerPreset?: string;
+      rerankerTopK?: number;
+    }]) => {
+      const { basemindSearchCode } = await import('../handlers/search');
+      return basemindSearchCode(params);
+    },
+    getRerankerEnabled: async () => {
+      const { getRerankerState } = await import('../handlers/rerankerPreference');
+      return getRerankerState();
+    },
+    getRerankerDefault: async () => {
+      const { getRerankerDefault } = await import('../handlers/rerankerPreference');
+      return { enabled: await getRerankerDefault() };
+    },
+    setRerankerEnabled: async ([value]: [boolean | null]) => {
+      const { setRerankerEnabled } = await import('../handlers/rerankerPreference');
+      return setRerankerEnabled(value);
+    },
+  },
+
+  // ========== Basemind MCP Server Lifecycle ==========
+  basemind: {
+    register: async () => {
+      const { registerBasemindServer } = await import('../utils/basemindManager');
+      const serverId = await registerBasemindServer();
+      return { serverId };
+    },
+    unregister: async () => {
+      const { unregisterBasemindServer } = await import('../utils/basemindManager');
+      await unregisterBasemindServer();
+      return { success: true };
+    },
+    status: async () => {
+      const { getBasemindServerStatus } = await import('../utils/basemindManager');
+      try {
+        return await getBasemindServerStatus();
+      } catch {
+        return { status: 'disconnected' };
+      }
+    },
+    download: async ([stage]: [import('../handlers/basemindDownload').BasemindDownloadStage?] = []) => {
+      const { basemindDownload } = await import('../handlers/basemindDownload');
+      const results: Array<{ stage: string; success: boolean; error?: string }> = [];
+      for await (const update of basemindDownload(stage)) {
+        if (update.done || update.error) {
+          results.push({
+            stage: update.stage,
+            success: update.done,
+            error: update.error,
+          });
+        }
+      }
+      return { stages: results, success: results.every(r => r.success) };
+    },
+    cpuFeatures: async () => {
+      const { cpuFeatures } = await import('../handlers/cpuFeatures');
+      const { isNoAvx2BasemindBinary, resolveBasemindBinary } = await import('../utils/basemindManager');
+      const features = await cpuFeatures();
+      // The UI gates AVX2-only model downloads on cpuFeatures.avx2. A staged
+      // noavx2 binary runs those models on any x86_64 CPU, so report it and
+      // let the UI stand down the gate.
+      return { ...features, noavx2Build: isNoAvx2BasemindBinary(resolveBasemindBinary()) };
+    },
+    getStaleRerankerCache: async () => {
+      const { getStaleRerankerCacheBytes } = await import('../handlers/rerankerWorkspace');
+      return { bytes: await getStaleRerankerCacheBytes() };
+    },
+    clearStaleRerankerCache: async () => {
+      const { clearStaleRerankerCache } = await import('../handlers/rerankerWorkspace');
+      return { freedBytes: await clearStaleRerankerCache() };
+    },
+  },
+
   // ========== Settings ==========
   settings: {
     get: async () => {

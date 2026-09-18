@@ -1803,5 +1803,19 @@
   "threadError.action.useCustomProvider": "Use Custom Provider",
   "threadError.action.manageModel": "Manage Model",
   "threadError.action.modelSettings": "Model settings",
-  "threadError.action.toolsSettings": "Tools settings"
+  "threadError.action.toolsSettings": "Tools settings",
+  "onboarding.basemind.title": "Document Intelligence",
+  "onboarding.basemind.description": "Download language understanding models for privacy-preserving document indexing. This happens once and is stored locally.",
+  "onboarding.basemind.startDownload": "Download & Continue",
+  "onboarding.basemind.continue": "Continue",
+  "onboarding.basemind.staleReranker": "{{size}} of previous reranker weights can be freed.",
+  "onboarding.basemind.freeSpace": "Free space",
+  "onboarding.basemind.freeingSpace": "Freeing…",
+  "basemind.download.retry": "Retry",
+  "basemind.download.skip": "Skip",
+  "settings.search.rerankLabel": "More accurate results",
+  "settings.search.rerankDescription": "Reorder search results by relevance with a local model. Slower on smaller computers.",
+  "settings.search.rerankNoModel": "The reranker model is not downloaded — search runs without reranking.",
+  "settings.search.rerankAuto": "Auto",
+  "settings.search.rerankAutoReset": "Back to auto"
 }
