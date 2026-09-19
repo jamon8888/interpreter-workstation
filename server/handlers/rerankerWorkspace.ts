@@ -62,8 +62,15 @@ const LEGACY_TOML = path.join('.basemind', WORKSPACE_TOML);
  * write back only on change. Never overwrites, never deletes.
  */
 export async function ensureWorkspaceRerankerModel(root: string): Promise<{ written: boolean; path: string }> {
-  const primary = path.join(root, WORKSPACE_TOML);
-  const legacy = path.join(root, LEGACY_TOML);
+  // Roots come from app config (last/recent workspaces), not the network —
+  // but a corrupt entry must never turn into a path traversal. Refuse anything
+  // that doesn't normalize to an absolute directory path.
+  const clean = path.normalize(root);
+  if (!path.isAbsolute(clean)) {
+    throw new Error(`refusing to write basemind.toml outside an absolute workspace root: ${root}`);
+  }
+  const primary = path.join(clean, WORKSPACE_TOML);
+  const legacy = path.join(clean, LEGACY_TOML);
   const target = existsSync(primary) ? primary : existsSync(legacy) ? legacy : primary;
   const existing = existsSync(target) ? readFileSync(target, 'utf-8') : null;
   const { toml, changed } = planWorkspaceRerankerToml(existing);
