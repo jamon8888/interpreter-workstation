@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Download, Check, AlertCircle, Loader2, SkipForward } from 'lucide-react';
-import { basemind } from '../../../ipc';
+import { basemind, search } from '../../../ipc';
 import type { CpuFeatures } from '../../../ipc';
 import { OnboardingHeading, OnboardingScreenShell } from '../components/OnboardingScreenShell';
 import { Button } from '../../ui/button';
+import { Switch } from '../../ui/switch';
 import { useOnboarding } from '../OnboardingContext';
 
 const STAGES = ['embeddings', 'reranker', 'nerModel'] as const;
@@ -29,15 +30,15 @@ const STAGE_CONFIG: Record<Stage, StageConfig> = {
   reranker: {
     label: 'Better results',
     description: 'Reorders search results by relevance, so the most useful answers appear first.',
-    size: '1.1 GB',
-    model: 'bge-reranker-v2-m3',
+    size: '341 MB',
+    model: 'onnx-community/gte-multilingual-reranker-base (int8)',
     requiresAvx2: true,
   },
   nerModel: {
     label: 'Privacy protection',
     description: 'Detects names, emails, and personal info in documents so it can be automatically redacted.',
-    size: '673 MB',
-    model: 'gliner_small-v2.5',
+    size: '181 MB',
+    model: 'knowledgator/gliner-pii-edge-v1.0',
     requiresAvx2: true,
   },
 };
@@ -50,6 +51,12 @@ interface StageState {
 }
 
 const MAX_RETRIES = 2;
+
+/** Human cache size for the stale-weights notice (GB with one decimal, else MB). */
+function formatCacheBytes(bytes: number): string {
+  if (bytes >= 1_000_000_000) return `${(bytes / 1_000_000_000).toFixed(1)} GB`;
+  return `${Math.max(1, Math.round(bytes / 1_000_000))} MB`;
+}
 
 export interface BasemindSetupScreenProps {
   onNext: () => void;
@@ -67,6 +74,28 @@ export function BasemindSetupScreen({ onNext }: BasemindSetupScreenProps) {
   const [isDownloading, setIsDownloading] = useState(false);
   const [isSkipped, setIsSkipped] = useState(false);
   const [cpuFeatures, setCpuFeatures] = useState<CpuFeatures | null>(null);
+  // Reranker opt-in, pre-checked from the per-machine default (RAM/CPU/model).
+  // Persisted as an explicit override only when the user touches the checkbox.
+  const [rerankerWanted, setRerankerWanted] = useState(true);
+  const [rerankerTouched, setRerankerTouched] = useState(false);
+  // Stale v2-m3 weights from before the GTE migration (#228): offered for
+  // cleanup, never removed without the button below.
+  const [staleRerankerBytes, setStaleRerankerBytes] = useState(0);
+  const [isClearingStale, setIsClearingStale] = useState(false);
+
+  useEffect(() => {
+    search.getRerankerDefault()
+      .then(({ enabled }) => {
+        setRerankerWanted((current) => (rerankerTouched ? current : enabled));
+      })
+      .catch(() => { /* keep the checked default on IPC failure */ });
+  }, [rerankerTouched]);
+
+  useEffect(() => {
+    basemind.getStaleRerankerCache()
+      .then(({ bytes }) => setStaleRerankerBytes(bytes))
+      .catch(() => { /* stale check is advisory; the stages stand alone */ });
+  }, []);
 
   useEffect(() => {
     basemind.cpuFeatures().then(setCpuFeatures).catch(() => {
@@ -89,6 +118,14 @@ export function BasemindSetupScreen({ onNext }: BasemindSetupScreenProps) {
     setIsDownloading(true);
     for (const stage of STAGES) {
       if (onlyStage !== null && stage !== onlyStage) continue;
+
+      if (stage === 'reranker' && !rerankerWanted) {
+        setStageStates(prev => ({
+          ...prev,
+          [stage]: { status: 'skipped', progress: 100, skipReason: t('onboarding.basemind.rerankSkipped', 'Skipped — search without reranking') },
+        }));
+        continue;
+      }
 
       if (!isCompatible(stage)) {
         setStageStates(prev => ({
@@ -142,7 +179,29 @@ export function BasemindSetupScreen({ onNext }: BasemindSetupScreenProps) {
     }
     setIsDownloading(false);
     setCurrentStage(null);
-  }, [isCompatible]);
+  }, [isCompatible, rerankerWanted, t]);
+
+  const persistRerankerChoice = useCallback(() => {
+    if (!rerankerTouched) return;
+    void search.setRerankerEnabled(rerankerWanted).catch((err) => {
+      console.error('Failed to save reranker choice:', err);
+    });
+  }, [rerankerTouched, rerankerWanted]);
+
+  const handleClearStaleReranker = useCallback(async () => {
+    setIsClearingStale(true);
+    try {
+      const { freedBytes } = await basemind.clearStaleRerankerCache();
+      if (freedBytes > 0) {
+        const { bytes } = await basemind.getStaleRerankerCache();
+        setStaleRerankerBytes(bytes);
+      }
+    } catch (err) {
+      console.error('Failed to clear stale reranker cache:', err);
+    } finally {
+      setIsClearingStale(false);
+    }
+  }, []);
 
   const handleSkipIncompatible = useCallback(() => {
     setIsSkipped(true);
@@ -151,14 +210,16 @@ export function BasemindSetupScreen({ onNext }: BasemindSetupScreenProps) {
 
   const handleSkipAll = useCallback(() => {
     setIsSkipped(true);
+    persistRerankerChoice();
     updateUserChoices({ basemindSetupComplete: true });
     onNext();
-  }, [onNext, updateUserChoices]);
+  }, [onNext, persistRerankerChoice, updateUserChoices]);
 
   const handleContinue = useCallback(() => {
+    persistRerankerChoice();
     updateUserChoices({ basemindSetupComplete: true });
     onNext();
-  }, [onNext, updateUserChoices]);
+  }, [onNext, persistRerankerChoice, updateUserChoices]);
 
   // Completion has to mean "everything worked", not "nothing is still running".
   // The old allHandled counted `error` as handled, which made the footer's
@@ -186,6 +247,24 @@ export function BasemindSetupScreen({ onNext }: BasemindSetupScreenProps) {
       />
 
       <div className="mt-6 space-y-3">
+        <label className="flex items-center gap-3 rounded-[10px] border px-4 py-3" style={{ borderColor: 'var(--oa-border)', background: 'var(--oa-bg-app)' }}>
+          <Switch
+            size="sm"
+            checked={rerankerWanted}
+            onCheckedChange={(checked) => {
+              setRerankerWanted(checked);
+              setRerankerTouched(true);
+            }}
+          />
+          <span className="flex-1 min-w-0">
+            <span className="block text-ui-sm font-medium text-foreground">
+              {t('onboarding.basemind.rerankOptIn', 'More accurate results (reranking)')}
+            </span>
+            <span className="block text-ui-xs text-muted-foreground mt-0.5">
+              {t('onboarding.basemind.rerankOptInHint', 'Slower on smaller computers — you can change this later in Settings.')}
+            </span>
+          </span>
+        </label>
         {STAGES.map((stage) => {
           const state = stageStates[stage];
           const config = STAGE_CONFIG[stage];
@@ -248,6 +327,21 @@ export function BasemindSetupScreen({ onNext }: BasemindSetupScreenProps) {
                 )}
                 {state.status === 'skipped' && state.skipReason && (
                   <p className="mt-1 text-ui-xs text-muted-foreground">{state.skipReason}</p>
+                )}
+                {stage === 'reranker' && staleRerankerBytes > 0 && (
+                  <p className="mt-1 text-ui-xs text-muted-foreground">
+                    {t('onboarding.basemind.staleReranker', { size: formatCacheBytes(staleRerankerBytes) })}{' '}
+                    <button
+                      type="button"
+                      onClick={handleClearStaleReranker}
+                      disabled={isClearingStale}
+                      className="underline transition-colors hover:text-foreground disabled:opacity-50"
+                    >
+                      {isClearingStale
+                        ? t('onboarding.basemind.freeingSpace', 'Freeing…')
+                        : t('onboarding.basemind.freeSpace', 'Free space')}
+                    </button>
+                  </p>
                 )}
               </div>
 

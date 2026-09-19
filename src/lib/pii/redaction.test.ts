@@ -3,11 +3,14 @@ import { describe, expect, test } from 'bun:test';
 import { needsRedactionForProvider, shouldBlockAttachmentSend } from './redaction';
 
 describe('needsRedactionForProvider', () => {
-  test('mistral and local providers are trusted', () => {
-    expect(needsRedactionForProvider('mistral')).toBe(false);
+  test('only on-device local providers are trusted', () => {
     expect(needsRedactionForProvider('local')).toBe(false);
-    expect(needsRedactionForProvider('Mistral')).toBe(false);
     expect(needsRedactionForProvider('LOCAL')).toBe(false);
+  });
+
+  test('mistral label requires redaction (covers local weights and remote API)', () => {
+    expect(needsRedactionForProvider('mistral')).toBe(true);
+    expect(needsRedactionForProvider('Mistral')).toBe(true);
   });
 
   test('api and hosted providers require redaction', () => {

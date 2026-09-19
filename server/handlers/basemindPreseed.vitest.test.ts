@@ -151,3 +151,26 @@ describe('preseedNerModel', () => {
     expect(result.error).toMatch(/403/);
   });
 });
+
+describe('pinned weight manifests (EDGE/GTE decisions #231/#228)', () => {
+  it('edge engine files carry sha256/size and an onnx entry (hubCache readiness)', async () => {
+    const { EDGE_REPO, EDGE_REV, EDGE_FILES } = await loadModule();
+    expect(EDGE_REPO).toBe('knowledgator/gliner-pii-edge-v1.0');
+    expect(EDGE_REV).toBe('main');
+    expect(EDGE_FILES.length).toBeGreaterThan(0);
+    for (const f of EDGE_FILES) {
+      expect(f.sha256).toMatch(/^[0-9a-f]{64}$/);
+      expect(f.size).toBeGreaterThan(0);
+    }
+    expect(EDGE_FILES.some((f) => f.path.endsWith('.onnx'))).toBe(true);
+  });
+
+  it('GTE reranker files carry sha256/size and the int8 onnx entry', async () => {
+    const { GTE_REPO, GTE_REV, GTE_FILES } = await loadModule();
+    expect(GTE_REPO).toBe('onnx-community/gte-multilingual-reranker-base');
+    expect(GTE_REV).toBe('main');
+    const onnx = GTE_FILES.find((f) => f.path === 'onnx/model_int8.onnx');
+    expect(onnx?.size).toBe(340_858_200);
+    expect(onnx?.sha256).toMatch(/^[0-9a-f]{64}$/);
+  });
+});

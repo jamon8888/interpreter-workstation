@@ -524,6 +524,11 @@
   "settings.inbox.whatsappDisconnected.step4": "That self-message creates a new WhatsApp chat in this app.",
   "settings.inbox.moreComingSoon.title": "More coming soon",
   "settings.inbox.moreComingSoon.description": "Additional inboxes will appear here as they roll out.",
+  "settings.search.rerankLabel": "More accurate results",
+  "settings.search.rerankDescription": "Reorder search results by relevance with a local model. Slower on smaller computers.",
+  "settings.search.rerankNoModel": "The reranker model is not downloaded — search runs without reranking.",
+  "settings.search.rerankAuto": "Auto",
+  "settings.search.rerankAutoReset": "Back to auto",
   "settings.shortcuts.newNote": "New Note",
   "settings.shortcuts.newTab": "New Tab",
   "settings.shortcuts.openFolder": "Open Folder",
@@ -1834,5 +1839,8 @@
   "onboarding.basemind.title": "Document Intelligence",
   "onboarding.basemind.description": "Download language understanding models for privacy-preserving document indexing. This happens once and is stored locally.",
   "onboarding.basemind.startDownload": "Download & Continue",
+  "onboarding.basemind.staleReranker": "{{size}} of previous reranker weights can be freed.",
+  "onboarding.basemind.freeSpace": "Free space",
+  "onboarding.basemind.freeingSpace": "Freeing…",
   "onboarding.basemind.continue": "Continue"
 }

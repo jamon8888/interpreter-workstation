@@ -1,10 +1,10 @@
 /**
- * Trusted providers keep prompt data local or under EU handling, so no
- * redaction promise is shown. Every other (or unknown) provider requires
- * basemind redaction before model-bound text leaves the device. Unknown
- * fails closed: redact and notify.
+ * Only on-device `local` models skip redaction: the provider string is a
+ * coarse label, and `mistral` covers both local weights and the remote API.
+ * Trusting the label would let raw bytes reach a distant model (#232).
+ * Unknown fails closed: redact and notify.
  */
-const TRUSTED_PROVIDERS = new Set(['mistral', 'local']);
+const TRUSTED_PROVIDERS = new Set(['local']);
 
 export function needsRedactionForProvider(
   provider: string | null | undefined,

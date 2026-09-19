@@ -194,6 +194,18 @@ const handlers: Record<string, Record<string, HandlerFn>> = {
       const { basemindSearchCode } = await import('../handlers/search');
       return basemindSearchCode(params);
     },
+    getRerankerEnabled: async () => {
+      const { getRerankerState } = await import('../handlers/rerankerPreference');
+      return getRerankerState();
+    },
+    getRerankerDefault: async () => {
+      const { getRerankerDefault } = await import('../handlers/rerankerPreference');
+      return { enabled: await getRerankerDefault() };
+    },
+    setRerankerEnabled: async ([value]: [boolean | null]) => {
+      const { setRerankerEnabled } = await import('../handlers/rerankerPreference');
+      return setRerankerEnabled(value);
+    },
   },
 
   // ========== PII redaction and rehydration ==========
@@ -271,6 +283,14 @@ const handlers: Record<string, Record<string, HandlerFn>> = {
       // noavx2 binary runs those models on any x86_64 CPU, so report it and
       // let the UI stand down the gate.
       return { ...features, noavx2Build: isNoAvx2BasemindBinary(resolveBasemindBinary()) };
+    },
+    getStaleRerankerCache: async () => {
+      const { getStaleRerankerCacheBytes } = await import('../handlers/rerankerWorkspace');
+      return { bytes: await getStaleRerankerCacheBytes() };
+    },
+    clearStaleRerankerCache: async () => {
+      const { clearStaleRerankerCache } = await import('../handlers/rerankerWorkspace');
+      return { freedBytes: await clearStaleRerankerCache() };
     },
   },
 

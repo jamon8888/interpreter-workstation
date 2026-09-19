@@ -16,7 +16,9 @@ export interface PiiDetection {
 const PATTERNS = {
   email: /[\w.+-]+@[\w-]+\.[\w.]+/g,
   iban: /\b[A-Z]{2}\d{2}(?:[ ]?[A-Z0-9]{4}){2,7}(?:[ ]?[A-Z0-9]{1,3})?\b/g,
-  phone: /(\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/g,
+  // E.164 first (`+` + 8–15 digits, separators allowed): the international
+  // form wins over the US-centric fallback below (+33 …, +1-800-…).
+  phone: /\+\d(?:[ .-]?\d){7,14}|(\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/g,
   ipv4: /\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/g,
   credit_card: /\b\d{4}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4}\b/g,
 } as const;
