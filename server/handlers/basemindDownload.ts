@@ -37,10 +37,10 @@ const WARMUP_QUERY = 'quarterly report renewable energy';
  *
  * Each call creates an isolated private temp dir (mkdtemp, 0700) so a
  * pre-existing /tmp path can't be used for symlink attacks. Caller must
- * remove it via cleanupWarmupWorkspace in a finally block.
- * Only the reranker stage needs git (basemind's `code` domain enumerates
- * files via git); embeddings/NER work without a Git executable, which
- * packaged builds don't ship.
+ * remove it via cleanupTempDir in a finally block.
+ * `needGit` stays for documentation: no current stage needs git anymore
+ * (reranker/NER are pre-seeded; embeddings warm up via `memory documents`,
+ * which doesn't enumerate via git), which keeps packaged builds git-free.
  */
 async function ensureWarmupWorkspace(needGit: boolean): Promise<string> {
   const dir = mkdtempSync(path.join(tmpdir(), 'basemind-model-warmup-'));
@@ -72,12 +72,12 @@ async function ensureWarmupWorkspace(needGit: boolean): Promise<string> {
     }
     return dir;
   } catch (err) {
-    cleanupWarmupWorkspace(dir);
+    cleanupTempDir(dir);
     throw err;
   }
 }
 
-function cleanupWarmupWorkspace(dir: string): void {
+function cleanupTempDir(dir: string): void {
   rmSync(dir, { recursive: true, force: true });
 }
 
@@ -86,21 +86,8 @@ function stageArgs(stage: BasemindDownloadStage, workspace: string): string[] {
     case 'embeddings':
       return ['memory', 'documents', WARMUP_QUERY, '--root', workspace, '--limit', '1'];
     case 'reranker':
-      return [
-        'code', 'semantic', WARMUP_QUERY,
-        '--root', workspace,
-        '--limit', '1',
-        '--rerank',
-        '--rerank-preset', 'bge-reranker-v2-m3',
-      ];
     case 'nerModel':
-      return [
-        'scan', '--root', workspace,
-        '--documents-enabled', 'true',
-        '--documents-ner-enabled', 'true',
-        '--documents-redaction-enabled', 'true',
-        '-q',
-      ];
+      throw new Error(`${stage} is pre-seeded directly, never warmed up`);
   }
 }
 
@@ -114,17 +101,39 @@ function stageArgs(stage: BasemindDownloadStage, workspace: string): string[] {
  * `BASEMIND_ALLOW_ANY_ROOT` is scoped to this one invocation via env — the
  * warmup workspace is a plain throwaway git repo, not a real project, and
  * would otherwise be refused as an accidentally-inherited scan root.
+ * `BASEMIND_COMMS_DIR` points the warmup at a private comms socket so it
+ * never collides with a user-running daemon (e.g. an editor-integrated
+ * basemind of another version holding ~/.local/share/basemind/comms):
+ * without isolation the warmup fails with "a previous/incompatible daemon
+ * holds the socket" instead of downloading anything. Model downloads still
+ * land in the shared Hugging Face hub cache — only the socket is isolated.
  */
-async function runWarmup(binary: string, stage: BasemindDownloadStage, workspace: string): Promise<{ ok: boolean; error?: string }> {
+async function runWarmup(binary: string, stage: BasemindDownloadStage, workspace: string, commsDir: string): Promise<{ ok: boolean; error?: string }> {
   try {
     await execFileAsync(binary, stageArgs(stage, workspace), {
-      env: { ...process.env, BASEMIND_ALLOW_ANY_ROOT: '1' },
+      env: { ...process.env, BASEMIND_ALLOW_ANY_ROOT: '1', BASEMIND_COMMS_DIR: commsDir },
       timeout: WARMUP_TIMEOUT_MS,
     });
     return { ok: true };
   } catch (err) {
     const stderr = err && typeof err === 'object' && 'stderr' in err ? String((err as { stderr?: unknown }).stderr ?? '') : '';
     const tail = stderr.trim().split('\n').slice(-3).join(' ').slice(0, 300);
+    // Only SIGILL indicates the stock ONNX Runtime hitting a missing
+    // instruction (AVX2 on pre-Haswell CPUs) — it leaves no stderr, so
+    // surface a clear cause. SIGTERM is the warmup timeout, anything else
+    // keeps the generic message.
+    const signal = err && typeof err === 'object' && 'signal' in err
+      ? (err as { signal?: unknown }).signal
+      : undefined;
+    if (signal === 'SIGILL') {
+      return { ok: false, error: `warmup command killed by SIGILL — this CPU may lack AVX2, which the bundled ONNX Runtime requires` };
+    }
+    if (signal === 'SIGTERM') {
+      return { ok: false, error: `warmup command timed out after ${WARMUP_TIMEOUT_MS / 1000}s` };
+    }
+    if (signal) {
+      return { ok: false, error: `warmup command killed by ${String(signal)}` };
+    }
     const message = err instanceof Error ? err.message : String(err);
     return { ok: false, error: tail || message };
   }
@@ -154,19 +163,61 @@ export async function* basemindDownload(onlyStage?: BasemindDownloadStage): Asyn
       continue;
     }
 
-    let workspace: string;
-    try {
-      workspace = await ensureWarmupWorkspace(stage === 'reranker');
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      yield { stage, progress: 0, done: false, error: `warmup workspace setup failed: ${message}` };
-      continue;
-    }
     let result: { ok: boolean; error?: string };
-    try {
-      result = await runWarmup(binary, stage, workspace);
-    } finally {
-      cleanupWarmupWorkspace(workspace);
+    if (stage === 'nerModel' || stage === 'reranker') {
+      // No basemind one-shot CLI command exercises these backends the way
+      // onboarding needs (scan never initializes NER; `code --rerank` only
+      // knows compiled-in presets, not the GTE Custom model) — pre-seed the
+      // weights directly so onboarding actually delivers "models downloaded"
+      // (see basemindPreseed.ts). nerModel = gliner-pii-edge (engine #231),
+      // reranker = GTE-multilingual int8 (decision #228).
+      const { preseedNerModel, EDGE_REPO, EDGE_REV, EDGE_FILES, GTE_REPO, GTE_REV, GTE_FILES } =
+        await import('./basemindPreseed');
+      const opts = stage === 'nerModel'
+        ? { repo: EDGE_REPO, rev: EDGE_REV, files: EDGE_FILES }
+        : { repo: GTE_REPO, rev: GTE_REV, files: GTE_FILES };
+      try {
+        result = await preseedNerModel(opts);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        result = { ok: false, error: `${stage} model cache setup failed: ${message}` };
+      }
+      if (result.ok && stage === 'reranker') {
+        // Activation follows the download: workspaces this app opened resolve
+        // the GTE reranker (created when absent, never overwritten). Best
+        // effort — a workspace failure must not fail the weights download.
+        try {
+          const { ensureKnownWorkspacesRerankerModels } = await import('./rerankerWorkspace');
+          await ensureKnownWorkspacesRerankerModels();
+        } catch (err) {
+          console.warn(`[basemindDownload] workspace GTE activation failed: ${err instanceof Error ? err.message : String(err)}`);
+        }
+      }
+    } else {
+      let workspace: string;
+      try {
+        // Only the embeddings stage still warms up (no git needed: `memory
+        // documents` doesn't enumerate via git). Reranker/NER are pre-seeded.
+        workspace = await ensureWarmupWorkspace(false);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        yield { stage, progress: 0, done: false, error: `warmup workspace setup failed: ${message}` };
+        continue;
+      }
+      // Private comms socket for this warmup (see runWarmup). Created beside
+      // the workspace with a matching name so both are throwaway, listed
+      // together, and cleaned together.
+      const commsDir = mkdtempSync(path.join(tmpdir(), 'basemind-model-warmup-comms-'));
+      try {
+        result = await runWarmup(binary, stage, workspace, commsDir);
+      } finally {
+        try { cleanupTempDir(workspace); } catch (err) {
+          console.warn(`[basemindDownload] warmup workspace cleanup failed for ${workspace}: ${err instanceof Error ? err.message : String(err)}`);
+      }
+      try { cleanupTempDir(commsDir); } catch (err) {
+        console.warn(`[basemindDownload] warmup comms cleanup failed for ${commsDir}: ${err instanceof Error ? err.message : String(err)}`);
+      }
+      }
     }
 
     // The warmup command downloads the model, then immediately exercises it

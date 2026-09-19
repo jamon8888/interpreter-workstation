@@ -524,6 +524,11 @@
   "settings.inbox.whatsappDisconnected.step4": "Ce message crée une nouvelle discussion WhatsApp dans cette app.",
   "settings.inbox.moreComingSoon.title": "D'autres arrivent bientôt",
   "settings.inbox.moreComingSoon.description": "D'autres boîtes apparaîtront ici au fil de leur déploiement.",
+  "settings.search.rerankLabel": "Résultats plus pertinents",
+  "settings.search.rerankDescription": "Réordonne les résultats par pertinence avec un modèle local. Plus lent sur les petits ordinateurs.",
+  "settings.search.rerankNoModel": "Le modèle de reranking n'est pas téléchargé — la recherche s'en passe.",
+  "settings.search.rerankAuto": "Auto",
+  "settings.search.rerankAutoReset": "Revenir en auto",
   "settings.shortcuts.newNote": "Nouvelle note",
   "settings.shortcuts.newTab": "Nouvel onglet",
   "settings.shortcuts.openFolder": "Ouvrir un dossier",
@@ -1833,6 +1838,9 @@
   "onboarding.basemind.title": "Intelligence documentaire",
   "onboarding.basemind.description": "Téléchargez les modèles de compréhension du langage pour une indexation documentaire respectueuse de la vie privée. Une seule fois, stocké localement.",
   "onboarding.basemind.startDownload": "Télécharger et continuer",
+  "onboarding.basemind.staleReranker": "{{size}} de l'ancien modèle de reranking peuvent être libérés.",
+  "onboarding.basemind.freeSpace": "Libérer l'espace",
+  "onboarding.basemind.freeingSpace": "Libération…",
   "onboarding.basemind.continue": "Continuer",
   "titlebar.search.placeholder": "Search workspace (code, docs, notes)..."
 }

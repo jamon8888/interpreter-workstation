@@ -672,8 +672,20 @@ export interface SearchCodeResponse {
   elapsedUs: number;
 }
 
+export interface RerankerState {
+  enabled: boolean;
+  /** Explicit user choice; null means automatic (per-machine default). */
+  override: boolean | null;
+}
+
 export interface SearchIpc {
   searchCode(params: SearchCodeParams): Promise<SearchCodeResponse>;
+  /** Effective state: override or per-machine default, never without the model. */
+  getRerankerEnabled(): Promise<RerankerState>;
+  /** Machine default without the model gate (onboarding pre-check). */
+  getRerankerDefault(): Promise<{ enabled: boolean }>;
+  /** Persist explicit choice; null returns to automatic. Resolves the effective state. */
+  setRerankerEnabled(value: boolean | null): Promise<{ enabled: boolean }>;
 }
 
 export type RehydrationPersistResult =
@@ -722,13 +734,15 @@ interface BasemindDownloadResult {
   success: boolean;
 }
 
-interface CpuFeatures {
+export interface CpuFeatures {
   arch: string;
   avx2: boolean;
   avx: boolean;
   sse4_1: boolean;
   sse4_2: boolean;
   neon: boolean;
+  /** True when the resolved basemind binary is the SSE2-baseline build, which runs AVX2-gated models on any x86_64 CPU. */
+  noavx2Build: boolean;
 }
 
 interface BasemindIpc {
@@ -737,6 +751,10 @@ interface BasemindIpc {
   status(): Promise<{ status: string }>;
   download(stage?: 'embeddings' | 'reranker' | 'nerModel'): Promise<BasemindDownloadResult>;
   cpuFeatures(): Promise<CpuFeatures>;
+  /** Stale v2-m3 footprint in bytes (0 when migrated/clean). */
+  getStaleRerankerCache(): Promise<{ bytes: number }>;
+  /** Remove stale v2-m3 preset dirs; resolves the freed estimate. */
+  clearStaleRerankerCache(): Promise<{ freedBytes: number }>;
 }
 
 interface ProjectRunnerIpc {
@@ -795,10 +813,15 @@ export const workspaceScan: WorkspaceScanIpc = isMarketingDemoMode()
   ? { status: async () => { throw new Error('Not available in demo mode'); } }
   : (client.workspaceScan as WorkspaceScanIpc);
 export const search: SearchIpc = isMarketingDemoMode()
-  ? { searchCode: async () => { throw new Error('Not available in demo mode'); } }
+  ? {
+    searchCode: async () => { throw new Error('Not available in demo mode'); },
+    getRerankerEnabled: async () => ({ enabled: false, override: null }),
+    getRerankerDefault: async () => ({ enabled: false }),
+    setRerankerEnabled: async () => { throw new Error('Not available in demo mode'); },
+  }
   : (client.search as SearchIpc);
 export const basemind: BasemindIpc = isMarketingDemoMode()
-  ? { register: async () => { throw new Error('Not available in demo mode'); }, unregister: async () => { throw new Error('Not available in demo mode'); }, status: async () => { throw new Error('Not available in demo mode'); }, download: async () => { throw new Error('Not available in demo mode'); }, cpuFeatures: async () => ({ arch: 'unknown', avx2: false, avx: false, sse4_1: false, sse4_2: false, neon: false }) }
+  ? { register: async () => { throw new Error('Not available in demo mode'); }, unregister: async () => { throw new Error('Not available in demo mode'); }, status: async () => { throw new Error('Not available in demo mode'); }, download: async () => { throw new Error('Not available in demo mode'); }, cpuFeatures: async () => ({ arch: 'unknown', avx2: false, avx: false, sse4_1: false, sse4_2: false, neon: false, noavx2Build: false }), getStaleRerankerCache: async () => ({ bytes: 0 }), clearStaleRerankerCache: async () => { throw new Error('Not available in demo mode'); } }
   : (client.basemind as BasemindIpc);
 export const pii: PiiIpc = isMarketingDemoMode()
   ? {

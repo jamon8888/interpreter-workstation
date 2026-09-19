@@ -51,12 +51,19 @@ describe('FileRedactionNotice', () => {
   });
 
   test('stays hidden on trusted providers', () => {
-    for (const provider of ['mistral', 'local']) {
-      const { container } = render(
-        <FileRedactionNotice modelProvider={provider} hasAttachments />,
-      );
-      expect(container).toBeEmptyDOMElement();
-    }
+    // Only on-device `local` is trusted: the `mistral` label covers both
+    // local weights and the remote API, so it must redact (#232).
+    const { container } = render(
+      <FileRedactionNotice modelProvider="local" hasAttachments />,
+    );
+    expect(container).toBeEmptyDOMElement();
+  });
+
+  test('warns on mistral: the label covers local weights and the remote API', () => {
+    render(<FileRedactionNotice modelProvider="mistral" hasAttachments />);
+    expect(
+      screen.getByText('Files will be redacted before sending to mistral via basemind'),
+    ).toBeVisible();
   });
 
   test('fails closed when the provider is unknown', () => {

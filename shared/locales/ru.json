@@ -524,6 +524,11 @@
   "settings.inbox.whatsappDisconnected.step4": "Это сообщение себе создаст новый чат WhatsApp в этом приложении.",
   "settings.inbox.moreComingSoon.title": "Скоро появятся новые",
   "settings.inbox.moreComingSoon.description": "Дополнительные входящие будут появляться здесь по мере выпуска.",
+  "settings.search.rerankLabel": "More accurate results",
+  "settings.search.rerankDescription": "Reorder search results by relevance with a local model. Slower on smaller computers.",
+  "settings.search.rerankNoModel": "The reranker model is not downloaded — search runs without reranking.",
+  "settings.search.rerankAuto": "Auto",
+  "settings.search.rerankAutoReset": "Back to auto",
   "settings.shortcuts.newNote": "Новая заметка",
   "settings.shortcuts.newTab": "Новая вкладка",
   "settings.shortcuts.openFolder": "Открыть папку",
@@ -1833,6 +1838,9 @@
   "onboarding.basemind.title": "Set up Basemind",
   "onboarding.basemind.description": "Download the local knowledge base for enhanced context.",
   "onboarding.basemind.startDownload": "Start Download",
+  "onboarding.basemind.staleReranker": "{{size}} of previous reranker weights can be freed.",
+  "onboarding.basemind.freeSpace": "Free space",
+  "onboarding.basemind.freeingSpace": "Freeing…",
   "onboarding.basemind.continue": "Continue",
   "titlebar.search.placeholder": "Search workspace (code, docs, notes)..."
 }
