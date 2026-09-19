@@ -20,33 +20,16 @@ export const MODEL_RESOURCE_REPOS: Record<ModelResource, string[]> = {
 };
 
 /**
- * Resolve the Hugging Face hub cache directory basemind downloads models into.
- * Empirically confirmed (2026-09-15, real `basemind memory documents` run):
- * with no override, xberg/hf-hub falls back to the standard hf-hub default,
- * ~/.cache/huggingface/hub — basemind does NOT redirect it to its own XDG
- * data home. The hub-specific HF cache env vars still win when set (test and
- * distribution overrides), then INTERPRETER_USER_DATA_DIR, then that default.
- */
-export function resolveHubBaseDir(): string {
-  return (
-    process.env.HF_HUB_CACHE?.trim() ||
-    process.env.HUGGINGFACE_HUB_CACHE?.trim() ||
-    (process.env.INTERPRETER_USER_DATA_DIR?.trim()
-      ? path.join(process.env.INTERPRETER_USER_DATA_DIR.trim(), 'basemind-hub')
-      : '') ||
-    path.join(homedir(), '.cache', 'huggingface', 'hub')
-  );
-}
-
-/**
  * Candidate Hugging Face hub cache directories, in the order basemind
  * resolves them. Empirically confirmed (2026-09-17) against basemind 0.30.0:
  * the binary downloads into its XDG data home
  * (~/.local/share/basemind/hub) and falls back to the legacy standard cache
  * (~/.cache/huggingface/hub) on reads — an embeddings model cached only in
  * the legacy dir is used without re-download, while fresh downloads land in
- * the data-home dir. Checking a single dir yields false "no model artifact
- * found" failures, so readiness must consult every candidate.
+ * the data-home dir. Checking a single dir (either one, or the
+ * INTERPRETER_USER_DATA_DIR-based path the server sets at startup, which the
+ * binary never reads) yields false "no model artifact found" failures, so
+ * readiness must consult every candidate.
  */
 export function resolveHubBaseDirs(): string[] {
   const dirs: string[] = [];

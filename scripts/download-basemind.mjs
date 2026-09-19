@@ -46,6 +46,15 @@ const PLATFORMS = {
     asset: 'basemind-x86_64-unknown-linux-gnu.tar.gz',
     binary: 'basemind',
   },
+  // SSE2-baseline build for pre-Haswell CPUs without AVX2 (e.g. Sandy Bridge):
+  // same `full` feature set, ONNX Runtime built from source + loaded via
+  // ort-dynamic. --current-platform on linux-x64 stages both variants; other
+  // platforms have no AVX2-less variant.
+  'linux-x64-noavx2': {
+    target: 'x86_64-unknown-linux-gnu',
+    asset: 'basemind-x86_64-unknown-linux-gnu-noavx2.tar.gz',
+    binary: 'basemind',
+  },
   'linux-arm64': {
     target: 'aarch64-unknown-linux-gnu',
     asset: 'basemind-aarch64-unknown-linux-gnu.tar.gz',
@@ -61,9 +70,41 @@ const PLATFORMS = {
 export const BASEMIND_PLATFORMS = PLATFORMS;
 export const PLATFORM_KEYS = Object.keys(PLATFORMS);
 
+// Platforms whose release asset may legitimately not exist yet (shipped by a
+// newer fork release than the pinned one). A missing asset warns and skips;
+// anything else (checksum mismatch, extraction failure) still fails hard.
+const OPTIONAL_PLATFORMS = new Set(['linux-x64-noavx2']);
+
+export function isMissingAssetError(platform, error) {
+  if (!OPTIONAL_PLATFORMS.has(platform)) return false;
+  const message = error instanceof Error ? error.message : String(error);
+  return message.includes('No checksum found for') || /error: 404\b/.test(message);
+}
+
 export function getPlatformKey(platform = process.platform, arch = process.arch) {
   const osPlatform = platform === 'win32' ? 'win32' : platform;
   return `${osPlatform}-${arch}`;
+}
+
+/**
+ * True when the CPU supports AVX2. Only linux-x64 has a noavx2 variant, so
+ * every other platform short-circuits to true. Unknown state (unreadable
+ * cpuinfo, no flags lines) fails CLOSED to false, matching cpuHasAvx2() in
+ * the server: the noavx2 binary runs anywhere, the stock one SIGILL-crashes
+ * without AVX2. This only affects download ordering (both variants stage).
+ */
+export function hasAvx2({ platform = process.platform, cpuinfo } = {}) {
+  if (platform !== 'linux') return true;
+  try {
+    const text = cpuinfo ?? fs.readFileSync('/proc/cpuinfo', 'utf8');
+    const flagLines = text.split('\n').filter((line) => line.startsWith('flags'));
+    if (flagLines.length === 0) return false;
+    // Require AVX2 on every core — the process can migrate, so one AVX2-less
+    // core means the stock build can SIGILL. Mirrors cpuHasAvx2() server-side.
+    return flagLines.every((line) => (line.split(':')[1] ?? '').trim().split(/\s+/).includes('avx2'));
+  } catch {
+    return false;
+  }
 }
 
 export function parseArgs(args) {
@@ -75,7 +116,7 @@ export function parseArgs(args) {
   return { version, currentPlatformOnly, requestedPlatform };
 }
 
-export function getPlatformsToDownload({ currentPlatformOnly = false, requestedPlatform, currentPlatformKey = getPlatformKey() } = {}) {
+export function getPlatformsToDownload({ currentPlatformOnly = false, requestedPlatform, currentPlatformKey = getPlatformKey(), avx2 = hasAvx2() } = {}) {
   if (requestedPlatform) {
     if (!PLATFORM_KEYS.includes(requestedPlatform)) {
       throw new Error(`No basemind binary available for platform: ${requestedPlatform}`);
@@ -84,6 +125,12 @@ export function getPlatformsToDownload({ currentPlatformOnly = false, requestedP
   }
 
   if (currentPlatformOnly) {
+    // Linux x64 ships two variants and the electron-builder config packages
+    // both, so --current-platform stages both regardless of host AVX2. The
+    // runtime resolver picks the right one per machine.
+    if (currentPlatformKey === 'linux-x64') {
+      return avx2 ? ['linux-x64', 'linux-x64-noavx2'] : ['linux-x64-noavx2', 'linux-x64'];
+    }
     if (!PLATFORM_KEYS.includes(currentPlatformKey)) {
       throw new Error(`No basemind binary available for platform: ${currentPlatformKey}`);
     }
@@ -248,7 +295,7 @@ async function main() {
   if (requestedPlatform) {
     console.log(`Downloading basemind ${version} for ${requestedPlatform}...\n`);
   } else if (currentPlatformOnly) {
-    console.log(`Downloading basemind ${version} for ${platformsToDownload[0]}...\n`);
+    console.log(`Downloading basemind ${version} for ${platformsToDownload.join(', ')}...\n`);
   } else {
     console.log(`Downloading basemind ${version} for all platforms...\n`);
   }
@@ -275,7 +322,12 @@ async function main() {
     try {
       await downloadAndExtract(version, platform);
     } catch (error) {
-      console.error(`error ${platform}: ${error instanceof Error ? error.message : String(error)}`);
+      const message = error instanceof Error ? error.message : String(error);
+      if (isMissingAssetError(platform, error)) {
+        console.error(`warn ${platform}: ${message} (asset not published yet, skipping)`);
+        continue;
+      }
+      console.error(`error ${platform}: ${message}`);
       process.exit(1);
     }
   }

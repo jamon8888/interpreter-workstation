@@ -10,33 +10,53 @@ const BINARY_NAME = process.platform === 'win32' ? 'basemind.exe' : 'basemind';
 
 /**
  * True when the CPU reports AVX2. Only linux-x64 ships a noavx2 variant, so
- * every other platform short-circuits to true. Unreadable cpuinfo → true
- * (preserve stock-binary behavior; an actually incompatible CPU fails later
- * with the download handler's explicit error).
+ * every other platform short-circuits to true. Unknown state (unreadable
+ * cpuinfo, no flags lines) fails CLOSED to false: the noavx2 build runs on
+ * any x86_64 CPU (SSE2 baseline + runtime dispatch), so preferring it when
+ * in doubt is safe, while the stock build SIGILL-crashes on AVX2-less CPUs.
+ * Callers always fall through to the stock binary when no noavx2 build is
+ * staged, so fail-closed only ever adds a preference, never removes one.
  */
 export function cpuHasAvx2(): boolean {
   if (process.platform !== 'linux' || process.arch !== 'x64') return true;
   try {
     const text = readFileSync('/proc/cpuinfo', 'utf8');
-    const flags = text.split('\n').find((line) => line.startsWith('flags'))?.split(':')[1] ?? '';
-    return flags.trim().split(/\s+/).includes('avx2');
+    // x86 reports `flags:`, ARM reports `Features:` — match both for
+    // consistency with the cpuFeatures handler (unreachable on ARM here
+    // given the short-circuit above, but harmless if platforms expand).
+    const flagLines = text.split('\n').filter((line) => line.startsWith('flags') || line.startsWith('Features'));
+    if (flagLines.length === 0) return false;
+    return flagLines.every((line) => (line.split(':')[1] ?? '').trim().split(/\s+/).includes('avx2'));
   } catch {
-    return true;
+    return false;
   }
 }
 
-/** True when the path is the SSE2-baseline build (staged `linux-x64-noavx2/` dir or packaged `basemind-noavx2/`). */
+/**
+ * True when the path is the SSE2-baseline build: a `basemind-noavx2` or
+ * `linux-x64-noavx2` path segment (packaged vs staged layout).
+ * Segment-boundary-aware on normalized slashes so similarly named paths
+ * (e.g. `my-linux-x64-noavx2-project/`) never match.
+ */
 export function isNoAvx2BasemindBinary(binaryPath: string): boolean {
-  return binaryPath.includes('noavx2');
+  const normalized = binaryPath.replace(/\\/g, '/');
+  return /(^|\/)(basemind-noavx2|linux-x64-noavx2)(\/|$)/.test(normalized);
 }
 
 function findBasemindBinary(): string {
   const projectRoot = process.cwd();
+  const needsNoAvx2 = !cpuHasAvx2();
 
   // Packaged app: electron-builder extraResources places basemind at
   // <resourcesPath>/basemind/basemind. Check this first so installed
   // users get the bundled binary without needing a local Rust toolchain.
   if (process.resourcesPath) {
+    // On AVX2-less linux-x64 prefer the SSE2-baseline build when packaged
+    // alongside (linux extraResources ships both).
+    if (needsNoAvx2) {
+      const packagedNoAvx2 = resolve(process.resourcesPath, 'basemind-noavx2', BINARY_NAME);
+      if (existsSync(packagedNoAvx2)) return packagedNoAvx2;
+    }
     const packaged = resolve(process.resourcesPath, 'basemind', BINARY_NAME);
     if (existsSync(packaged)) return packaged;
   }
@@ -46,6 +66,12 @@ function findBasemindBinary(): string {
   // writes and `extraResources` reads for packaging). Checked before PATH for
   // the same reason as the packaged path above: a stray basemind on a
   // developer's PATH should not silently take the place of the pinned build.
+  // On AVX2-less linux-x64 the stock ONNX Runtime SIGILL-crashes, so prefer
+  // the staged noavx2 variant when present.
+  if (needsNoAvx2) {
+    const devNoAvx2 = resolve(projectRoot, 'resources', 'basemind', 'linux-x64-noavx2', BINARY_NAME);
+    if (existsSync(devNoAvx2)) return devNoAvx2;
+  }
   const devPlatformKey = `${process.platform}-${process.arch}`;
   const devStaged = resolve(projectRoot, 'resources', 'basemind', devPlatformKey, BINARY_NAME);
   if (existsSync(devStaged)) return devStaged;
