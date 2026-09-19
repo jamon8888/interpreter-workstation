@@ -11,7 +11,12 @@ export const MODEL_RESOURCE_REPOS: Record<ModelResource, string[]> = {
     'models--xberg-io--gliner-models',
   ],
   embeddings: ['models--xberg-io--embedding-models'],
-  reranker: ['models--xberg-io--reranker-models'],
+  reranker: [
+    'models--xberg-io--reranker-models',
+    // GTE-multilingual int8 (FR decision #228): xberg lazy-downloads it on
+    // first Custom use; the preseed below writes this same layout.
+    'models--onnx-community--gte-multilingual-reranker-base',
+  ],
 };
 
 /**
@@ -25,6 +30,26 @@ export const MODEL_RESOURCE_REPOS: Record<ModelResource, string[]> = {
  * INTERPRETER_USER_DATA_DIR-based path the server sets at startup, which the
  * binary never reads) yields false "no model artifact found" failures, so
  * readiness must consult every candidate.
+ */
+export function resolveHubBaseDirs(): string[] {
+  const dirs: string[] = [];
+  const override = process.env.HF_HUB_CACHE?.trim() || process.env.HUGGINGFACE_HUB_CACHE?.trim();
+  if (override) dirs.push(override);
+  const dataHome = process.env.XDG_DATA_HOME?.trim() || path.join(homedir(), '.local', 'share');
+  dirs.push(path.join(dataHome, 'basemind', 'hub'));
+  dirs.push(path.join(homedir(), '.cache', 'huggingface', 'hub'));
+  return dirs;
+}
+
+/**
+ * Candidate Hugging Face hub cache directories, in the order basemind
+ * resolves them. Empirically confirmed (2026-09-17) against basemind 0.30.0:
+ * the binary downloads into its XDG data home
+ * (~/.local/share/basemind/hub) and falls back to the legacy standard cache
+ * (~/.cache/huggingface/hub) on reads — an embeddings model cached only in
+ * the legacy dir is used without re-download, while fresh downloads land in
+ * the data-home dir. Checking a single dir yields false "no model artifact
+ * found" failures, so readiness must consult every candidate.
  */
 export function resolveHubBaseDirs(): string[] {
   const dirs: string[] = [];

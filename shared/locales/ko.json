@@ -505,6 +505,11 @@
   "settings.inbox.whatsappDisconnected.step4": "그 자기 메시지가 이 앱에 새 WhatsApp 채팅을 생성합니다.",
   "settings.inbox.moreComingSoon.title": "추가 기능 출시 예정",
   "settings.inbox.moreComingSoon.description": "추가 받은편지함이 출시되면 여기에 표시됩니다.",
+  "settings.search.rerankLabel": "More accurate results",
+  "settings.search.rerankDescription": "Reorder search results by relevance with a local model. Slower on smaller computers.",
+  "settings.search.rerankNoModel": "The reranker model is not downloaded — search runs without reranking.",
+  "settings.search.rerankAuto": "Auto",
+  "settings.search.rerankAutoReset": "Back to auto",
   "settings.shortcuts.newNote": "새 메모",
   "settings.shortcuts.newTab": "새 탭",
   "settings.shortcuts.openFolder": "폴더 열기",
@@ -1833,6 +1838,9 @@
   "onboarding.basemind.title": "Set up Basemind",
   "onboarding.basemind.description": "Download the local knowledge base for enhanced context.",
   "onboarding.basemind.startDownload": "Start Download",
+  "onboarding.basemind.staleReranker": "{{size}} of previous reranker weights can be freed.",
+  "onboarding.basemind.freeSpace": "Free space",
+  "onboarding.basemind.freeingSpace": "Freeing…",
   "onboarding.basemind.continue": "Continue",
   "titlebar.search.placeholder": "Search workspace (code, docs, notes)..."
 }

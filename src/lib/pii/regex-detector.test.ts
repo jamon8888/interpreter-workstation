@@ -41,6 +41,17 @@ describe('detectRegex', () => {
     expect(detectRegex('host 192.168.1.10')[0].category).toBe('ipv4');
   });
 
+  test('detects E.164 international numbers (FR +33, US +1)', () => {
+    expect(detectRegex('call +33 6 12 34 56 78').map((d) => [d.category, d.text])).toEqual([
+      ['phone', '+33 6 12 34 56 78'],
+    ]);
+    expect(detectRegex('call +1-800-555-1234').map((d) => [d.category, d.text])).toEqual([
+      ['phone', '+1-800-555-1234'],
+    ]);
+    // National form still matches via the fallback branch.
+    expect(detectRegex('call 0612345678')[0].category).toBe('phone');
+  });
+
   test('handles large input without quadratic slowdown', () => {
     // ~100k chars with 500 emails and many phone-number-like strings. The old
     // per-pattern + alreadyCovered.some() implementation is O(n * matches)
