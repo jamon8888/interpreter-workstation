@@ -1293,6 +1293,19 @@ function handleDeepLink(url: string) {
   mainWindow.webContents.send(IPC_CHANNELS.AUTH_DEEP_LINK, { url });
 }
 
+/**
+ * Forward basemind scan progress events from the server-side emitter to the
+ * renderer via IPC. Called once after the main window is created.
+ */
+function wireScanProgressForwarding(): void {
+  const { scanProgressEmitter } = require('../server/utils/basemindManager') as typeof import('../server/utils/basemindManager');
+  scanProgressEmitter.on('scan-progress', (event: import('../server/utils/basemindManager').ScanProgressEvent) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send(IPC_CHANNELS.SCAN_PROGRESS, event);
+    }
+  });
+}
+
 function getUserSuppliedArgv(argv: string[]): string[] {
   return argv.slice(process.defaultApp ? 2 : 1);
 }
@@ -2342,6 +2355,7 @@ async function createWindow(options?: CreateWindowOptions): Promise<CreateWindow
 
   if (isPrimaryWindow) {
     mainWindow = window;
+    wireScanProgressForwarding();
     mainWindowCloseRequested = false;
     updateMainWindowLaunchState('browser-window-created', {
       background: options?.background === true,

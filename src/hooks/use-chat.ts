@@ -7,7 +7,8 @@ import type {
   StreamSkillReference,
   StreamRequestBody,
 } from "@/lib/codex/api-types";
-import { getApiUrl, runtime } from "@/ipc";
+import { getApiUrl, runtime, pii } from "@/ipc";
+import { detectRegex, buildRedactedText, mergeDetections } from "@/lib/pii";
 import {
   clearLiveToolCallsForIds,
   setLiveToolCall,
@@ -1038,6 +1039,9 @@ export function useChat(
   const publishedLiveIdsRef = useRef<Set<string>>(new Set());
   const messagesRef = useRef<ChatMessage[]>(messages);
   const stateRef = useRef<ChatState>(createInitialChatState());
+  // Token→original map accumulated across turns for inbound rehydration.
+  // Merged on every outbound redaction and loaded from vault on thread switch.
+  const rehydrationMapRef = useRef<Record<string, string>>({});
   const requestCustomEndpointRef = useRef<string | null>(
     options.customEndpoint ?? null,
   );
@@ -1349,6 +1353,24 @@ export function useChat(
     };
   }, [historyLoaded, marketingDemoMode, options.initialThreadId]);
 
+  // Load the rehydration map from vault when the thread changes so inbound
+  // tokens from previous sessions can be resolved. Failure is silent — the
+  // tokens render as styled chips (remarkPiiTokens) and the user can still
+  // read them.
+  useEffect(() => {
+    if (!threadId || marketingDemoMode) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const map = await pii.decryptRehydration(`thread-${threadId}`);
+        if (!cancelled && Object.keys(map).length > 0) {
+          rehydrationMapRef.current = { ...rehydrationMapRef.current, ...map };
+        }
+      } catch { /* no vault blob yet — expected for new threads */ }
+    })();
+    return () => { cancelled = true; };
+  }, [threadId, marketingDemoMode]);
+
   const handleParsedEvent = useCallback(
     (chunk: SseStreamEvent) => {
       if (chunk.event === "userMessage") {
@@ -1417,6 +1439,24 @@ export function useChat(
             });
           }
         }
+      }
+
+      // ── PII rehydration (inbound) ────────────────────────────────────
+      // The model may echo redaction tokens ([EMAIL_0], …) in its response.
+      // Replace them with originals from the session-scoped map before the
+      // reducer accumulates the text into the draft.
+      if (
+        (chunk.event === "delta" || chunk.event === "final")
+        && chunk.payload.text
+        && Object.keys(rehydrationMapRef.current).length > 0
+      ) {
+        let resolved = chunk.payload.text;
+        for (const [token, original] of Object.entries(rehydrationMapRef.current)) {
+          if (resolved.includes(token)) {
+            resolved = resolved.split(token).join(original);
+          }
+        }
+        chunk = { ...chunk, payload: { ...chunk.payload, text: resolved } };
       }
 
       const prev = stateRef.current;
@@ -1508,6 +1548,9 @@ export function useChat(
       const message = (messageOverride ?? input).trim();
       const parsedSkills = extractSkillMentionsFromText(message);
       const cleanedMessage = parsedSkills.text;
+      // Synchronous regex scan — fast, no IPC. Results feed into the async
+      // NER merge inside the IIFE below so the model never sees raw PII.
+      const regexDetections = detectRegex(cleanedMessage);
       const normalizedMarketingDemoMessage =
         stripWorkstationContext(cleanedMessage).trim();
       const pendingAttachments = overrides?.attachments ?? [];
@@ -1895,6 +1938,30 @@ export function useChat(
 
       (async () => {
         try {
+          // ── PII redaction (outbound) ──────────────────────────────────
+          // Regex ran synchronously above; NER is async via IPC. Merge wins
+          // on overlap, regex fills gaps. The redacted text reaches the model;
+          // the original stays in userMsg for the transcript.
+          if (regexDetections.length > 0) {
+            let detections = regexDetections;
+            try {
+              const nerHits = await pii.detectPii(cleanedMessage);
+              if (nerHits.length > 0) {
+                detections = mergeDetections(nerHits, regexDetections);
+              }
+            } catch { /* NER unavailable — regex-only is fine */ }
+            const { redactedText, rehydrationMap } = buildRedactedText(
+              cleanedMessage,
+              detections,
+            );
+            requestBody.message = redactedText;
+            // Merge into the session-scoped map so inbound tokens can resolve.
+            Object.assign(rehydrationMapRef.current, rehydrationMap);
+            if (threadId && Object.keys(rehydrationMap).length > 0) {
+              pii.persistRehydration(threadId, rehydrationMap).catch(() => {});
+            }
+          }
+
           // NOTE(victor): SSE over localhost HTTP is intentional over Electron IPC.
           // Localhost TCP is kernel-optimized (~0.1ms roundtrip), eventsource-parser
           // handles reconnection/partial chunks/event boundaries for free (battle-tested

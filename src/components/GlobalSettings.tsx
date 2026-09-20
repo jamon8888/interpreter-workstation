@@ -33,6 +33,7 @@ import { McpSettingsSectionContent } from './settings/McpSettingsSection';
 import { Button } from './ui/button';
 import { buildVerticalEdgeMask } from './ui/ProgressiveBlurOverlay';
 import { AppBehaviorSectionContent } from './settings/AppBehaviorSection';
+import { ProfileSection } from './settings/ProfileSection';
 import { CustomInstructionsSectionContent } from './settings/CustomInstructionsSection';
 import { OverlaySectionContent, OverlaySectionIntroContent } from './settings/OverlaySection';
 import { BrowserSectionContent } from './settings/BrowserSection';
@@ -399,6 +400,7 @@ export function GlobalSettings({
                       {typeof window !== 'undefined' && !!window.electron && (
                         <AppBehaviorSectionContent />
                       )}
+                      <ProfileSection />
                       <LanguageSectionContent />
                       <EditorSectionContent />
                     </SettingsSection>

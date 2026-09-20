@@ -6,6 +6,8 @@ import { Explorer } from './Explorer';
 import { InboxSidebar } from './InboxSidebar';
 import { HelpPanel } from './HelpPanel';
 import { SkillsPanel } from './SkillsPanel';
+import { ScanBanner } from './pii/ScanBanner';
+import { ScanProgressPanel } from './pii/ScanProgressPanel';
 import { useLayout } from '../hooks/useLayout';
 import { useHelp } from '../contexts/HelpContext';
 import { EXPLORER_BUTTON_ID, EXPLORER_SIDEBAR_ID } from '../../shared/element-ids';
@@ -14,6 +16,7 @@ import { isMarketingDemoMode } from '../demo/marketingDemo';
 import { TooltipButton } from './ui/tooltip-button';
 import { cn } from '@/lib/utils';
 import { isWorkstationReadOnly } from '../remote/workstationConnection';
+import { workspace } from '@/ipc';
 
 interface SidebarProps {
   onFileOpen: (path: string) => void;
@@ -30,12 +33,21 @@ export function Sidebar({ onFileOpen }: SidebarProps) {
   const activeTab = state.leftSidebar.activeTab;
   const footerStackRef = useRef<HTMLDivElement>(null);
   const [isSkillsPanelOpen, setIsSkillsPanelOpen] = useState(false);
+  const [workspacePath, setWorkspacePath] = useState<string | null>(null);
+  const [scanActive, setScanActive] = useState(false);
   const showCollapsedFooterDivider = activeTab === 'explorer' && !isHelpPanelOpen && !isSkillsPanelOpen;
   const titlebarButtonClassName = cn(
     'oa-hover-chip titlebar-button min-w-[34px] border border-transparent bg-transparent text-[#5f6673] shadow-none transition-colors duration-150',
     'hover:text-[#202123]',
     'dark:text-[#bdbdbd] dark:hover:text-[#f5f5f5]',
   );
+
+  useEffect(() => {
+    const unsub = workspace.onChanged((event: { workspacePath: string | null }) => {
+      setWorkspacePath(event.workspacePath);
+    });
+    return unsub;
+  }, []);
 
   useEffect(() => {
     const footerStack = footerStackRef.current;
@@ -88,9 +100,19 @@ export function Sidebar({ onFileOpen }: SidebarProps) {
       {/* Sidebar content */}
       <div className="flex-1 min-h-0 px-2.5">
         <div id="explorer-sidebar" className="h-full" style={{ display: activeTab === 'explorer' ? 'block' : 'none' }} data-testid={EXPLORER_SIDEBAR_ID}>
+          <ScanBanner
+            workspacePath={workspacePath}
+            onScanStarted={() => setScanActive(true)}
+          />
           <div className="h-full min-h-0">
             <Explorer onFileOpen={onFileOpen} />
           </div>
+          {scanActive && (
+            <ScanProgressPanel
+              workspacePath={workspacePath}
+              onClose={() => setScanActive(false)}
+            />
+          )}
         </div>
 
         {!marketingDemoMode ? (

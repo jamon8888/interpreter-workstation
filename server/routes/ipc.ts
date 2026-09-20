@@ -177,6 +177,10 @@ const handlers: Record<string, Record<string, HandlerFn>> = {
       const { getWorkspaceScanStatus } = await import('../handlers/workspaceScan');
       return getWorkspaceScanStatus();
     },
+    rescan: async ([workspacePath, paths]: [string, string[]?]) => {
+      const { workspaceRescan } = await import('../handlers/workspaceScan');
+      return workspaceRescan({ workspacePath, paths });
+    },
   },
 
   // ========== Search (basemind code/document search) ==========
@@ -291,6 +295,14 @@ const handlers: Record<string, Record<string, HandlerFn>> = {
     clearStaleRerankerCache: async () => {
       const { clearStaleRerankerCache } = await import('../handlers/rerankerWorkspace');
       return { freedBytes: await clearStaleRerankerCache() };
+    },
+    detectMachineProfile: async () => {
+      const { cpuFeatures } = await import('../handlers/cpuFeatures');
+      const { detectProfile, getProfile } = await import('../../src/lib/pii/machineProfiles');
+      const features = await cpuFeatures();
+      const totalMemoryBytes = (await import('node:os')).totalmem();
+      const profileId = detectProfile({ arch: features.arch, avx2: features.avx2, totalMemoryBytes });
+      return { profileId, profile: getProfile(profileId), hardware: { ...features, totalMemoryBytes } };
     },
   },
 
