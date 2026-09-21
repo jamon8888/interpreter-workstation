@@ -29,9 +29,9 @@ export function ScanBanner({ workspacePath, onScanStarted, onDismiss }: ScanBann
     if (!workspacePath) return;
     setScanning(true);
     setError(null);
+    onScanStarted?.();
     try {
       await workspaceScan.rescan(workspacePath, ['.']);
-      onScanStarted?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Scan failed');
     } finally {

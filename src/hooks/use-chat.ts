@@ -1363,8 +1363,8 @@ export function useChat(
     void (async () => {
       try {
         const map = await pii.decryptRehydration(`thread-${threadId}`);
-        if (!cancelled && Object.keys(map).length > 0) {
-          rehydrationMapRef.current = { ...rehydrationMapRef.current, ...map };
+        if (!cancelled) {
+          rehydrationMapRef.current = Object.keys(map).length > 0 ? map : {};
         }
       } catch { /* no vault blob yet — expected for new threads */ }
     })();
@@ -1953,6 +1953,7 @@ export function useChat(
             const { redactedText, rehydrationMap } = buildRedactedText(
               cleanedMessage,
               detections,
+              new Set(Object.keys(rehydrationMapRef.current)),
             );
             requestBody.message = redactedText;
             // Merge into the session-scoped map so inbound tokens can resolve.
