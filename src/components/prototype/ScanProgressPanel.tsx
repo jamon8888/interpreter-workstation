@@ -63,14 +63,17 @@ function useMockScan(): ScanProgress {
     let fileIdx = 0;
     const interval = setInterval(() => {
       if (fileIdx >= MOCK_FILES.length) {
-        setProgress(prev => ({
-          ...prev,
-          stage: prev.stage === 'ner' ? 'done' : prev.stage === 'extract' ? 'embed' : prev.stage === 'embed' ? 'index' : 'ner',
-          filesProcessed: prev.stage === 'ner' ? MOCK_FILES.length : prev.filesProcessed,
-        }));
-        if (progress.stage === 'ner') {
-          clearInterval(interval);
-        }
+        setProgress(prev => {
+          const nextStage = prev.stage === 'ner' ? 'done' : prev.stage === 'extract' ? 'embed' : prev.stage === 'embed' ? 'index' : 'ner';
+          if (prev.stage === 'ner') {
+            clearInterval(interval);
+          }
+          return {
+            ...prev,
+            stage: nextStage,
+            filesProcessed: prev.stage === 'ner' ? MOCK_FILES.length : prev.filesProcessed,
+          };
+        });
         return;
       }
 
@@ -226,7 +229,11 @@ function VariantC({ progress }: { progress: ScanProgress }) {
 
   useEffect(() => {
     if (feedRef.current) {
-      feedRef.current.scrollTop = feedRef.current.scrollHeight;
+      requestAnimationFrame(() => {
+        if (feedRef.current) {
+          feedRef.current.scrollTop = feedRef.current.scrollHeight;
+        }
+      });
     }
   }, [progress.findings.length]);
 
@@ -303,16 +310,17 @@ function VariantC({ progress }: { progress: ScanProgress }) {
 
 export default function ScanProgressPanelPrototype() {
   const params = new URLSearchParams(window.location.search);
-  const variant = params.get('variant') || 'A';
+  const [variant, setVariant] = useState<string>(params.get('variant') || 'A');
   const progress = useMockScan();
 
   const variants = ['A', 'B', 'C'] as const;
-  const names = { A: 'Compact sidebar', B: 'Stage pipeline banner', C: 'Floating card' };
-  const currentIdx = variants.indexOf(variant as typeof variants[number]);
+  type Variant = typeof variants[number];
+  const names: Record<Variant, string> = { A: 'Compact sidebar', B: 'Stage pipeline banner', C: 'Floating card' };
+  const currentIdx = variants.indexOf(variant as Variant);
 
-  const navigate = (v: string) => {
+  const navigate = (v: Variant) => {
     window.history.replaceState(null, '', `?variant=${v}`);
-    window.location.reload();
+    setVariant(v);
   };
 
   return (

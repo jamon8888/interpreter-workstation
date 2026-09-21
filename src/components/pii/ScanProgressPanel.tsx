@@ -16,11 +16,26 @@ export function ScanProgressPanel({ onClose, onViewResults }: ScanProgressPanelP
   const [elapsed, setElapsed] = useState(0);
   const startTimeRef = useRef(Date.now());
 
+  // Reset timer when a new scan starts
   useEffect(() => {
+    if (progress?.type === 'progress' && progress.stage === 'extract') {
+      startTimeRef.current = Date.now();
+      setElapsed(0);
+    }
+  }, [progress?.stage]);
+
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
     const unsub = scanProgress.onProgress((event: ScanProgressEvent) => {
+      if (!mountedRef.current) return;
       setProgress(event);
     });
-    return unsub;
+    return () => {
+      mountedRef.current = false;
+      unsub();
+    };
   }, []);
 
   useEffect(() => {

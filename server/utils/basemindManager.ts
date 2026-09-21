@@ -170,7 +170,8 @@ export async function ensureDaemon(): Promise<boolean> {
   if (!resolveBasemindBinary()) return false;
   try {
     await registerBasemindServer();
-  } catch {
+  } catch (err) {
+    console.error('[basemindManager] registerBasemindServer failed:', err);
     return false;
   }
   // The spawned `serve` process creates comms.sock just after the MCP
@@ -191,7 +192,8 @@ export function mcpRequest(method: string, params: Record<string, unknown> = {})
       reject(new Error(`MCP request timed out: ${method}`));
     }, 30_000);
     sock.connect(sockPath, () => {
-      const req = JSON.stringify({ jsonrpc: '2.0', id: 1, method, params });
+      const reqId = Math.floor(Math.random() * 100000);
+      const req = JSON.stringify({ jsonrpc: '2.0', id: reqId, method, params });
       sock.write(req + '\n');
     });
     sock.on('data', (chunk) => {
@@ -248,7 +250,8 @@ export function mcpRequestWithNotifications(
     }, options?.timeoutMs ?? 300_000);
 
     sock.connect(sockPath, () => {
-      const req = JSON.stringify({ jsonrpc: '2.0', id: 1, method, params });
+      const reqId = Math.floor(Math.random() * 100000);
+      const req = JSON.stringify({ jsonrpc: '2.0', id: reqId, method, params });
       sock.write(req + '\n');
     });
 
@@ -276,7 +279,11 @@ export function mcpRequestWithNotifications(
           }
           if ('method' in msg) {
             // Notification (no id) — dispatch and keep reading.
-            onNotification?.({ method: msg.method, params: msg.params ?? {} });
+            try {
+              onNotification?.({ method: msg.method, params: msg.params ?? {} });
+            } catch (err) {
+              console.error('[basemindManager] onNotification threw:', err);
+            }
           }
         } catch {
           // Partial frame — keep buffering.

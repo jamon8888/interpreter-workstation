@@ -3,9 +3,9 @@
  *
  * Profiles determine which basemind models and features are enabled:
  *   - constrained: <8GB RAM or no AVX2 → regex-only PII, no reranker
- *   - balanced: 8-16GB + AVX2 → lightweight NER + regex, reranker optional
+ *   - balanced: 8-16GB + AVX2 → lightweight NER + regex, reranker off
  *   - full: 16GB+ + AVX2 → full NER + regex, reranker on
- *   - aarch64: ARM64 → lightweight NER + regex, reranker optional
+ *   - aarch64: ARM64 → lightweight NER + regex, reranker off
  */
 
 export type MachineProfileId = 'constrained' | 'balanced' | 'full' | 'aarch64';
@@ -39,7 +39,7 @@ const PROFILES: Record<MachineProfileId, MachineProfile> = {
   balanced: {
     id: 'balanced',
     label: 'Balanced',
-    description: 'Lightweight NER + regex, reranker optional.',
+    description: 'Lightweight NER + regex. Reranker off.',
     nerEnabled: true,
     rerankerEnabled: false,
     embedMode: 'lightweight',
@@ -61,7 +61,7 @@ const PROFILES: Record<MachineProfileId, MachineProfile> = {
   aarch64: {
     id: 'aarch64',
     label: 'ARM64',
-    description: 'Optimized for ARM64. Lightweight NER + regex.',
+    description: 'Optimized for ARM64. Lightweight NER + regex. Reranker off.',
     nerEnabled: true,
     rerankerEnabled: false,
     embedMode: 'lightweight',
@@ -69,9 +69,11 @@ const PROFILES: Record<MachineProfileId, MachineProfile> = {
   },
 };
 
+const RAM_GB = 1024 * 1024 * 1024;
+
 const RAM_THRESHOLDS = {
-  balanced: 8 * 1024 * 1024 * 1024,  // 8 GB
-  full: 16 * 1024 * 1024 * 1024,     // 16 GB
+  balanced: 8 * RAM_GB,
+  full: 16 * RAM_GB,
 };
 
 export function detectProfile(hardware: HardwareInfo): MachineProfileId {

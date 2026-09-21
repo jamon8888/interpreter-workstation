@@ -26,10 +26,12 @@ export function ProfileSection() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let cancelled = false;
     basemind.detectMachineProfile()
-      .then(setInfo)
-      .catch(() => {})
-      .finally(() => setLoading(false));
+      .then((info) => { if (!cancelled) setInfo(info); })
+      .catch((err) => { console.error('[ProfileSection] Failed to detect machine profile:', err); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
   }, []);
 
   if (loading) {

@@ -12,7 +12,7 @@ interface ScanBannerProps {
 const DISMISS_KEY_PREFIX = 'pii-scan-dismissed-';
 
 function dismissKey(workspacePath: string): string {
-  return `${DISMISS_KEY_PREFIX}${workspacePath}`;
+  return `${DISMISS_KEY_PREFIX}${encodeURIComponent(workspacePath)}`;
 }
 
 // Attempt to extract PII findings from basemind rescan stdout.
@@ -46,7 +46,9 @@ export function ScanBanner({ workspacePath, onScanStarted, onScanComplete, onDis
   useEffect(() => {
     if (!workspacePath) return;
     setDismissed(localStorage.getItem(dismissKey(workspacePath)) === '1');
-    workspaceScan.status().then(setStatus).catch(() => {});
+    workspaceScan.status().then(setStatus).catch((err) => {
+      console.error('[ScanBanner] Failed to fetch scan status:', err);
+    });
   }, [workspacePath]);
 
   const handleScan = useCallback(async () => {

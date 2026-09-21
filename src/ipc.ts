@@ -840,7 +840,10 @@ export const pii: PiiIpc = isMarketingDemoMode()
   : client.pii;
 export const scanProgress = {
   onProgress: (callback: (event: import('../electron/ipc/registry').ScanProgressEvent) => void) => {
-    return client.scanProgress.onProgress(callback);
+    if (client.scanProgress?.onProgress) {
+      return client.scanProgress.onProgress(callback);
+    }
+    return () => {};
   },
 };
 export const setup = client.setup;

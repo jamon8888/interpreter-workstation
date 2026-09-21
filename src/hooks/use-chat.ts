@@ -1361,12 +1361,15 @@ export function useChat(
   // read them.
   useEffect(() => {
     if (!threadId || marketingDemoMode) return;
+    // Clear the map for the new thread to avoid cross-thread contamination
+    rehydrationMapRef.current = {};
     let cancelled = false;
+    const currentThreadId = threadId;
     void (async () => {
       try {
-        const map = await pii.decryptRehydration(`thread-${threadId}`);
-        if (!cancelled) {
-          rehydrationMapRef.current = Object.keys(map).length > 0 ? map : {};
+        const map = await pii.decryptRehydration(`thread-${currentThreadId}`);
+        if (!cancelled && currentThreadId === threadId) {
+          rehydrationMapRef.current = { ...rehydrationMapRef.current, ...map };
         }
       } catch { /* no vault blob yet — expected for new threads */ }
     })();
@@ -1450,15 +1453,19 @@ export function useChat(
       if (
         (chunk.event === "delta" || chunk.event === "final")
         && chunk.payload.text
-        && Object.keys(rehydrationMapRef.current).length > 0
       ) {
         let resolved = chunk.payload.text;
-        for (const [token, original] of Object.entries(rehydrationMapRef.current)) {
+        const entries = Object.entries(rehydrationMapRef.current);
+        // Sort by token length descending so longer tokens match before shorter prefixes
+        entries.sort((a, b) => b[0].length - a[0].length);
+        for (const [token, original] of entries) {
           if (resolved.includes(token)) {
             resolved = resolved.split(token).join(original);
           }
         }
-        chunk = { ...chunk, payload: { ...chunk.payload, text: resolved } };
+        if (resolved !== chunk.payload.text) {
+          chunk = { ...chunk, payload: { ...chunk.payload, text: resolved } };
+        }
       }
 
       const prev = stateRef.current;
@@ -1507,7 +1514,8 @@ export function useChat(
       // Flush any first-turn rehydration entries that were queued before the
       // thread ID was assigned.
       if (result.state.threadId && Object.keys(pendingRehydrationRef.current).length > 0) {
-        pii.persistRehydration(result.state.threadId, pendingRehydrationRef.current).catch(() => {});
+        pii.persistRehydration(result.state.threadId, pendingRehydrationRef.current)
+          .catch((err) => { console.warn('[useChat] Failed to persist first-turn rehydration:', err); });
         pendingRehydrationRef.current = {};
       }
       setError(result.state.error);
@@ -1955,7 +1963,9 @@ export function useChat(
           try {
             const nerHits = await pii.detectPii(cleanedMessage);
             detections = mergeDetections(nerHits, regexDetections);
-          } catch { /* NER unavailable — regex-only is fine */ }
+          } catch (err) {
+            console.warn('[useChat] NER detection failed, using regex-only:', err);
+          }
           if (detections.length > 0) {
             const { redactedText, rehydrationMap } = buildRedactedText(
               cleanedMessage,
@@ -1967,7 +1977,8 @@ export function useChat(
             Object.assign(rehydrationMapRef.current, rehydrationMap);
             if (Object.keys(rehydrationMap).length > 0) {
               if (threadId) {
-                pii.persistRehydration(threadId, rehydrationMap).catch(() => {});
+                pii.persistRehydration(threadId, rehydrationMap)
+                  .catch((err) => { console.warn('[useChat] Failed to persist rehydration:', err); });
               } else {
                 // First turn — threadId not yet assigned. Queue for flush.
                 Object.assign(pendingRehydrationRef.current, rehydrationMap);

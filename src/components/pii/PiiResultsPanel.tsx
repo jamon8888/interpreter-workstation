@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 
 export interface PiiResult {
+  id?: string;
   category: string;
   file: string;
   line: number;
@@ -127,7 +128,7 @@ export function PiiResultsPanel({ results, onClose }: PiiResultsPanelProps) {
               {file}
             </div>
             {items.map((item, i) => (
-              <div key={i} className="px-4 py-1.5 flex items-center gap-3 text-xs hover:bg-gray-50 dark:hover:bg-gray-800/30">
+              <div key={item.id ?? `${item.file}:${item.line}:${i}`} className="px-4 py-1.5 flex items-center gap-3 text-xs hover:bg-gray-50 dark:hover:bg-gray-800/30">
                 <span className="text-gray-400 w-12 text-right">{item.line}</span>
                 <span className="w-20 text-gray-500 dark:text-gray-400">{CATEGORY_LABELS[item.category] ?? item.category}</span>
                 <span className="flex-1 font-mono text-gray-700 dark:text-gray-300">

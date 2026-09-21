@@ -297,12 +297,17 @@ const handlers: Record<string, Record<string, HandlerFn>> = {
       return { freedBytes: await clearStaleRerankerCache() };
     },
     detectMachineProfile: async () => {
-      const { cpuFeatures } = await import('../handlers/cpuFeatures');
-      const { detectProfile, getProfile } = await import('../../src/lib/pii/machineProfiles');
-      const features = await cpuFeatures();
-      const totalMemoryBytes = (await import('node:os')).totalmem();
-      const profileId = detectProfile({ arch: features.arch, avx2: features.avx2, totalMemoryBytes });
-      return { profileId, profile: getProfile(profileId), hardware: { ...features, totalMemoryBytes } };
+      try {
+        const { cpuFeatures } = await import('../handlers/cpuFeatures');
+        const { detectProfile, getProfile } = await import('../../src/lib/pii/machineProfiles');
+        const features = await cpuFeatures();
+        const totalMemoryBytes = (await import('node:os')).totalmem();
+        const profileId = detectProfile({ arch: features.arch, avx2: features.avx2, totalMemoryBytes });
+        return { profileId, profile: getProfile(profileId), hardware: { ...features, totalMemoryBytes } };
+      } catch (err) {
+        console.error('[ipc] detectMachineProfile failed:', err);
+        throw err;
+      }
     },
   },
 
