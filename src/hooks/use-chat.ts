@@ -1042,6 +1042,8 @@ export function useChat(
   // Token→original map accumulated across turns for inbound rehydration.
   // Merged on every outbound redaction and loaded from vault on thread switch.
   const rehydrationMapRef = useRef<Record<string, string>>({});
+  // Queued rehydration entries for first-turn sends where threadId is still null.
+  const pendingRehydrationRef = useRef<Record<string, string>>({});
   const requestCustomEndpointRef = useRef<string | null>(
     options.customEndpoint ?? null,
   );
@@ -1502,6 +1504,12 @@ export function useChat(
       }
 
       setThreadId(result.state.threadId);
+      // Flush any first-turn rehydration entries that were queued before the
+      // thread ID was assigned.
+      if (result.state.threadId && Object.keys(pendingRehydrationRef.current).length > 0) {
+        pii.persistRehydration(result.state.threadId, pendingRehydrationRef.current).catch(() => {});
+        pendingRehydrationRef.current = {};
+      }
       setError(result.state.error);
       setErrorDetails(result.state.errorDetails);
       setErrorEndpointBaseUrl(
@@ -1942,14 +1950,13 @@ export function useChat(
           // Regex ran synchronously above; NER is async via IPC. Merge wins
           // on overlap, regex fills gaps. The redacted text reaches the model;
           // the original stays in userMsg for the transcript.
-          if (regexDetections.length > 0) {
-            let detections = regexDetections;
-            try {
-              const nerHits = await pii.detectPii(cleanedMessage);
-              if (nerHits.length > 0) {
-                detections = mergeDetections(nerHits, regexDetections);
-              }
-            } catch { /* NER unavailable — regex-only is fine */ }
+          // Always run NER — it may find PII that regex misses.
+          let detections = regexDetections;
+          try {
+            const nerHits = await pii.detectPii(cleanedMessage);
+            detections = mergeDetections(nerHits, regexDetections);
+          } catch { /* NER unavailable — regex-only is fine */ }
+          if (detections.length > 0) {
             const { redactedText, rehydrationMap } = buildRedactedText(
               cleanedMessage,
               detections,
@@ -1958,8 +1965,13 @@ export function useChat(
             requestBody.message = redactedText;
             // Merge into the session-scoped map so inbound tokens can resolve.
             Object.assign(rehydrationMapRef.current, rehydrationMap);
-            if (threadId && Object.keys(rehydrationMap).length > 0) {
-              pii.persistRehydration(threadId, rehydrationMap).catch(() => {});
+            if (Object.keys(rehydrationMap).length > 0) {
+              if (threadId) {
+                pii.persistRehydration(threadId, rehydrationMap).catch(() => {});
+              } else {
+                // First turn — threadId not yet assigned. Queue for flush.
+                Object.assign(pendingRehydrationRef.current, rehydrationMap);
+              }
             }
           }
 

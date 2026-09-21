@@ -1,9 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import { workspaceScan, type WorkspaceScanStatus } from '@/ipc';
+import type { PiiResult } from './PiiResultsPanel';
 
 interface ScanBannerProps {
   workspacePath: string | null;
   onScanStarted?: () => void;
+  onScanComplete?: (results: PiiResult[]) => void;
   onDismiss?: () => void;
 }
 
@@ -13,7 +15,29 @@ function dismissKey(workspacePath: string): string {
   return `${DISMISS_KEY_PREFIX}${workspacePath}`;
 }
 
-export function ScanBanner({ workspacePath, onScanStarted, onDismiss }: ScanBannerProps) {
+// Attempt to extract PII findings from basemind rescan stdout.
+// The format is basemind-specific; returns [] on any parse failure.
+function parseRescanFindings(stdout: string): PiiResult[] {
+  try {
+    const json = JSON.parse(stdout);
+    // basemind admin rescan may return { findings: [...] } or similar.
+    // Adapt as the basemind API shape stabilizes.
+    const findings = json?.findings ?? json?.result?.findings ?? [];
+    if (!Array.isArray(findings)) return [];
+    return findings.map((f: Record<string, unknown>) => ({
+      category: String(f.category ?? f.type ?? 'unknown'),
+      file: String(f.file ?? f.path ?? ''),
+      line: Number(f.line ?? 0),
+      maskedValue: String(f.masked ?? f.token ?? ''),
+      originalValue: f.original ? String(f.original) : undefined,
+      confidence: Number(f.confidence ?? 0.8),
+    }));
+  } catch {
+    return [];
+  }
+}
+
+export function ScanBanner({ workspacePath, onScanStarted, onScanComplete, onDismiss }: ScanBannerProps) {
   const [status, setStatus] = useState<WorkspaceScanStatus | null>(null);
   const [scanning, setScanning] = useState(false);
   const [dismissed, setDismissed] = useState(false);
@@ -31,13 +55,14 @@ export function ScanBanner({ workspacePath, onScanStarted, onDismiss }: ScanBann
     setError(null);
     onScanStarted?.();
     try {
-      await workspaceScan.rescan(workspacePath, ['.']);
+      const result = await workspaceScan.rescan(workspacePath, ['.']);
+      onScanComplete?.(parseRescanFindings(result.stdout));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Scan failed');
     } finally {
       setScanning(false);
     }
-  }, [workspacePath, onScanStarted]);
+  }, [workspacePath, onScanStarted, onScanComplete]);
 
   const handleDismiss = useCallback(() => {
     if (workspacePath) {

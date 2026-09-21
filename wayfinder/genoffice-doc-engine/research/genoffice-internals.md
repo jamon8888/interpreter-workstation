@@ -88,7 +88,7 @@ just a new route.
     Workstation has already permissioned the path — same trust model as
     oo-editors' server).
   - `POST /save?path=...` → write bytes (equivalent of `docs:save-to`,
-    `saveDocxTo` ipc.ts:360-362).
+    `saveDocxTo` ipc.ts:360-362). **Path traversal protection:** The embed server must validate that the `path` parameter resolves within the workspace root before writing. Reject paths containing `..` or symlinks that escape the workspace boundary.
   - `GET /health` → status + version (see §6).
 - New `apps/docs/src/renderer/embed-shim.ts` (~100 lines): when `?embed=1`,
   install `window.desktop` as an HTTP-backed shim — `openDocx`/`openDocxPath`
@@ -137,10 +137,11 @@ to Workstation's message:
 | slides `{slide, elements}` | `{kind:'object', objects:[{type,id}]}` |
 | pdf `{page, text}` | `{kind:'text', text}` |
 
-Delivery: `window.parent.postMessage(msg, '*')` — Workstation validates
+Delivery: `window.parent.postMessage(msg, OO_EDITORS_ORIGIN)` — Workstation validates
 `event.origin !== OO_EDITORS_ORIGIN` and listens on `window` 'message'
 (`src/components/OfficeExtensionViewer.tsx:272-280`). The origin constant is
 the configured port, so it matches whatever port the fork server binds.
+**Security note:** Use the specific origin constant (`OO_EDITORS_ORIGIN`) rather than `'*'` as the target origin to prevent leaking selection data to unintended recipients.
 ~50-80 lines per family, plus a few wiring lines in each App.tsx. All
 selection data needed already exists renderer-side; no engine changes.
 

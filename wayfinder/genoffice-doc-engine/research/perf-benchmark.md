@@ -115,7 +115,7 @@ written so that ticket can execute it directly. The clone at
 
 One machine, one run, same fixtures through both engines' real Workstation
 paths — oo-editors via the actual iframe flow, genoffice via the forked
-`/open` + postMessage flow (or its dev server as a pre-fork baseline).
+`/open` + postMessage flow. **Important:** Do not mix dev-server baselines with embedded comparison results. For go/no-go decisions, require the forked `/open` and `postMessage` path. Label any dev-server results as non-comparable.
 
 ### Metrics (per engine, per fixture)
 
@@ -134,6 +134,7 @@ paths — oo-editors via the actual iframe flow, genoffice via the forked
    sidecar RSS this way — reuse that code).
 5. **Conversion speed** (ms): oo-editors `office-extension:convert`
    wall-clock; genoffice equivalent (open-to-IR or the sidecar open call).
+   **Ensure equivalent boundaries:** Measure the same operation scope for both engines (e.g., file read + parse + render, or just the conversion step). Document which boundaries are included so results are comparable.
 6. **Save round-trip** (ms, docx/xlsx/pptx with a byte-preserving edit) —
    optional second-tier metric; genoffice's SHA-256 fail-closed save and
    x2t's round-trip are not required for the go/no-go, but cheap to time.

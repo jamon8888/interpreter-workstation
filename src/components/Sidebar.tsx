@@ -8,7 +8,7 @@ import { HelpPanel } from './HelpPanel';
 import { SkillsPanel } from './SkillsPanel';
 import { ScanBanner } from './pii/ScanBanner';
 import { ScanProgressPanel } from './pii/ScanProgressPanel';
-import { PiiResultsPanel } from './pii/PiiResultsPanel';
+import { PiiResultsPanel, type PiiResult } from './pii/PiiResultsPanel';
 import { useLayout } from '../hooks/useLayout';
 import { useHelp } from '../contexts/HelpContext';
 import { EXPLORER_BUTTON_ID, EXPLORER_SIDEBAR_ID } from '../../shared/element-ids';
@@ -37,6 +37,7 @@ export function Sidebar({ onFileOpen }: SidebarProps) {
   const [workspacePath, setWorkspacePath] = useState<string | null>(null);
   const [scanActive, setScanActive] = useState(false);
   const [showResults, setShowResults] = useState(false);
+  const [scanResults, setScanResults] = useState<PiiResult[]>([]);
   const showCollapsedFooterDivider = activeTab === 'explorer' && !isHelpPanelOpen && !isSkillsPanelOpen;
   const titlebarButtonClassName = cn(
     'oa-hover-chip titlebar-button min-w-[34px] border border-transparent bg-transparent text-[#5f6673] shadow-none transition-colors duration-150',
@@ -105,6 +106,7 @@ export function Sidebar({ onFileOpen }: SidebarProps) {
           <ScanBanner
             workspacePath={workspacePath}
             onScanStarted={() => setScanActive(true)}
+            onScanComplete={(results) => setScanResults(results)}
           />
           <div className="h-full min-h-0">
             <Explorer onFileOpen={onFileOpen} />
@@ -121,7 +123,7 @@ export function Sidebar({ onFileOpen }: SidebarProps) {
           )}
           {showResults && (
             <PiiResultsPanel
-              results={[]}
+              results={scanResults}
               onClose={() => setShowResults(false)}
             />
           )}

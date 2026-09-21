@@ -117,8 +117,8 @@ cd onnxruntime
 
 Key flags:
 - `onnxruntime_ENABLE_CPUINFO=ON` — enables runtime CPU feature detection
-- `-mno-avx -mno-avx2 -mno-fma` — disables AVX/AVX2/FMA instruction generation
-- The MLAS library will detect CPU features at runtime and use SSE2 codepaths
+- `-mno-avx -mno-avx2 -mno-fma` — disables AVX/AVX2/FMA instruction generation for most source files
+- **Caveat:** MLAS (Microsoft Linear Algebra Sublibrary) files are compiled with their own `-mavx -mavx2 -mfma` flags, overriding the global settings. The resulting library is **runtime-dispatched**, not fully AVX-free — it still contains ISA-specific MLAS objects. At runtime, CPU feature detection routes to the appropriate codepath (SSE2 when AVX2 is absent).
 
 This is essentially what TauSh3N did for Windows, adapted for Linux.
 
@@ -127,7 +127,7 @@ This is essentially what TauSh3N did for Windows, adapted for Linux.
 ## 7. Windows x86 (32-bit) as Workaround?
 
 - Microsoft publishes ONNX Runtime for `win32` (32-bit x86) — e.g., `onnxruntime-win-x86-1.17.3.tgz`
-- 32-bit x86 code cannot use AVX2 (which is a 64-bit extension), so these binaries are inherently AVX-free
+- **Note:** AVX2 is supported in both 32-bit and 64-bit modes (per Intel's instruction reference). A 32-bit build is not inherently AVX-free — it depends on the compiler flags used. Verify the build's compiler flags or disassemble the binary before assuming it lacks AVX2.
 - **Cannot be used on Linux x86_64** — wrong binary format (PE vs ELF), wrong word size
 - Not a practical workaround for Linux
 

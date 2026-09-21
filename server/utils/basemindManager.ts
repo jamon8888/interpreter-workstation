@@ -309,6 +309,9 @@ export async function basemindRescan(opts: { root: string; paths?: string[]; jso
   if (!(await ensureDaemon())) return { success: false, exitCode: null, stdout: '', stderr: '', error: 'daemon not running' };
   try {
     const progressToken = `rescan-${Date.now()}`;
+    // Emit an initial event so subscribers that attach after this point
+    // immediately see "scanning" rather than waiting for the first notification.
+    scanProgressEmitter.emit('scan-progress', { type: 'progress', stage: 'extract', progress: 0, total: null, message: 'Starting scan…' } satisfies ScanProgressEvent);
     const result = await mcpRequestWithNotifications(
       'tools/call',
       {

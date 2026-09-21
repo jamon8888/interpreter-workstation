@@ -11,7 +11,7 @@ Workstation's existing document-engine plumbing works unchanged:
 - What patch exposes an `/open?filepath=...&lang=...&theme=...` URL serving
   the editor in an iframe, matching `src/lib/officeExtensionUrl.ts`?
 - Can the editor emit postMessage selection events matching
-  `src/lib/officeExtensionSelection.ts` (`selection:changed`)? What shape?
+  `src/lib/officeExtensionSelection.ts` (`selection:changed`)? What is the exact `postMessage` wire type (event name, data shape, origin)?
 - How separable is the AI panel strip (components, providers, Genspark
   sign-in) — is a build flag / env / code removal enough?
 - Do genoffice's engines read legacy formats (doc/odt/rtf/xls/ppt) and what

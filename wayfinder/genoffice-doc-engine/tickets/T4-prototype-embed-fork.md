@@ -11,7 +11,7 @@ prototype in a fork of genoffice and react to it:
   `apps/shell/src/main/mcp/mcp-server.ts`).
 - HTTP-backed `window.desktop` shim so the renderers (which depend on
   Electron preload APIs) work inside an iframe.
-- Per-family selection push (~60 lines/family) mapping
+- Per-family selection push (~60 lines/family) using **renderer selection events** as the push source, mapping
   `window.__genofficeControl` pull-based selection (docs/sheets/slides) to
   Workstation's `ONLYOFFICE_SELECTION_CHANGED` postMessage shape.
 - `?embed=1` / `GENOFFICE_EMBED=1` flag gating the AI panel, AI IPC, and

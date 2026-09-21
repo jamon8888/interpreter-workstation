@@ -19,8 +19,7 @@ RSS ≤1.5GB.
   in-repo benchmarks + open-latency measurements.
 - oo-editors side (HITL): installing it needs release-repo access. Hand
   the human a precise checklist (install via a Workstation official build
-  or direct release download, then run the same protocol); or skip the
-  oo-editors side if the human says the comparison isn't needed.
+  or direct release download, then run the same protocol). **Do not skip the oo-editors comparison** — it is required for the benchmark to be valid.
 
 ## Acceptance
 

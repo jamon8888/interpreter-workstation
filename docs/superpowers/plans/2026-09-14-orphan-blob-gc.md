@@ -211,7 +211,7 @@ import { describe, expect, test, beforeEach, afterEach } from 'bun:test';
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { runOrphanBlobGcOnce } from './vaultGc';
+import { runOrphanBlobGcOnce, resetGcFlagForTests } from './vaultGc';
 
 describe('runOrphanBlobGcOnce', () => {
   let dir: string;
@@ -219,6 +219,10 @@ describe('runOrphanBlobGcOnce', () => {
   beforeEach(() => {
     dir = mkdtempSync(join(tmpdir(), 'gc-'));
     process.env.INTERPRETER_USER_DATA_DIR = dir;
+    // Reset the GC flag so each test starts fresh.
+    // Import and call the reset function from vaultGc if exported,
+    // or directly set gcRanThisSession to false via a test-only export.
+    resetGcFlagForTests();
   });
 
   afterEach(() => {
@@ -353,7 +357,7 @@ git commit -s -m "feat(vault): add lazy orphan blob GC"
 In `server/services/vault.ts`, import and call the GC lazily:
 
 ```ts
-import { runOrphanBlobGcOnce } from './vaultGc';
+import { runOrphanBlobGcOnce, resetGcFlagForTests } from './vaultGc';
 import { broadcastEvent } from '../handlers/broadcast';
 import { listAllThreadIds } from '../handlers/agentThreads';
 

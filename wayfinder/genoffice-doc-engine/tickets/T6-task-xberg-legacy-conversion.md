@@ -17,7 +17,7 @@ open via xberg extraction to markdown at open time. Wire it:
   (agent converts via code execution — soffice/LibreOffice, pandoc,
   etc.).
 - Save stays markdown — the original file is never modified, extraction
-  is lossy (no round-trip to .doc/.odt).
+  is lossy (no round-trip to .doc/.odt). **Define a separate markdown save identity** (e.g., `legacy-markdown` source type) before wiring legacy opens, so the save path can distinguish between original binary formats and extracted markdown.
 - The community distribution must stay fully usable without
   basemind/xberg (graceful fallback, never a hard dependency).
 
