@@ -7,7 +7,8 @@ import type {
   StreamSkillReference,
   StreamRequestBody,
 } from "@/lib/codex/api-types";
-import { getApiUrl, runtime } from "@/ipc";
+import { getApiUrl, runtime, pii } from "@/ipc";
+import { detectRegex, buildRedactedText, mergeDetections } from "@/lib/pii";
 import {
   clearLiveToolCallsForIds,
   setLiveToolCall,
@@ -1038,6 +1039,11 @@ export function useChat(
   const publishedLiveIdsRef = useRef<Set<string>>(new Set());
   const messagesRef = useRef<ChatMessage[]>(messages);
   const stateRef = useRef<ChatState>(createInitialChatState());
+  // Token→original map accumulated across turns for inbound rehydration.
+  // Merged on every outbound redaction and loaded from vault on thread switch.
+  const rehydrationMapRef = useRef<Record<string, string>>({});
+  // Queued rehydration entries for first-turn sends where threadId is still null.
+  const pendingRehydrationRef = useRef<Record<string, string>>({});
   const requestCustomEndpointRef = useRef<string | null>(
     options.customEndpoint ?? null,
   );
@@ -1349,6 +1355,27 @@ export function useChat(
     };
   }, [historyLoaded, marketingDemoMode, options.initialThreadId]);
 
+  // Load the rehydration map from vault when the thread changes so inbound
+  // tokens from previous sessions can be resolved. Failure is silent — the
+  // tokens render as styled chips (remarkPiiTokens) and the user can still
+  // read them.
+  useEffect(() => {
+    if (!threadId || marketingDemoMode) return;
+    // Clear the map for the new thread to avoid cross-thread contamination
+    rehydrationMapRef.current = {};
+    let cancelled = false;
+    const currentThreadId = threadId;
+    void (async () => {
+      try {
+        const map = await pii.decryptRehydration(`thread-${currentThreadId}`);
+        if (!cancelled && currentThreadId === threadId) {
+          rehydrationMapRef.current = { ...rehydrationMapRef.current, ...map };
+        }
+      } catch { /* no vault blob yet — expected for new threads */ }
+    })();
+    return () => { cancelled = true; };
+  }, [threadId, marketingDemoMode]);
+
   const handleParsedEvent = useCallback(
     (chunk: SseStreamEvent) => {
       if (chunk.event === "userMessage") {
@@ -1419,6 +1446,28 @@ export function useChat(
         }
       }
 
+      // ── PII rehydration (inbound) ────────────────────────────────────
+      // The model may echo redaction tokens ([EMAIL_0], …) in its response.
+      // Replace them with originals from the session-scoped map before the
+      // reducer accumulates the text into the draft.
+      if (
+        (chunk.event === "delta" || chunk.event === "final")
+        && chunk.payload.text
+      ) {
+        let resolved = chunk.payload.text;
+        const entries = Object.entries(rehydrationMapRef.current);
+        // Sort by token length descending so longer tokens match before shorter prefixes
+        entries.sort((a, b) => b[0].length - a[0].length);
+        for (const [token, original] of entries) {
+          if (resolved.includes(token)) {
+            resolved = resolved.split(token).join(original);
+          }
+        }
+        if (resolved !== chunk.payload.text) {
+          chunk = { ...chunk, payload: { ...chunk.payload, text: resolved } };
+        }
+      }
+
       const prev = stateRef.current;
       const result = applyChatEvent(prev, chunk);
       stateRef.current = result.state;
@@ -1462,6 +1511,13 @@ export function useChat(
       }
 
       setThreadId(result.state.threadId);
+      // Flush any first-turn rehydration entries that were queued before the
+      // thread ID was assigned.
+      if (result.state.threadId && Object.keys(pendingRehydrationRef.current).length > 0) {
+        pii.persistRehydration(result.state.threadId, pendingRehydrationRef.current)
+          .catch((err) => { console.warn('[useChat] Failed to persist first-turn rehydration:', err); });
+        pendingRehydrationRef.current = {};
+      }
       setError(result.state.error);
       setErrorDetails(result.state.errorDetails);
       setErrorEndpointBaseUrl(
@@ -1508,6 +1564,9 @@ export function useChat(
       const message = (messageOverride ?? input).trim();
       const parsedSkills = extractSkillMentionsFromText(message);
       const cleanedMessage = parsedSkills.text;
+      // Synchronous regex scan — fast, no IPC. Results feed into the async
+      // NER merge inside the IIFE below so the model never sees raw PII.
+      const regexDetections = detectRegex(cleanedMessage);
       const normalizedMarketingDemoMessage =
         stripWorkstationContext(cleanedMessage).trim();
       const pendingAttachments = overrides?.attachments ?? [];
@@ -1895,6 +1954,38 @@ export function useChat(
 
       (async () => {
         try {
+          // ── PII redaction (outbound) ──────────────────────────────────
+          // Regex ran synchronously above; NER is async via IPC. Merge wins
+          // on overlap, regex fills gaps. The redacted text reaches the model;
+          // the original stays in userMsg for the transcript.
+          // Always run NER — it may find PII that regex misses.
+          let detections = regexDetections;
+          try {
+            const nerHits = await pii.detectPii(cleanedMessage);
+            detections = mergeDetections(nerHits, regexDetections);
+          } catch (err) {
+            console.warn('[useChat] NER detection failed, using regex-only:', err);
+          }
+          if (detections.length > 0) {
+            const { redactedText, rehydrationMap } = buildRedactedText(
+              cleanedMessage,
+              detections,
+              new Set(Object.keys(rehydrationMapRef.current)),
+            );
+            requestBody.message = redactedText;
+            // Merge into the session-scoped map so inbound tokens can resolve.
+            Object.assign(rehydrationMapRef.current, rehydrationMap);
+            if (Object.keys(rehydrationMap).length > 0) {
+              if (threadId) {
+                pii.persistRehydration(threadId, rehydrationMap)
+                  .catch((err) => { console.warn('[useChat] Failed to persist rehydration:', err); });
+              } else {
+                // First turn — threadId not yet assigned. Queue for flush.
+                Object.assign(pendingRehydrationRef.current, rehydrationMap);
+              }
+            }
+          }
+
           // NOTE(victor): SSE over localhost HTTP is intentional over Electron IPC.
           // Localhost TCP is kernel-optimized (~0.1ms roundtrip), eventsource-parser
           // handles reconnection/partial chunks/event boundaries for free (battle-tested

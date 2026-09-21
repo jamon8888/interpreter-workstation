@@ -1,4 +1,4 @@
-import { isDaemonRunning, mcpRequest } from '../utils/basemindManager';
+import { ensureDaemon, mcpRequest } from '../utils/basemindManager';
 
 export interface SearchHit {
   path: string;
@@ -96,7 +96,7 @@ export async function basemindSearchCode(params: {
   degradedReason?: string;
   elapsedUs: number;
 }> {
-  if (!isDaemonRunning()) {
+  if (!(await ensureDaemon())) {
     throw new Error('basemind daemon not running');
   }
 

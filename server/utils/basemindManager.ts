@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { Socket } from 'node:net';
 import { createRequire } from 'node:module';
+import { EventEmitter } from 'node:events';
 
 // Cargo emits `basemind.exe` on Windows, so every candidate path below has to
 // carry the platform suffix, not just the ones that go through PATH or npm.
@@ -127,6 +128,27 @@ export function isDaemonRunning(): boolean {
   }
 }
 
+/**
+ * Scan progress events. The Electron main process forwards these to the
+ * renderer via IPC so the UI can show per-file progress and PII findings.
+ */
+export interface ScanProgressEvent {
+  type: 'progress' | 'complete' | 'error';
+  /** Pipeline stage: extract | embed | index | ner | done */
+  stage?: string;
+  /** 0-based progress count (files processed so far). */
+  progress?: number;
+  /** Total files to process (null when unknown). */
+  total?: number | null;
+  /** Human-readable message from basemind. */
+  message?: string;
+  /** Error message when type === 'error'. */
+  error?: string;
+}
+
+export const scanProgressEmitter = new EventEmitter();
+scanProgressEmitter.setMaxListeners(20);
+
 let _cachedBinary: string | null = null;
 
 export function resolveBasemindBinary(): string {
@@ -134,6 +156,30 @@ export function resolveBasemindBinary(): string {
     _cachedBinary = findBasemindBinary();
   }
   return _cachedBinary;
+}
+
+/**
+ * Start the daemon on demand: nothing ever calls basemind.register() (fresh
+ * profiles have no persisted MCP servers), so the first scan/search would
+ * otherwise fail with "daemon not running" forever. Registration is
+ * idempotent (addServer repairs an existing entry), so every caller routes
+ * through here instead of gating on isDaemonRunning() directly.
+ */
+export async function ensureDaemon(): Promise<boolean> {
+  if (isDaemonRunning()) return true;
+  if (!resolveBasemindBinary()) return false;
+  try {
+    await registerBasemindServer();
+  } catch (err) {
+    console.error('[basemindManager] registerBasemindServer failed:', err);
+    return false;
+  }
+  // The spawned `serve` process creates comms.sock just after the MCP
+  // handshake addServer already awaited; poll briefly for the socket.
+  for (let i = 0; i < 20 && !isDaemonRunning(); i++) {
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+  return isDaemonRunning();
 }
 
 export function mcpRequest(method: string, params: Record<string, unknown> = {}): Promise<unknown> {
@@ -146,7 +192,8 @@ export function mcpRequest(method: string, params: Record<string, unknown> = {})
       reject(new Error(`MCP request timed out: ${method}`));
     }, 30_000);
     sock.connect(sockPath, () => {
-      const req = JSON.stringify({ jsonrpc: '2.0', id: 1, method, params });
+      const reqId = Math.floor(Math.random() * 100000);
+      const req = JSON.stringify({ jsonrpc: '2.0', id: reqId, method, params });
       sock.write(req + '\n');
     });
     sock.on('data', (chunk) => {
@@ -178,8 +225,82 @@ export function mcpRequest(method: string, params: Record<string, unknown> = {})
   });
 }
 
+/**
+ * Like `mcpRequest`, but reads newline-delimited JSON in a loop so
+ * interleaved `notifications/progress` messages are dispatched to a callback
+ * instead of being mistaken for the response.
+ *
+ * The stdio relay forwards notifications transparently (no id field);
+ * responses always carry the request id. The socket stays open until the
+ * response arrives.
+ */
+export function mcpRequestWithNotifications(
+  method: string,
+  params: Record<string, unknown> = {},
+  onNotification?: (notification: { method: string; params: Record<string, unknown> }) => void,
+  options?: { timeoutMs?: number },
+): Promise<unknown> {
+  const sockPath = resolve(basemindCommsDir(), 'comms.sock');
+  return new Promise((resolve, reject) => {
+    const sock = new Socket();
+    let data = '';
+    const timer = setTimeout(() => {
+      sock.destroy();
+      reject(new Error(`MCP request timed out: ${method}`));
+    }, options?.timeoutMs ?? 300_000);
+
+    sock.connect(sockPath, () => {
+      const reqId = Math.floor(Math.random() * 100000);
+      const req = JSON.stringify({ jsonrpc: '2.0', id: reqId, method, params });
+      sock.write(req + '\n');
+    });
+
+    sock.on('data', (chunk) => {
+      data += chunk.toString();
+      let newlineIdx: number;
+      while ((newlineIdx = data.indexOf('\n')) !== -1) {
+        const line = data.slice(0, newlineIdx).trim();
+        data = data.slice(newlineIdx + 1);
+        if (!line) continue;
+        try {
+          const msg = JSON.parse(line);
+          if ('id' in msg && msg.id !== null && msg.id !== undefined) {
+            // Response to our request — done.
+            clearTimeout(timer);
+            sock.destroy();
+            if (msg.error) {
+              const { code, message } = msg.error;
+              const suffix = code === undefined ? '' : ` (${code})`;
+              reject(new Error(`MCP request failed: ${method}${suffix}: ${message ?? 'unknown error'}`));
+              return;
+            }
+            resolve(msg.result ?? msg);
+            return;
+          }
+          if ('method' in msg) {
+            // Notification (no id) — dispatch and keep reading.
+            try {
+              onNotification?.({ method: msg.method, params: msg.params ?? {} });
+            } catch (err) {
+              console.error('[basemindManager] onNotification threw:', err);
+            }
+          }
+        } catch {
+          // Partial frame — keep buffering.
+        }
+      }
+    });
+
+    sock.on('error', (err) => {
+      clearTimeout(timer);
+      sock.destroy();
+      reject(err);
+    });
+  });
+}
+
 export async function basemindScan(opts: { root: string; paths?: string[]; json?: boolean }) {
-  if (!isDaemonRunning()) return { success: false, exitCode: null, stdout: '', stderr: '', error: 'daemon not running' };
+  if (!(await ensureDaemon())) return { success: false, exitCode: null, stdout: '', stderr: '', error: 'daemon not running' };
   try {
     await mcpRequest('tools/call', {
       name: 'code',
@@ -192,15 +313,38 @@ export async function basemindScan(opts: { root: string; paths?: string[]; json?
 }
 
 export async function basemindRescan(opts: { root: string; paths?: string[]; json?: boolean }) {
-  if (!isDaemonRunning()) return { success: false, exitCode: null, stdout: '', stderr: '', error: 'daemon not running' };
+  if (!(await ensureDaemon())) return { success: false, exitCode: null, stdout: '', stderr: '', error: 'daemon not running' };
   try {
-    await mcpRequest('tools/call', {
-      name: 'code',
-      arguments: { subcommand: 'files', root: opts.root, paths: opts.paths, full: true }
-    });
-    return { success: true, exitCode: 0, stdout: '', stderr: '', error: undefined };
+    const progressToken = `rescan-${Date.now()}`;
+    // Emit an initial event so subscribers that attach after this point
+    // immediately see "scanning" rather than waiting for the first notification.
+    scanProgressEmitter.emit('scan-progress', { type: 'progress', stage: 'extract', progress: 0, total: null, message: 'Starting scan…' } satisfies ScanProgressEvent);
+    const result = await mcpRequestWithNotifications(
+      'tools/call',
+      {
+        name: 'admin',
+        arguments: { mode: 'rescan', paths: opts.paths ?? ['.'], root: opts.root, full: true },
+        _meta: { progressToken },
+      },
+      (notification) => {
+        if (notification.method === 'notifications/progress') {
+          const { progress, total, message } = notification.params;
+          scanProgressEmitter.emit('scan-progress', {
+            type: 'progress',
+            progress: typeof progress === 'number' ? progress : 0,
+            total: typeof total === 'number' ? total : null,
+            message: typeof message === 'string' ? message : '',
+          } satisfies ScanProgressEvent);
+        }
+      },
+      { timeoutMs: 300_000 },
+    );
+    scanProgressEmitter.emit('scan-progress', { type: 'complete', message: 'Scan complete' } satisfies ScanProgressEvent);
+    return { success: true, exitCode: 0, stdout: JSON.stringify(result), stderr: '', error: undefined };
   } catch (err) {
-    return { success: false, exitCode: null, stdout: '', stderr: '', error: err instanceof Error ? err.message : String(err) };
+    const msg = err instanceof Error ? err.message : String(err);
+    scanProgressEmitter.emit('scan-progress', { type: 'error', error: msg } satisfies ScanProgressEvent);
+    return { success: false, exitCode: null, stdout: '', stderr: '', error: msg };
   }
 }
 

@@ -110,6 +110,9 @@ export function BasemindSetupScreen({ onNext }: BasemindSetupScreenProps) {
     const config = STAGE_CONFIG[stage];
     if (!config.requiresAvx2) return true;
     if (!cpuFeatures) return true;
+    // A staged noavx2 binary runs AVX2-only models on any x86_64 CPU (the
+    // server reports it via cpuFeatures.noavx2Build) — stand down the gate.
+    if (cpuFeatures.noavx2Build) return true;
     if (cpuFeatures.arch === 'aarch64') return true;
     if (cpuFeatures.arch === 'x86_64') return cpuFeatures.avx2;
     return true;

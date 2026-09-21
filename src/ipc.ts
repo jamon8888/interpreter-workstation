@@ -727,6 +727,7 @@ export interface PiiRevealAuditEntry {
 }
 interface WorkspaceScanIpc {
   status(): Promise<WorkspaceScanStatus>;
+  rescan(workspacePath: string, paths?: string[]): Promise<{ success: boolean; exitCode: number | null; stdout: string; stderr: string; error?: string }>;
 }
 
 interface BasemindDownloadResult {
@@ -755,6 +756,12 @@ interface BasemindIpc {
   getStaleRerankerCache(): Promise<{ bytes: number }>;
   /** Remove stale v2-m3 preset dirs; resolves the freed estimate. */
   clearStaleRerankerCache(): Promise<{ freedBytes: number }>;
+  /** Detect hardware and return the optimal machine profile. */
+  detectMachineProfile(): Promise<{
+    profileId: string;
+    profile: { id: string; label: string; description: string; nerEnabled: boolean; rerankerEnabled: boolean; embedMode: string; redactionCategories: string[] };
+    hardware: CpuFeatures & { totalMemoryBytes: number };
+  }>;
 }
 
 interface ProjectRunnerIpc {
@@ -810,7 +817,7 @@ export const agentThreads: AgentThreadsIpc = isMarketingDemoMode()
 export const workspace = isMarketingDemoMode() ? marketingDemoWorkspaceIpc : client.workspace;
 export const vault: VaultIpc = isMarketingDemoMode() ? marketingDemoVaultIpc : client.vault;
 export const workspaceScan: WorkspaceScanIpc = isMarketingDemoMode()
-  ? { status: async () => { throw new Error('Not available in demo mode'); } }
+  ? { status: async () => { throw new Error('Not available in demo mode'); }, rescan: async () => { throw new Error('Not available in demo mode'); } }
   : (client.workspaceScan as WorkspaceScanIpc);
 export const search: SearchIpc = isMarketingDemoMode()
   ? {
@@ -821,7 +828,7 @@ export const search: SearchIpc = isMarketingDemoMode()
   }
   : (client.search as SearchIpc);
 export const basemind: BasemindIpc = isMarketingDemoMode()
-  ? { register: async () => { throw new Error('Not available in demo mode'); }, unregister: async () => { throw new Error('Not available in demo mode'); }, status: async () => { throw new Error('Not available in demo mode'); }, download: async () => { throw new Error('Not available in demo mode'); }, cpuFeatures: async () => ({ arch: 'unknown', avx2: false, avx: false, sse4_1: false, sse4_2: false, neon: false, noavx2Build: false }), getStaleRerankerCache: async () => ({ bytes: 0 }), clearStaleRerankerCache: async () => { throw new Error('Not available in demo mode'); } }
+  ? { register: async () => { throw new Error('Not available in demo mode'); }, unregister: async () => { throw new Error('Not available in demo mode'); }, status: async () => { throw new Error('Not available in demo mode'); }, download: async () => { throw new Error('Not available in demo mode'); }, cpuFeatures: async () => ({ arch: 'unknown', avx2: false, avx: false, sse4_1: false, sse4_2: false, neon: false, noavx2Build: false }), getStaleRerankerCache: async () => ({ bytes: 0 }), clearStaleRerankerCache: async () => { throw new Error('Not available in demo mode'); }, detectMachineProfile: async () => ({ profileId: 'constrained', profile: { id: 'constrained', label: 'Constrained', description: 'Demo mode', nerEnabled: false, rerankerEnabled: false, embedMode: 'lightweight', redactionCategories: [] }, hardware: { arch: 'unknown', avx2: false, avx: false, sse4_1: false, sse4_2: false, neon: false, noavx2Build: false, totalMemoryBytes: 0 } }) }
   : (client.basemind as BasemindIpc);
 export const pii: PiiIpc = isMarketingDemoMode()
   ? {
@@ -831,6 +838,14 @@ export const pii: PiiIpc = isMarketingDemoMode()
       recordReveal: async () => {},
     }
   : client.pii;
+export const scanProgress = {
+  onProgress: (callback: (event: import('../electron/ipc/registry').ScanProgressEvent) => void) => {
+    if (client.scanProgress?.onProgress) {
+      return client.scanProgress.onProgress(callback);
+    }
+    return () => {};
+  },
+};
 export const setup = client.setup;
 export const computerUseSetup: ComputerUseSetupIpc = {
   onRequested: (callback) => client.computerUseSetup.onRequested(callback),

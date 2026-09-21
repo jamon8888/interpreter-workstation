@@ -111,5 +111,13 @@ export function buildMiscNamespaces(ipcRenderer: IpcRenderer, IPC_CHANNELS: type
         return () => ipcRenderer.removeListener(IPC_CHANNELS.CHECKPOINT_STATUS_CHANGED, handler);
       },
     },
+
+    scanProgress: {
+      onProgress: (callback: (event: import('../ipc/registry').ScanProgressEvent) => void) => {
+        const handler = (_event: unknown, data: import('../ipc/registry').ScanProgressEvent) => callback(data);
+        ipcRenderer.on(IPC_CHANNELS.SCAN_PROGRESS, handler);
+        return () => ipcRenderer.removeListener(IPC_CHANNELS.SCAN_PROGRESS, handler);
+      },
+    },
   };
 }
