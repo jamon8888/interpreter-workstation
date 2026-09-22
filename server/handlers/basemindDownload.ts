@@ -81,26 +81,49 @@ function cleanupWarmupWorkspace(dir: string): void {
   rmSync(dir, { recursive: true, force: true });
 }
 
-function stageArgs(stage: BasemindDownloadStage, workspace: string): string[] {
+function stageCommands(stage: BasemindDownloadStage, workspace: string): string[][] {
   switch (stage) {
     case 'embeddings':
-      return ['memory', 'documents', WARMUP_QUERY, '--root', workspace, '--limit', '1'];
+      return [['memory', 'documents', WARMUP_QUERY, '--root', workspace, '--limit', '1']];
     case 'reranker':
+      // `code semantic` reads from a code map basemind builds during `scan` —
+      // on a workspace it has never scanned it reports 0 files and returns no
+      // hits, and --rerank never engages (nothing to rerank). Scan first.
       return [
-        'code', 'semantic', WARMUP_QUERY,
-        '--root', workspace,
-        '--limit', '1',
-        '--rerank',
-        '--rerank-preset', 'bge-reranker-v2-m3',
+        ['scan', '--root', workspace, '-q'],
+        [
+          'code', 'semantic', WARMUP_QUERY,
+          '--root', workspace,
+          '--limit', '1',
+          '--rerank',
+          '--rerank-preset', 'bge-reranker-v2-m3',
+        ],
       ];
     case 'nerModel':
-      return [
+      return [[
         'scan', '--root', workspace,
         '--documents-enabled', 'true',
         '--documents-ner-enabled', 'true',
         '--documents-redaction-enabled', 'true',
         '-q',
-      ];
+      ]];
+  }
+}
+
+/**
+ * basemind auto-spawns a persistent background "comms daemon" the first time
+ * any command touches a workspace, which can hold a stale in-memory code map
+ * across separate CLI invocations and make a later `code semantic` report 0
+ * files even after a fresh `scan` populated the on-disk index. There is no
+ * CLI-level "stop" for it, so kill it outright before each warmup sequence —
+ * safe because it respawns on demand and this workspace is never shared with
+ * a real user session.
+ */
+async function killStaleBasemindDaemon(): Promise<void> {
+  try {
+    await execFileAsync('pkill', ['-9', '-f', 'basemind comms daemon']);
+  } catch {
+    // No matching process (pkill exits 1) — nothing to clean up.
   }
 }
 
@@ -116,11 +139,12 @@ function stageArgs(stage: BasemindDownloadStage, workspace: string): string[] {
  * would otherwise be refused as an accidentally-inherited scan root.
  */
 async function runWarmup(binary: string, stage: BasemindDownloadStage, workspace: string): Promise<{ ok: boolean; error?: string }> {
+  await killStaleBasemindDaemon();
+  const env = { ...process.env, BASEMIND_ALLOW_ANY_ROOT: '1' };
   try {
-    await execFileAsync(binary, stageArgs(stage, workspace), {
-      env: { ...process.env, BASEMIND_ALLOW_ANY_ROOT: '1' },
-      timeout: WARMUP_TIMEOUT_MS,
-    });
+    for (const args of stageCommands(stage, workspace)) {
+      await execFileAsync(binary, args, { env, timeout: WARMUP_TIMEOUT_MS });
+    }
     return { ok: true };
   } catch (err) {
     const stderr = err && typeof err === 'object' && 'stderr' in err ? String((err as { stderr?: unknown }).stderr ?? '') : '';
