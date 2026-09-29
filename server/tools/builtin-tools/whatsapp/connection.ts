@@ -374,7 +374,7 @@ export async function initializeSocket(): Promise<void> {
     version,
     logger,
     printQRInTerminal: false,
-    browser: ['Interpreter', 'Desktop', '1.0.0'],
+    browser: ['Hacienda', 'Desktop', '1.0.0'],
     syncFullHistory: false,
     shouldSyncHistoryMessage: () => true,
     markOnlineOnConnect: false,
@@ -508,7 +508,9 @@ export async function initializeSocket(): Promise<void> {
           ? Number(msg.messageTimestamp) * 1000
           : Date.now();
 
+        // eslint-disable-next-line no-useless-assignment -- defaults for if/else branches below
         let fromName = 'Unknown';
+        // eslint-disable-next-line no-useless-assignment -- defaults for if/else branches below
         let fromId = '';
         if (isOutgoing) {
           fromName = 'You';
@@ -636,7 +638,9 @@ export async function initializeSocket(): Promise<void> {
       const deliveryStatus = resolveDeliveryStatus(statusCode);
 
       // Determine sender
+      // eslint-disable-next-line no-useless-assignment -- defaults for if/else branches below
       let fromName = 'Unknown';
+      // eslint-disable-next-line no-useless-assignment -- defaults for if/else branches below
       let fromId = '';
       if (isOutgoing) {
         fromName = 'You';

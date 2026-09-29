@@ -550,6 +550,7 @@ class CheckpointManager {
       });
 
       console.error('[CheckpointManager] Error creating before checkpoint:', errorMessage);
+      // eslint-disable-next-line preserve-caught-error
       throw new Error(errorMessage);
     }
   }
@@ -683,6 +684,7 @@ class CheckpointManager {
       });
 
       console.error('[CheckpointManager] After checkpoint failed:', errorMessage);
+      // eslint-disable-next-line preserve-caught-error
       throw new Error(errorMessage);
     }
   }

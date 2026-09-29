@@ -14,7 +14,7 @@ import { TooltipButton } from '../ui/tooltip-button';
 import { KeyboardShortcutHint } from '../ui/keyboard-shortcut-hint';
 import { ContextMenu } from '../ContextMenu';
 import { CUSTOM_TITLEBAR_ID, EXPLORER_BUTTON_ID, CHAT_BUTTON_ID, APPROVAL_BADGE_ID } from '../../../shared/element-ids';
-import { workspace, windowIpc, macTitlebarClicked, showContextMenu, openFolderDialog, showItemInFolder, getRuntimeSystemInfo, openExternal, zoomFactor as zoomFactorIpc, type ContextMenuItem } from '@/ipc';
+import { workspace, windowIpc, macTitlebarClicked, showContextMenu, openFolderDialog, showItemInFolder, getRuntimeSystemInfo, openExternal, zoomFactor as zoomFactorIpc, search, type ContextMenuItem } from '@/ipc';
 import { cn } from '@/lib/utils';
 import { trackWorkspaceChanged } from '@/utils/telemetry';
 import type { WindowFullscreenChangedEvent } from '../../../electron/ipc/registry';
@@ -44,13 +44,26 @@ const WINDOWS_TITLE_MENU_ZOOM_STEP = 0.1;
 
 export function CustomTitleBar() {
   const { t } = useTranslation();
-  const { state, setLeftSidebarTab, toggleLeftSidebar, toggleRightSidebar, setActiveTabRegion, openNewTab, openSettings } = useLayout();
+  const { state, setLeftSidebarTab, toggleLeftSidebar, toggleRightSidebar, setActiveTabRegion, openNewTab, openSettings, openFile } = useLayout();
   const [workspacePath, setWorkspacePath] = useState<string | null>(null);
   const [workspaceMenuPos, setWorkspaceMenuPos] = useState<{ x: number; y: number } | null>(null);
   const [recentFolders, setRecentFolders] = useState<RecentWorkspaceFolder[]>([]);
   const [noteWorkspaces, setNoteWorkspaces] = useState<DetectedNoteWorkspace[]>([]);
   const [isScanningNoteWorkspaces, setIsScanningNoteWorkspaces] = useState(false);
   const [_isFullScreen, setIsFullScreen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<Array<{
+    path: string;
+    chunkId: string;
+    symbol: string;
+    kind: string;
+    lang: string;
+    lineStart: number;
+    lineEnd: number;
+  }>>([]);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
   const { isCommandHeld, activatedKey } = useCommandOverlay();
   const pendingApprovalsByAgent = usePendingApprovalsByAgent();
   const runtimePlatform = getRuntimeSystemInfo().platform;
@@ -331,6 +344,61 @@ export function CustomTitleBar() {
     }
   };
 
+  const searchSeqRef = useRef(0);
+
+  const handleSearch = async (query: string) => {
+    if (!query.trim()) {
+      setSearchResults([]);
+      setSearchError(null);
+      return;
+    }
+    const seq = ++searchSeqRef.current;
+    setIsSearching(true);
+    try {
+      const result = await search.searchCode({
+        query: query.trim(),
+        limit: 10,
+        lane: 'hybrid',
+      });
+      if (seq !== searchSeqRef.current) return;
+      setSearchResults(result.hits.map((hit) => ({
+        path: hit.path,
+        chunkId: hit.chunkId,
+        symbol: hit.symbol,
+        kind: hit.kind,
+        lang: hit.lang,
+        lineStart: hit.lineStart,
+        lineEnd: hit.lineEnd,
+      })));
+      setSearchError(null);
+    } catch (err) {
+      if (seq !== searchSeqRef.current) return;
+      console.error('[CustomTitleBar] Search failed:', err);
+      setSearchResults([]);
+      setSearchError(err instanceof Error ? err.message : String(err));
+    } finally {
+      if (seq === searchSeqRef.current) setIsSearching(false);
+    }
+  };
+
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleSearchChange = (query: string) => {
+    setSearchQuery(query);
+    setSearchError(null);
+    setSearchOpen(true);
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    searchDebounceRef.current = setTimeout(() => {
+      handleSearch(query);
+    }, 200);
+  };
+
+  const handleSearchResultClick = (result: { path: string; lineStart: number; lineEnd: number }) => {
+    openFile(result.path);
+    setSearchOpen(false);
+    setSearchQuery('');
+  };
+
   const revealWorkspaceLabel = getRevealInFileManagerLabel(runtimePlatform);
   const explorerShortcutLabel = formatPrimaryShortcut('K', runtimePlatform);
   const openFolderShortcutLabel = formatPrimaryShortcut('O', runtimePlatform);
@@ -444,7 +512,50 @@ export function CustomTitleBar() {
         className="flex-1 h-full"
         style={{ WebkitAppRegion: getDragRegionStyle(runtimePlatform) } as React.CSSProperties}
         onDoubleClick={handleDoubleClick}
-      />
+      >
+        {!readOnlyWorkstation && (
+          <div className="flex items-center justify-center pointer-events-auto" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
+            <div className="relative">
+              <input
+                type="text"
+                className="oa-search-input w-[320px] max-w-[40vw] px-3 py-1.5 pr-10 text-ui-sm bg-muted/50 border border-border/50 rounded-lg placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all duration-150"
+                placeholder={t('titlebar.search.placeholder')}
+                value={searchQuery}
+                onChange={(e) => handleSearchChange(e.target.value)}
+                onFocus={() => setSearchOpen(true)}
+                onBlur={() => setTimeout(() => setSearchOpen(false), 150)}
+                autoComplete="off"
+                aria-label={t('titlebar.search.placeholder')}
+              />
+              {isSearching && (
+                <span className="absolute right-3 text-muted-foreground/50 animate-spin">⟳</span>
+              )}
+              {searchOpen && searchResults.length > 0 && (
+                <div className="absolute top-full left-0 right-0 mt-1 z-50 bg-popover border border-border rounded-lg shadow-lg overflow-hidden max-h-[300px] overflow-y-auto">
+                  {searchResults.map((result, index) => (
+                    <button
+                      key={`${result.path}-${result.chunkId}-${index}`}
+                      className="w-full px-3 py-2 text-left hover:bg-accent transition-colors flex items-center gap-2"
+                      onClick={() => handleSearchResultClick(result)}
+                    >
+                      <span className="text-ui-xs text-muted-foreground font-mono truncate flex-1">{result.path}</span>
+                      {result.symbol && (
+                        <span className="text-ui-xs text-muted-foreground/70 px-1.5 py-0.5 rounded bg-muted">{result.symbol}</span>
+                      )}
+                      <span className="text-ui-xs text-muted-foreground/50 font-mono">{result.lineStart}–{result.lineEnd}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {searchOpen && !isSearching && searchResults.length === 0 && searchQuery.trim() && searchError && (
+                <div className="absolute top-full left-0 right-0 mt-1 z-50 bg-popover border border-border rounded-lg shadow-lg overflow-hidden px-3 py-2">
+                  <span className="text-ui-xs text-destructive">{searchError}</span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Right sidebar button */}
       {!readOnlyWorkstation || canSignOut ? <div ref={rightControlsRef} className="flex items-center pointer-events-auto" style={{ gap: 'var(--unit-padding-small)', WebkitAppRegion: 'no-drag' } as React.CSSProperties}>

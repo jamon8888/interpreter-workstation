@@ -96,4 +96,8 @@ export function getPiiColor(category: string): { light: string; dark: string } {
   return PII_COLORS[category];
 }
 
+export function getAllPiiCategories(): string[] {
+  return Object.keys(PII_COLORS);
+}
+
 export default PII_COLORS;

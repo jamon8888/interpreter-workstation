@@ -59,6 +59,9 @@ canonical origin.
   running acceptance tests.
 - Preserve user work and unrelated changes. Never publish, push, or create a
   public artifact without explicit authorization.
+- **Every commit must include a DCO sign-off.** Use `git commit -s` or append
+  `Signed-off-by: Name <email>` to the commit message. CI rejects commits
+  without it. When amending or cherry-picking, re-add the sign-off.
 
 ## Product boundaries
 
@@ -122,15 +125,15 @@ boundary and report any platform or credential-dependent step that was not run.
 
 ### Issue tracker
 
-Issues live as GitHub issues. See `docs/agents/issue-tracker.md`.
+Issues live as GitHub issues via `gh`. See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 
-Default five-role vocabulary, label string equals role name. See `docs/agents/triage-labels.md`.
+Default five canonical labels as-is. See `docs/agents/triage-labels.md`.
 
 ### Domain docs
 
-Single-context layout. See `docs/agents/domain.md`.
+Single-context with root `CONTEXT.md`. See `docs/agents/domain.md`.
 
 ### Repo skills
 

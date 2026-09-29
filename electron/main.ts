@@ -5,6 +5,7 @@ import os from 'node:os';
 import { randomBytes } from 'node:crypto';
 import fs from 'fs';
 import util from 'node:util';
+import { enableCompileCache, constants } from 'node:module';
 import fixPath from 'fix-path';
 import * as Sentry from '@sentry/electron/main';
 import { handlePendingNativeCrashReports, startLocalCrashReporter } from './crashReports';
@@ -13,6 +14,7 @@ import {
   listenOnAvailableLocalPort,
 } from './utils/localServerPort';
 import { destroyTraySafely, shouldKeepAppResident } from './utils/windowCloseBehavior';
+import { migrateUserDataDirectory } from './utils/userDataMigration';
 import {
   buildMainProcessFatalErrorHandler,
   configureMainProcessSentryIntegrations,
@@ -78,6 +80,16 @@ attachConsoleSinkGuards({
   stdout: process.stdout,
   stderr: process.stderr,
 });
+
+// Enable V8 compile cache for faster module loading on subsequent launches.
+// Must be called before any require() calls — enables bytecode caching for
+// the current process. ESM imports are hoisted but dynamic requires inside
+// functions will benefit from the cached bytecode.
+const compileCacheDir = path.join(app.getPath('userData'), 'compile-cache');
+const cacheResult = enableCompileCache(compileCacheDir);
+if (cacheResult.status === constants.compileCacheStatus.FAILED) {
+  console.warn('[compile-cache] Failed to enable:', cacheResult.message);
+}
 
 // =============================================================================
 // FIX PATH - Inherit user's shell PATH in packaged Electron apps
@@ -399,7 +411,7 @@ app.commandLine.appendSwitch('enable-features', [
   'DocumentPolicyIncludeJSCallStacksInCrashReports',
 ].join(','));
 
-// The Interpreter Overlay window hides by dropping to opacity 0 while staying
+// The Hacienda Overlay window hides by dropping to opacity 0 while staying
 // "visible", so macOS reports it occluded. Chromium then suspends that
 // renderer (timers, rAF, IPC-driven rendering) even with
 // backgroundThrottling: false, and the next hotkey open shows a wedged,
@@ -412,6 +424,27 @@ app.commandLine.appendSwitch('disable-background-timer-throttling');
 
 const forcedAppName = process.env.INTERPRETER_APP_NAME?.trim();
 app.setName(forcedAppName || (isInternal ? `${ACTIVE_BRAND.appName} Internal` : ACTIVE_BRAND.appName));
+
+// `userData` follows the app name, so the rename moved it out from under every
+// existing install. Carry the previous directory over before anything reads
+// from the new one — the vault key lives in there, and a missing key is minted
+// anew, which orphans every blob encrypted under the old one.
+if (!forcedAppName && !process.env.INTERPRETER_USER_DATA_DIR?.trim()) {
+  const migration = migrateUserDataDirectory({
+    currentDir: app.getPath('userData'),
+    currentName: ACTIVE_BRAND.appName,
+    legacyName: ACTIVE_BRAND.legacyAppName,
+  });
+  if (migration.action === 'move') {
+    console.log(`[user-data] carried ${migration.from} over to ${migration.to}`);
+  } else if (migration.action === 'failed') {
+    console.error(`[user-data] could not carry ${migration.from} over to ${migration.to}: ${migration.error}`);
+  } else if (migration.action === 'none' && migration.code === 'current-holds-data') {
+    // Declining here is correct, but it leaves the previous install's data
+    // stranded where support will have to go looking for it.
+    console.warn(`[user-data] previous data left in place: ${migration.reason}`);
+  }
+}
 
 // Surface the real app version in the native "About" panel (macOS/Linux). Without
 // this, the panel falls back to app.getVersion(), which in dev reports the Electron
@@ -1219,6 +1252,10 @@ function loadFileTreeCache(): void {
 
 // Load cache early (before app.whenReady)
 loadFileTreeCache();
+
+// Skip Electron's default application menu setup cost. The app builds its
+// own menu via buildApplicationMenu() after app.whenReady().
+Menu.setApplicationMenu(null);
 
 // NOTE(victor): Protocol must be registered before app.whenReady() for proper handling
 const CUSTOM_PROTOCOL = 'workstation';
@@ -2258,7 +2295,6 @@ async function createWindow(options?: CreateWindowOptions): Promise<CreateWindow
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false, // Disable sandbox to allow ES module preload
-      webSecurity: false, // NOTE(victor): Disabled to allow file:// <-> http://localhost communication for oo-editors iframe on Windows
       // Use persist partition to ensure localStorage survives app restarts
       // This is CRITICAL for auth token persistence
       partition: WORKSTATION_PARTITION,
@@ -2510,7 +2546,7 @@ async function cleanup() {
     interpreterOverlayService = null;
     cleanupResults['interpreterOverlay'] = { success: true, timedOut: false };
   } catch (error) {
-    console.error('Error shutting down Interpreter Overlay:', error);
+    console.error('Error shutting down Hacienda Overlay:', error);
     cleanupResults['interpreterOverlay'] = { success: false, timedOut: false };
   }
 
@@ -2779,7 +2815,7 @@ app.whenReady().then(async () => {
     Sentry.captureException(error);
     await Sentry.flush(2000);
     dialog.showErrorBox(
-      'Interpreter',
+      'Hacienda',
       'The application failed to start.\n\nOur team has been notified. If this persists, please contact help@openinterpreter.com'
     );
     app.quit();

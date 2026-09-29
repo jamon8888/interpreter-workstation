@@ -241,7 +241,7 @@ type PresetKey =
 const PRESET_SCAFFOLDING: Record<PresetKey, ProfilePreset> = {
   hosted: {
     id: 'hosted',
-    title: 'Interpreter Models',
+    title: 'Hacienda Models',
     description: 'Access top models with no setup required.',
     icon: <InterpreterLogoMark fitSquare size={20} segmentClassName="bg-current" className="text-muted-foreground" />,
     group: 'recommended',
@@ -1274,9 +1274,11 @@ interface ProfileManagerProps {
   startInNewProfile?: boolean;
   /** Called when user saves a profile and wants to continue (onboarding mode only) */
   onSetDefaultAndContinue?: (profile: Profile) => void;
+  /** Show privacy hint on each profile row in compact mode */
+  showPrivacyHint?: boolean;
 }
 
-export function ProfileManager({ selectedProfileId: _selectedProfileId, onProfileSelect, onProfileUpdate, compact: _compact = false, compactActionLabel, getCompactActionLabel, compactFooterLabel, listClassName, currentModelConfig: _currentModelConfig, onNavigateToSettings, onboardingMode = false, startInNewProfile = false, onSetDefaultAndContinue }: ProfileManagerProps) {
+export function ProfileManager({ selectedProfileId: _selectedProfileId, onProfileSelect, onProfileUpdate, compact: _compact = false, compactActionLabel, getCompactActionLabel, compactFooterLabel, listClassName, currentModelConfig: _currentModelConfig, onNavigateToSettings, onboardingMode = false, startInNewProfile = false, onSetDefaultAndContinue, showPrivacyHint }: ProfileManagerProps) {
   "use no memo";
 
   const { t } = useTranslation();
@@ -1590,6 +1592,7 @@ export function ProfileManager({ selectedProfileId: _selectedProfileId, onProfil
           onProfileSelect(profile, true);
         }}
         onOpenSettings={onNavigateToSettings}
+        showPrivacyHint={showPrivacyHint}
       />
     );
   }

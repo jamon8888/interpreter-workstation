@@ -26,6 +26,7 @@ export function buildMacUpdateInstallScript(options: MacUpdateInstallScriptOptio
 set -euo pipefail
 PENDING_DIR=${quoteShell(options.updaterPendingDir)}
 APP_PATH=${quoteShell(appPath)}
+APP_NAME=${quoteShell(options.appName)}
 APP_BUNDLE_NAME=${quoteShell(appBundleName)}
 TEMP_DIR_ROOT=${quoteShell(tempDirRoot)}
 VERIFY_CODESIGN=${verifyCodeSignature ? '1' : '0'}
@@ -49,7 +50,7 @@ cleanup() {
 
 trap cleanup EXIT
 
-ZIP=$(ls -t "$PENDING_DIR"/Interpreter*.zip 2>/dev/null | head -n1) || exit 1
+ZIP=$(ls -t "$PENDING_DIR"/"$APP_NAME"*.zip 2>/dev/null | head -n1) || exit 1
 while kill -0 ${options.currentPid} 2>/dev/null; do sleep 0.1; done
 /usr/bin/ditto -xk "$ZIP" "$STAGING_DIR"
 STAGED_APP="$STAGING_DIR/$APP_BUNDLE_NAME"

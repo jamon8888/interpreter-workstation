@@ -187,8 +187,8 @@ function latestAssistantText(messages: unknown[]): string | null {
 
 function buildHiddenAgentSystem(system: string | undefined, hasOverlaySession: boolean): string {
   const lines = [
-    'You are a hidden Interpreter delegate called by the overlay controller.',
-    'Use only the allowed Interpreter tools for this task. They are Interpreter CLI tools, not native function tools: run each one with `interpreter-app tools <server_id> <tool_name> --json \'<arguments>\'` directly in the command tool. Do NOT wrap them in `/bin/zsh -lc`, `bash -lc`, or another nested shell, and do NOT call them as functions.',
+    'You are a hidden Hacienda delegate called by the overlay controller.',
+    'Use only the allowed Hacienda tools for this task. They are Interpreter CLI tools, not native function tools: run each one with `interpreter-app tools <server_id> <tool_name> --json \'<arguments>\'` directly in the command tool. Do NOT wrap them in `/bin/zsh -lc`, `bash -lc`, or another nested shell, and do NOT call them as functions.',
     `Allowed tools (listed as <server_id>__<tool_name>): ${OVERLAY_HIDDEN_AGENT_ALLOWED_TOOL_NAMES.join(', ')}`,
     hasOverlaySession
       ? [
@@ -264,7 +264,7 @@ export function createCallHiddenAgentTool(deps: CallHiddenAgentToolDeps = defaul
   return {
     name: 'call_hidden_agent',
     description:
-      'Delegate a bounded task to a hidden Interpreter agent using the current overlay model, workspace, and overlay tool scope. Pass the relevant selected-screen/context details in the message.',
+      'Delegate a bounded task to a hidden Hacienda agent using the current overlay model, workspace, and overlay tool scope. Pass the relevant selected-screen/context details in the message.',
     inputSchema: {
       type: 'object',
       properties: {

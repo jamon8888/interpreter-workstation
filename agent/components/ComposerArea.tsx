@@ -28,6 +28,7 @@ import {
 } from './ComposerArea.helpers';
 import { ContextPreview, calculateContextDiff, formatContextDiffForMessage, getLastSentContext, setLastSentContext, isContextEnabled } from './composer/ContextPreview';
 import { WorkspacePopover } from './composer/WorkspacePopover';
+import { resolveRuntimeModelProviderFromModelConfig } from './composer/SettingsPopover';
 import { QueuedMessagesDisplay } from './composer/QueuedMessagesDisplay';
 import { SuggestionChips } from './composer/SuggestionChips';
 import { ComposerSecondaryButton } from './composer/ComposerSecondaryButton';
@@ -54,6 +55,7 @@ import type { Profile } from '../../shared/types/profile';
 import type { MessageSendSource } from '../../shared/types/messageSendSource';
 import type { AgentModelConfig } from '../../shared/types/model';
 import {
+  DEFAULT_AMBIENT_TRIGGER_PHRASES,
   DEFAULT_STT_SETTINGS,
   getPrimaryAmbientPhrase,
   type SttBackend,
@@ -129,6 +131,8 @@ export interface ComposerAreaProps {
 
   // Agent mode props
   agentId?: string;
+  /** Codex thread id, forwarded so the composer can key its persisted map. */
+  threadId?: string | null;
   modelConfig?: AgentModelConfig;
   workspacePath?: string;
   isStreaming?: boolean;
@@ -265,7 +269,8 @@ function resolveManagedSttBackend(backend: SttBackend): SttBackend {
 export const ComposerArea = React.forwardRef<BaseTiptapComposerRef, ComposerAreaProps>(function ComposerArea({
   isTerminal,
   agentId,
-  modelConfig: _modelConfig, // Reserved for future use
+  threadId = null,
+  modelConfig,
   workspacePath,
   isStreaming = false,
   autoStartVoiceMode = false,
@@ -292,6 +297,9 @@ export const ComposerArea = React.forwardRef<BaseTiptapComposerRef, ComposerArea
   "use no memo";
 
   const { t, i18n } = useTranslation();
+  const modelProvider = modelConfig
+    ? resolveRuntimeModelProviderFromModelConfig(modelConfig)
+    : null;
   const layout = useContext(LayoutContext);
   const { showToast } = useToast();
   const marketingDemoMode = !isTerminal && isMarketingDemoMode();
@@ -457,6 +465,7 @@ export const ComposerArea = React.forwardRef<BaseTiptapComposerRef, ComposerArea
     setPreviewText: (text: string | null) => composerRef.current?.setPreviewText(text),
     getContent: () => composerRef.current?.getContent() ?? '',
     getSubmission: () => composerRef.current?.getSubmission() ?? EMPTY_COMPOSER_SUBMISSION,
+    getRehydrationMap: () => composerRef.current?.getRehydrationMap() ?? {},
     clearContent: () => composerRef.current?.clearContent(),
     setContentWithTokenFlash: (text: string, ranges: Array<{ start: number; end: number }>) => composerRef.current?.setContentWithTokenFlash(text, ranges),
   }), []);
@@ -1914,7 +1923,7 @@ export const ComposerArea = React.forwardRef<BaseTiptapComposerRef, ComposerArea
     try {
       const result = await interpreterOverlay.startWindowVoiceMode({ selectedText });
       if (!result.success) {
-        showToast(result.error ?? 'Could not start Interpreter Overlay voice mode.', 'error', 8000);
+        showToast(result.error ?? 'Could not start Hacienda Overlay voice mode.', 'error', 8000);
       } else {
         emitVoiceLatencyEvent('overlay-window-voice-started', {
           surface: 'main-composer',
@@ -1923,7 +1932,7 @@ export const ComposerArea = React.forwardRef<BaseTiptapComposerRef, ComposerArea
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      showToast(`Could not start Interpreter Overlay voice mode. ${message}`, 'error', 8000);
+      showToast(`Could not start Hacienda Overlay voice mode. ${message}`, 'error', 8000);
     } finally {
       if (isMountedRef.current) {
         setIsVoiceModeStarting(false);
@@ -1987,7 +1996,7 @@ export const ComposerArea = React.forwardRef<BaseTiptapComposerRef, ComposerArea
       let ambientPendingSendText = '';
       const ambientTriggerPhrases = sttSettingsRef.current.ambientTriggerPhrases;
       const ambientEndPhrases = sttSettingsRef.current.ambientEndPhrases;
-      const ambientPrimaryTriggerPhrase = getPrimaryAmbientPhrase(ambientTriggerPhrases, 'Interpreter');
+      const ambientPrimaryTriggerPhrase = getPrimaryAmbientPhrase(ambientTriggerPhrases, DEFAULT_AMBIENT_TRIGGER_PHRASES[0]);
       const ambientTriggerPattern = buildTolerantPhraseSetPattern(ambientTriggerPhrases);
       const ambientEndPattern = buildTolerantPhraseSetPattern(ambientEndPhrases);
       const logAmbientDecision = (
@@ -3479,7 +3488,7 @@ export const ComposerArea = React.forwardRef<BaseTiptapComposerRef, ComposerArea
       const pushToTalkModeLabel = t('settings.stt.voiceModePushToTalk');
       const ambientModeLabel = t('settings.stt.voiceModeAmbient');
       const ambientModeDescription = t('help.composer.voice.modeAmbientDescription', {
-        trigger: getPrimaryAmbientPhrase(sttSettingsForUi.ambientTriggerPhrases, 'Interpreter'),
+        trigger: getPrimaryAmbientPhrase(sttSettingsForUi.ambientTriggerPhrases, DEFAULT_AMBIENT_TRIGGER_PHRASES[0]),
         endPhrase: getPrimaryAmbientPhrase(sttSettingsForUi.ambientEndPhrases, 'make it so'),
       });
       const voiceModeMenuItems: HoverMenuItem[] = [
@@ -3663,8 +3672,8 @@ export const ComposerArea = React.forwardRef<BaseTiptapComposerRef, ComposerArea
                   ? 'text-amber-700 hover:text-amber-800 dark:text-amber-300 dark:hover:text-amber-200'
                   : ''
               }`}
-              aria-label={`Open Interpreter access settings. ${sandboxNotice.description}`}
-              data-help-title={`Interpreter access: ${sandboxNotice.label}`}
+              aria-label={`Open Hacienda access settings. ${sandboxNotice.description}`}
+              data-help-title={`Hacienda access: ${sandboxNotice.label}`}
               data-help-description={`Open access settings. ${sandboxNotice.description}`}
             >
               <span>{sandboxNotice.label}</span>
@@ -3714,7 +3723,7 @@ export const ComposerArea = React.forwardRef<BaseTiptapComposerRef, ComposerArea
       if (ambientPhase === 'accumulating') {
         return `Say "${getPrimaryAmbientPhrase(sttSettingsForUi.ambientEndPhrases, 'make it so')}" to send`;
       }
-      return `Say "${getPrimaryAmbientPhrase(sttSettingsForUi.ambientTriggerPhrases, 'Interpreter')}" to start`;
+      return `Say "${getPrimaryAmbientPhrase(sttSettingsForUi.ambientTriggerPhrases, DEFAULT_AMBIENT_TRIGGER_PHRASES[0])}" to start`;
     }
     return isVoiceWorking ? 'Recording' : 'Listening';
   })() : null;
@@ -3930,6 +3939,8 @@ export const ComposerArea = React.forwardRef<BaseTiptapComposerRef, ComposerArea
         renderSendButton={renderSendButton}
         settingsContent={settingsContent}
         skillsWorkspacePath={effectiveWorkspacePath ?? null}
+        modelProvider={modelProvider}
+        threadId={threadId}
       />
     </div>
   );

@@ -14,6 +14,7 @@ import { homedir } from 'node:os';
 import { ToolManager } from '../tools/toolManager';
 import { getAppMcpOwnerThreadId } from './appMcpThread';
 import { resolveHubBaseDirs } from '../utils/hubCache';
+import { resolveMinConfidence } from './piiConfidencePolicy';
 
 export interface PiiDetectionResult {
   category: string;
@@ -145,7 +146,7 @@ export function parseRedactTextResult(result: unknown): RedactTextResult {
 
 async function detectPii(
   text: string,
-  options?: { categories?: string[] },
+  options?: { categories?: string[]; minConfidence?: number },
 ): Promise<PiiDetectionResult[]> {
   const manager = new ToolManager();
   const raw = await manager.callTool(
@@ -158,9 +159,13 @@ async function detectPii(
     // detection silently degraded to the regex fallback on every send.
     { threadId: await getAppMcpOwnerThreadId() },
   );
-  // Confidence is filtered upstream by basemind (DEFAULT_MIN_CONFIDENCE);
-  // the Electron side passes detections through untouched.
-  return parseRedactTextResult(raw).detections;
+  const parsed = parseRedactTextResult(raw);
+  // Below-bar spans are dropped, not surfaced as a failure: this only narrows
+  // what a successful NER run reports. `shouldBlockAttachmentSend` is the
+  // fail-closed path, and it only fires when NER did not run at all.
+  return parsed.detections.filter(
+    (detection) => detection.confidence >= resolveMinConfidence(detection.category, options?.minConfidence),
+  );
 }
 
 /**

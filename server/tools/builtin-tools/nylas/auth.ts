@@ -178,6 +178,7 @@ export async function handleOAuthCallback(
     console.log('[Nylas OAuth] Successfully authenticated:', credentials.email);
   } catch (error) {
     console.error('[Nylas OAuth] Error handling callback:', error);
+    // eslint-disable-next-line preserve-caught-error
     throw new Error(`Failed to complete OAuth flow: ${error}`);
   }
 }

@@ -10,6 +10,8 @@ import { shouldBlockAttachmentSend } from '../../src/lib/pii/redaction';
 import { piiDetectionService } from '../services/piiDetection';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { wakeTokenValid } from '../utils/wakeSources';
+import { readyWakeSources, wakeSources } from '../utils/wakeSourcesRuntime';
 import { stat } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { getCustomInstructions, getLanguage } from '../configStore';
@@ -45,6 +47,7 @@ import {
   forkAgentTaskThread,
   resumeAgentTaskThread,
   startAgentTask,
+  resolveAgentModelConfig,
   type AgentTaskMode,
   type AgentTaskProgressEvent,
 } from '../agentTaskService';
@@ -93,6 +96,7 @@ import {
   type NormalizedStreamRequest,
 } from './agentStreamRequest';
 import { resolveLocalModelToolUseSupport } from '../handlers/providers';
+import { renameThread } from '../handlers/agentThreads';
 
 import { appendCustomInstructionsToPrompt } from '../utils/customInstructions';
 import { isReasoningEffort } from '../../shared/types/reasoning';
@@ -132,6 +136,72 @@ import {
 } from '../utils/threadHistoryPagination';
 
 const router = Router();
+
+function wakeMutationAllowed(req: Request): boolean {
+  const address = req.socket.remoteAddress;
+  if (!['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(address ?? '')) return false;
+  const origin = req.header('origin');
+  if (!origin) return true; // local CLI; remote hosts remain subject to workstationAccessMiddleware
+  try { return new URL(origin).host === req.get('host'); }
+  catch { return false; }
+}
+
+// Inbound producers know the explicit secret; a normal browser session never
+// receives it. This is not a public desktop or network ingress endpoint.
+router.post('/threads/:threadId/wake-events', async (req: Request, res: Response) => {
+  if (!wakeMutationAllowed(req) ||
+      !wakeTokenValid(process.env.WORKSTATION_WAKE_TOKEN, req.header('authorization')?.replace(/^Bearer /i, ''))) {
+    return res.status(401).json({ error: 'Authentication required.' });
+  }
+  try {
+    const { sourceId, eventId, message } = req.body ?? {};
+    await readyWakeSources();
+    await getCodexService().readThread(req.params.threadId);
+    const event = await wakeSources.ingest(req.params.threadId, sourceId, eventId, message);
+    res.status(202).json({ eventId: event.eventId, status: event.status });
+    void wakeSources.tick().catch(console.error);
+  } catch (error) {
+    res.status(400).json({ error: error instanceof Error ? error.message : 'Invalid event.' });
+  }
+});
+
+// Local operator diagnostic through the *existing* native client. Return only
+// bounded queue identifiers and status, never the queued input or transcript.
+router.get('/threads/:threadId/native-custody', async (req: Request, res: Response) => {
+  if (!wakeMutationAllowed(req) ||
+      !wakeTokenValid(process.env.WORKSTATION_WAKE_TOKEN, req.header('authorization')?.replace(/^Bearer /i, ''))) {
+    return res.status(401).json({ error: 'Authentication required.' });
+  }
+  if (!/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/.test(req.params.threadId)) {
+    return res.status(400).json({ error: 'Invalid thread ID.' });
+  }
+  try {
+    res.json(await getCodexService().readNativeCustody(req.params.threadId));
+  } catch {
+    res.status(503).json({ error: 'Native custody inspection unavailable.' });
+  }
+});
+
+router.get('/threads/:threadId/wake-sources', async (req: Request, res: Response) => {
+  try { await readyWakeSources(); res.json(wakeSources.list(req.params.threadId)); }
+  catch { res.status(503).json({ error: 'Wake sources unavailable.' }); }
+});
+
+router.put('/threads/:threadId/wake-sources/:sourceId', async (req: Request, res: Response) => {
+  if (!wakeMutationAllowed(req)) return res.status(403).json({ error: 'Local same-origin request required.' });
+  try {
+    await readyWakeSources();
+    await getCodexService().readThread(req.params.threadId);
+    const source = await wakeSources.put({ ...req.body, id: req.params.sourceId, threadId: req.params.threadId });
+    res.json({ source });
+  } catch (error) { res.status(400).json({ error: error instanceof Error ? error.message : 'Invalid source.' }); }
+});
+
+router.delete('/threads/:threadId/wake-sources/:sourceId', async (req: Request, res: Response) => {
+  if (!wakeMutationAllowed(req)) return res.status(403).json({ error: 'Local same-origin request required.' });
+  try { await readyWakeSources(); await wakeSources.cancel(req.params.threadId, req.params.sourceId); res.json({ ok: true }); }
+  catch (error) { res.status(400).json({ error: error instanceof Error ? error.message : 'Invalid source.' }); }
+});
 
 function isAgentTaskMode(value: unknown): value is AgentTaskMode {
   return value === 'headed' || value === 'headless';
@@ -268,6 +338,8 @@ router.post('/tasks', async (req: Request, res: Response) => {
       threadId,
       mode,
       modelConfig,
+      model,
+      reasoningEffort,
       runtimeConfig,
     } = parseProgrammaticTaskBody((req.body ?? {}) as Record<string, unknown>);
 
@@ -305,6 +377,10 @@ router.post('/tasks', async (req: Request, res: Response) => {
     }
 
     await applyProgrammaticTaskRuntimeConfigFromBody(runtimeConfig);
+    const resolvedModelConfig = await resolveAgentModelConfig(modelConfig, {
+      modelId: model,
+      reasoningEffort,
+    });
 
     const result = await startAgentTask({
       mode: 'headless',
@@ -313,7 +389,7 @@ router.post('/tasks', async (req: Request, res: Response) => {
       timeoutMs,
       idleTimeoutMs,
       workspace,
-      modelConfig,
+      modelConfig: resolvedModelConfig,
       threadId,
       notifyStarted: true,
     });
@@ -341,6 +417,8 @@ router.post('/tasks/stream', async (req: Request, res: Response) => {
     threadId,
     mode,
     modelConfig,
+    model,
+    reasoningEffort,
     runtimeConfig,
   } = parseProgrammaticTaskBody((req.body ?? {}) as Record<string, unknown>);
 
@@ -393,6 +471,10 @@ router.post('/tasks/stream', async (req: Request, res: Response) => {
 
   try {
     await applyProgrammaticTaskRuntimeConfigFromBody(runtimeConfig);
+    const resolvedModelConfig = await resolveAgentModelConfig(modelConfig, {
+      modelId: model,
+      reasoningEffort,
+    });
 
     const result = await startAgentTask({
       mode: 'headless',
@@ -401,7 +483,7 @@ router.post('/tasks/stream', async (req: Request, res: Response) => {
       timeoutMs,
       idleTimeoutMs,
       workspace,
-      modelConfig,
+      modelConfig: resolvedModelConfig,
       threadId,
       notifyStarted: true,
       onProgress: (progress) => {
@@ -583,6 +665,12 @@ export function parseProgrammaticTaskBody(body: Record<string, unknown>) {
   const modelConfig = body.modelConfig && typeof body.modelConfig === 'object'
     ? body.modelConfig as AgentModelConfig
     : undefined;
+  const model = typeof body.model === 'string' && body.model.trim()
+    ? body.model.trim()
+    : undefined;
+  const reasoningEffort = isReasoningEffort(body.reasoningEffort)
+    ? body.reasoningEffort
+    : undefined;
   const runtimeConfig = body.runtimeConfig && typeof body.runtimeConfig === 'object'
     ? body.runtimeConfig as Record<string, unknown>
     : undefined;
@@ -596,6 +684,8 @@ export function parseProgrammaticTaskBody(body: Record<string, unknown>) {
     threadId,
     mode,
     modelConfig,
+    model,
+    reasoningEffort,
     runtimeConfig,
   };
 }
@@ -752,6 +842,29 @@ router.get('/threads/:threadId', async (req: Request, res: Response) => {
   }
 });
 
+router.put('/threads/:threadId/name', async (req: Request, res: Response) => {
+  const threadId = req.params.threadId.trim();
+  if (!threadId) {
+    return res.status(400).json({ error: 'threadId is required.' });
+  }
+
+  const name = typeof req.body?.name === 'string' ? req.body.name : '';
+  if (!name.trim()) {
+    return res.status(400).json({ error: 'name is required.' });
+  }
+  if (name.trim().length > 200) {
+    return res.status(400).json({ error: 'name must be 200 characters or fewer.' });
+  }
+
+  try {
+    return res.json(await renameThread(threadId, name));
+  } catch (error) {
+    return res.status(500).json({
+      error: error instanceof Error ? error.message : 'Failed to rename thread.',
+    });
+  }
+});
+
 router.get('/threads/:threadId/goal', async (req: Request, res: Response) => {
   try {
     const goal = await getCodexService().getThreadGoal(req.params.threadId);
@@ -878,8 +991,6 @@ router.all('/groq-proxy/*', async (req: Request, res: Response) => {
 });
 
 router.post('/chat/stream', async (req: Request, res: Response) => {
-  let body: StreamRequestBody;
-  let request: NormalizedStreamRequest;
   let activeProfileProvider: string | null = null;
   let activeModelId: string | null = null;
   const streamStartedAt = Date.now();
@@ -887,8 +998,8 @@ router.post('/chat/stream', async (req: Request, res: Response) => {
   if (!validateStreamRequestBody(req.body)) {
     return res.status(400).json({ error: 'Invalid request body.' });
   }
-  body = req.body;
-  request = normalizeStreamRequestBody(body);
+  const body: StreamRequestBody = req.body;
+  const request: NormalizedStreamRequest = normalizeStreamRequestBody(body);
   console.log(
     `[AGENT] turn_start selection=${request.selection} profileId=${request.selection === 'stored-profile' ? request.profileId : 'none'} agentId=${request.agentId ?? 'none'} threadId=${request.threadId ?? 'new'} model=${request.model ?? 'default'} attachmentCount=${request.attachments.length} skillCount=${request.skills.length}`,
   );
@@ -1151,12 +1262,10 @@ router.post('/chat/stream', async (req: Request, res: Response) => {
 });
 
 router.post('/chat/stop', async (req: Request, res: Response) => {
-  let body: StopRequestBody;
-
   if (!validateStopRequestBody(req.body)) {
     return res.status(400).json({ error: 'threadId is required.' });
   }
-  body = req.body;
+  const body: StopRequestBody = req.body;
 
   try {
     await getCodexService().interrupt(body.threadId as string, body.turnId);
@@ -1169,12 +1278,10 @@ router.post('/chat/stop', async (req: Request, res: Response) => {
 });
 
 router.post('/chat/steer', async (req: Request, res: Response) => {
-  let body: SteerRequestBody;
-
   if (!validateSteerRequestBody(req.body)) {
     return res.status(400).json({ error: 'threadId, turnId, and message, attachments, or skills are required.' });
   }
-  body = req.body;
+  const body: SteerRequestBody = req.body;
 
   try {
     const turnId = await getCodexService().steer(body.threadId as string, {
@@ -1195,12 +1302,10 @@ router.post('/chat/steer', async (req: Request, res: Response) => {
 });
 
 router.post('/chat/background/stop', async (req: Request, res: Response) => {
-  let body: BackgroundTerminalStopRequestBody;
-
   if (!validateBackgroundTerminalStopRequestBody(req.body)) {
     return res.status(400).json({ error: 'threadId is required.' });
   }
-  body = req.body;
+  const body: BackgroundTerminalStopRequestBody = req.body;
 
   try {
     await getCodexService().cleanBackgroundTerminals(body.threadId as string);
@@ -1223,6 +1328,7 @@ router.get('/voice/moonshine-assets/*', async (req: Request, res: Response) => {
     return res.status(400).json({ error: 'Missing Moonshine asset path.' });
   }
 
+  // eslint-disable-next-line no-useless-assignment -- initial value needed for try/catch scope
   let decodedPath = '';
   try {
     decodedPath = decodeURIComponent(requestedPath);

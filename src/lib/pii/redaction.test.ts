@@ -1,6 +1,30 @@
 import { describe, expect, test } from 'bun:test';
 
-import { shouldBlockAttachmentSend } from './redaction';
+import { needsRedactionForProvider, shouldBlockAttachmentSend } from './redaction';
+
+describe('needsRedactionForProvider', () => {
+  test('only on-device local providers are trusted', () => {
+    expect(needsRedactionForProvider('local')).toBe(false);
+    expect(needsRedactionForProvider('LOCAL')).toBe(false);
+  });
+
+  test('mistral label requires redaction (covers local weights and remote API)', () => {
+    expect(needsRedactionForProvider('mistral')).toBe(true);
+    expect(needsRedactionForProvider('Mistral')).toBe(true);
+  });
+
+  test('api and hosted providers require redaction', () => {
+    expect(needsRedactionForProvider('api')).toBe(true);
+    expect(needsRedactionForProvider('hosted')).toBe(true);
+    expect(needsRedactionForProvider('openai-oauth')).toBe(true);
+  });
+
+  test('missing provider fails closed', () => {
+    expect(needsRedactionForProvider(null)).toBe(true);
+    expect(needsRedactionForProvider(undefined)).toBe(true);
+    expect(needsRedactionForProvider('')).toBe(true);
+  });
+});
 
 describe('shouldBlockAttachmentSend', () => {
   test('blocks attachment payloads when NER failed', () => {

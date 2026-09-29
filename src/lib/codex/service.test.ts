@@ -28,6 +28,56 @@ function createTurn(id: string, status: v2.TurnStatus = "inProgress"): v2.Turn {
   };
 }
 
+describe('native custody metadata', () => {
+  test('pages native queue through the existing client without returning input', async () => {
+    const fake = createFakeClient({});
+    const client = fake.client;
+    const requested: Array<string | null | undefined> = [];
+    client.threadQueueList = async ({ cursor }) => {
+      requested.push(cursor);
+      return cursor
+        ? { data: [{ id: 'queue_2', clientUserMessageId: 'message_2', input: [{ text: 'private-two' }] }], nextCursor: null }
+        : { data: [{ id: 'queue_1', clientUserMessageId: 'message_1', input: [{ text: 'private-one' }] }], nextCursor: '1' };
+    };
+    const result = await new CodexService(client).readNativeCustody('thr_new');
+    assert.deepEqual(requested, [null, '1']);
+    assert.equal(result.queuedSubmissionCount, 2);
+    assert.deepEqual(result.queuedSubmissions, [
+      { id: 'queue_1', clientUserMessageId: 'message_1' },
+      { id: 'queue_2', clientUserMessageId: 'message_2' },
+    ]);
+    assert.doesNotMatch(JSON.stringify(result), /private-one|private-two/);
+  });
+
+  test('fails closed on malformed or cyclic pagination', async () => {
+    const client = createFakeClient({}).client;
+    client.threadQueueList = async () => ({ data: [], nextCursor: '1' });
+    await assert.rejects(new CodexService(client).readNativeCustody('thr_new'), /cursor/);
+  });
+
+  test('fails closed when native queue inspection is unsupported', async () => {
+    const client = createFakeClient({}).client;
+    client.threadQueueList = async () => { throw new Error('experimental method unavailable'); };
+    await assert.rejects(new CodexService(client).readNativeCustody('thr_new'), /unavailable/);
+  });
+  test('reports native pending approval flags without transcript content', async () => {
+    const client = createFakeClient({}).client;
+    const read = client.threadRead.bind(client);
+    client.threadRead = async (params) => {
+      const result = await read(params);
+      return { thread: {
+        ...result.thread,
+        status: { type: 'active', activeFlags: ['waitingOnApproval'] },
+        turns: [{ ...createTurn('turn_1'), items: [] }],
+      } };
+    };
+    const result = await new CodexService(client).readNativeCustody('thr_new');
+    assert.equal(result.status, 'active');
+    assert.deepEqual(result.activeFlags, ['waitingOnApproval']);
+    assert.equal(result.lastTurnStatus, 'inProgress');
+  });
+});
+
 function createFakeClient(overrides: {
   startTurn?: (params: Parameters<CodexClient["startTurn"]>[0]) => Promise<v2.Turn>;
   steerTurn?: (params: Parameters<CodexClient["steerTurn"]>[0]) => Promise<v2.TurnSteerResponse>;
@@ -260,6 +310,9 @@ function createFakeClient(overrides: {
           turns: [],
         },
       };
+    },
+    async threadQueueList() {
+      return { data: [], nextCursor: null };
     },
     async threadSetName(params) {
       calls.threadSetNameParams.push(params);
@@ -825,6 +878,45 @@ describe("CodexService", () => {
     assert.equal(result.status, "completed");
   });
 
+  test("reconciles only an exact terminal persisted turn before resuming", async () => {
+    let startCount = 0;
+    const fake = createFakeClient({
+      startTurn: async () => createTurn(`turn_${++startCount}`),
+      threadRead: async () => ({ thread: {
+        id: "thr_existing", status: { type: "idle" },
+        turns: [createTurn("turn_1", "completed")],
+      } } as v2.ThreadReadResponse),
+    });
+    const service = new CodexService(fake.client);
+    void service.runTurn({ threadId: "thr_existing", message: "first", model: "test-model", onEvent: () => {} });
+    await waitFor(() => fake.calls.startTurn === 1);
+
+    const second = service.runTurn({ threadId: "thr_existing", message: "second", model: "test-model", onEvent: () => {} });
+    await waitFor(() => fake.calls.startTurn === 2);
+    fake.emit({ method: SERVER_METHOD.turnCompleted, params: {
+      threadId: "thr_existing", turn: createTurn("turn_2", "completed"),
+    } });
+    assert.equal((await second).status, "completed");
+    assert.equal(fake.calls.startTurn, 2);
+  });
+
+  test("retains the active guard when persisted turn identity does not match", async () => {
+    const fake = createFakeClient({
+      threadRead: async () => ({ thread: {
+        id: "thr_existing", status: { type: "idle" },
+        turns: [createTurn("different_turn", "completed")],
+      } } as v2.ThreadReadResponse),
+    });
+    const service = new CodexService(fake.client);
+    void service.runTurn({ threadId: "thr_existing", message: "first", model: "test-model", onEvent: () => {} });
+    await waitFor(() => fake.calls.startTurn === 1);
+    await assert.rejects(
+      service.runTurn({ threadId: "thr_existing", message: "second", model: "test-model", onEvent: () => {} }),
+      /already responding in this thread/,
+    );
+    assert.equal(fake.calls.startTurn, 1);
+  });
+
   test("rejects an overlapping turn while the first runtime turn is still starting", async () => {
     const pendingStart = deferred<v2.Turn>();
     const fake = createFakeClient({
@@ -1192,6 +1284,26 @@ describe("CodexService", () => {
     await run;
   });
 
+  test("wake admission starts only the exact existing thread and keeps its active-turn guard", async () => {
+    const fake = createFakeClient();
+    const service = new CodexService(fake.client);
+    assert.equal(await service.startExistingThreadTurn("thr_existing", "wake input", "/workspace"), "turn_1");
+    assert.equal(fake.calls.resumeThread, 1);
+    assert.equal(fake.calls.startThread, 0);
+    assert.equal(fake.calls.startTurn, 1);
+    assert.equal(fake.calls.resumeThreadModel[0], null);
+    await assert.rejects(service.startExistingThreadTurn("thr_existing", "duplicate"), /already responding/);
+    assert.equal(fake.calls.startTurn, 1);
+  });
+
+  test("wake admission never replaces a missing thread", async () => {
+    const fake = createFakeClient();
+    const service = new CodexService(fake.client);
+    await assert.rejects(service.startExistingThreadTurn("missing", "wake input"), /missing thread/);
+    assert.equal(fake.calls.startThread, 0);
+    assert.equal(fake.calls.startTurn, 0);
+  });
+
   test("rethrows non-stale resumeThread errors instead of starting a fresh thread", async () => {
     const fake = createFakeClient({
       async resumeThread() {
@@ -1272,13 +1384,13 @@ describe("CodexService", () => {
     const run = service.runTurn({
       message: "hello",
       model: "test-model",
-      baseInstructions: "You are Interpreter.",
+      baseInstructions: "You are Hacienda.",
       developerInstructions: "Use interpreter-specific behavior.",
       onEvent: () => {},
     });
 
     await waitFor(() => fake.calls.startTurn === 1);
-    assert.equal(fake.calls.startThreadBaseInstructions[0], "You are Interpreter.");
+    assert.equal(fake.calls.startThreadBaseInstructions[0], "You are Hacienda.");
     assert.equal(
       fake.calls.startThreadDeveloperInstructions[0],
       "Use interpreter-specific behavior.",
@@ -1525,13 +1637,13 @@ describe("CodexService", () => {
       threadId: "thr_existing",
       message: "hello",
       model: "test-model",
-      baseInstructions: "You are Interpreter.",
+      baseInstructions: "You are Hacienda.",
       developerInstructions: "Use interpreter-specific behavior.",
       onEvent: () => {},
     });
 
     await waitFor(() => fake.calls.startTurn === 1);
-    assert.equal(fake.calls.resumeThreadBaseInstructions[0], "You are Interpreter.");
+    assert.equal(fake.calls.resumeThreadBaseInstructions[0], "You are Hacienda.");
     assert.equal(
       fake.calls.resumeThreadDeveloperInstructions[0],
       "Use interpreter-specific behavior.",
@@ -1697,11 +1809,11 @@ describe("CodexService", () => {
 
     const profile: Profile = {
       id: "interpreter",
-      label: "Interpreter",
+      label: "Hacienda",
       modelProvider: "interpreter",
       providerConfig: {
         base_url: "https://example.com",
-        name: "Interpreter",
+        name: "Hacienda",
         requires_openai_auth: false,
       },
     };

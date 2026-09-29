@@ -14,6 +14,7 @@ interface ModelSelectorPopoverPanelProps {
   onClose?: () => void;
   closeButtonTestId?: string;
   children?: React.ReactNode;
+  showPrivacyHint?: boolean;
 }
 
 export function ModelSelectorPopoverPanel({
@@ -22,9 +23,11 @@ export function ModelSelectorPopoverPanel({
   onNavigateToSettings,
   compactActionLabel,
   getCompactActionLabel,
+  compactFooterLabel,
   onClose,
   closeButtonTestId,
   children,
+  showPrivacyHint,
 }: ModelSelectorPopoverPanelProps) {
   const { t } = useTranslation();
 
@@ -69,6 +72,8 @@ export function ModelSelectorPopoverPanel({
           compact={true}
           compactActionLabel={compactActionLabel}
           getCompactActionLabel={getCompactActionLabel}
+          compactFooterLabel={compactFooterLabel}
+          showPrivacyHint={showPrivacyHint}
         />
       </div>
       {children}

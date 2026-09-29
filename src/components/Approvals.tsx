@@ -127,7 +127,7 @@ export function Approvals({
 
       dismissToast(toastId);
       runtimeRestartToastIdRef.current = null;
-      showToast('Interpreter restarted. New changes have taken effect.', 'success', 5000);
+      showToast('Hacienda restarted. New changes have taken effect.', 'success', 5000);
     });
   }, [dismissToast, showToast]);
 
@@ -157,7 +157,7 @@ export function Approvals({
       approvalShownAtRef.current.delete(id);
 
       if (isRuntimeRestart) {
-        restartToastId = showToast('Interpreter is restarting the agent...', 'info');
+        restartToastId = showToast('Hacienda is restarting the agent...', 'info');
         runtimeRestartToastIdRef.current = restartToastId;
       }
 
@@ -177,7 +177,7 @@ export function Approvals({
         }
       }
       if (isRuntimeRestart) {
-        showToast('Interpreter could not restart. Try again.', 'error', 8000);
+        showToast('Hacienda could not restart. Try again.', 'error', 8000);
       }
       setError(err.message);
     }

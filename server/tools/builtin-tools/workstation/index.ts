@@ -1,7 +1,7 @@
 /**
- * Interpreter Server
+ * Hacienda Server
  *
- * Provides tools for querying and controlling the Interpreter UI.
+ * Provides tools for querying and controlling the Hacienda UI.
  * Tools use the workstationService for direct access to the Electron main process.
  */
 
@@ -12,6 +12,7 @@ import { setLayoutTool } from './setLayoutTool';
 import { getSelectionTool } from './getSelectionTool';
 import { closeTabTool } from './closeTabTool';
 import { refreshFileTool } from './refreshFileTool';
+import { wakeScheduleTool } from './wakeScheduleTool';
 import { settingsGetTool } from './settingsGetTool';
 import { settingsSetTool } from './settingsSetTool';
 import { usageGetTool } from './usageGetTool';
@@ -34,8 +35,8 @@ import { workspaceSearchTool } from './workspaceSearchTool';
 
 export const interpreterServerDefinition: BuiltinServerDefinition = {
   id: 'builtin-interpreter',
-  name: 'Interpreter',
-  description: 'Query and control the Interpreter app UI',
+  name: 'Hacienda',
+  description: 'Query and control the Hacienda app UI',
   isBuiltin: true,
   tools: [
     getContextTool,
@@ -44,6 +45,7 @@ export const interpreterServerDefinition: BuiltinServerDefinition = {
     getSelectionTool,
     closeTabTool,
     refreshFileTool,
+    wakeScheduleTool,
     showInFolderTool,
     vaultTool,
     settingsGetTool,

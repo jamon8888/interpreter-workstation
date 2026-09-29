@@ -98,6 +98,7 @@ function getCacheKey(modelId: TtsModelId, provider: TtsProvider): string {
 function getUserDataPath(): string {
   if (process.versions.electron) {
     // Lazy load electron so browser mode can still typecheck.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- sync Electron API in lazy-load guard
     const { app } = require('electron') as { app: { getPath(name: 'userData'): string } };
     return app.getPath('userData');
   }
@@ -323,8 +324,32 @@ function resolveArchiveEntry(baseDir: string, entryName: string): string {
   return destinationPath;
 }
 
+interface TarEntryStream {
+  on(event: 'end', listener: () => void): this;
+  on(event: 'error', listener: (error: Error) => void): this;
+  pipe(destination: NodeJS.WritableStream): NodeJS.WritableStream;
+  resume(): this;
+}
+
+interface TarEntryHeader {
+  name: string;
+  type: string;
+  mode?: number;
+}
+
+interface TarExtractEventHandlers {
+  on(
+    event: 'entry',
+    listener: (header: TarEntryHeader, stream: TarEntryStream, next: (error?: Error | null) => void) => void,
+  ): this;
+  on(event: 'finish', listener: () => void): this;
+  on(event: 'error', listener: (error: Error) => void): this;
+}
+
 async function extractTarBz2Archive(archivePath: string, destinationDir: string): Promise<void> {
-  const extract = tar.extract();
+  // tar-stream 3.2.1's Extract type inherits from streamx, which has no declarations,
+  // although the runtime exposes the event methods used by the extractor.
+  const extract = tar.extract() as ReturnType<typeof tar.extract> & TarExtractEventHandlers;
 
   const extractDone = new Promise<void>((resolvePromise, rejectPromise) => {
     extract.on('entry', (header, stream, next) => {
@@ -640,6 +665,7 @@ function resolveSherpaOnnxModulePath(): string {
     return cachedSherpaOnnxModulePath;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
+    // eslint-disable-next-line preserve-caught-error
     throw new Error(`Failed to resolve sherpa-onnx module path: ${message}`);
   }
 }

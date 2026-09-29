@@ -1,0 +1,17 @@
+# CONTEXT
+
+Ubiquitous language for the interpreter-workstation effort. Glossary only — no implementation details.
+
+## Glossary
+
+- **Production-ready (local)**: a packaged production-mode Linux build running on this machine with all must-verify features proven working. Not the release pipeline (signing, distribution, auto-update are a separate effort).
+- **Verified**: passing the automated smoke gate plus the manual UI checklist; never claimed from typechecking alone.
+- **Must-verify features**: basemind 0.29 integration, GDPR/xberg redaction pipeline, needle deferred routing, onboarding flow, provider/model management.
+- **Theater**: UI or progress reporting that claims work it does not perform (e.g. a download that downloads nothing). Never ships as production-ready.
+- **Resources-ready**: the app's `resourcesReady` markers (nerModel, embeddings, reranker). Open question whether these marker paths match where basemind actually provisions models — see the download-design ticket.
+- **Pseudonymization**: the whole reversible loop (detect → tokenize → send → persist → reveal). Never "redaction" alone.
+- **Redaction**: the forward step only: source text becomes `[LABEL_N]` tokens plus a rehydration map.
+- **Rehydration / reveal**: the reverse step: tokens back to originals through a vault-backed map.
+- **Rehydration map**: the token → original mapping produced by one redaction pass.
+- **Vault key**: the identifier of one encrypted rehydration-map blob in the vault (`doc-{sanitizedPath}` for document/extraction blobs, `thread-{threadKey}` for runtime conversation blobs). Never "docId" — a vault key is a blob location, not a document identity.
+- **Extraction**: the eager workspace-wide detection pass that runs when a folder is opened.

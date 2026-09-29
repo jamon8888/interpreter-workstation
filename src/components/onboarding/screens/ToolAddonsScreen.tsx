@@ -352,7 +352,7 @@ function getGitHubCliAuthSetupErrorMessage(error?: string): string {
   if (detail) {
     return detail;
   }
-  return 'GitHub CLI is not installed or not authenticated. Run "gh auth login" in a terminal, or set GH_TOKEN/GITHUB_TOKEN before starting Interpreter.';
+  return 'GitHub CLI is not installed or not authenticated. Run "gh auth login" in a terminal, or set GH_TOKEN/GITHUB_TOKEN before starting Hacienda.';
 }
 
 async function persistDiscoveredMcpSummary(discoveredMcps: DiscoveredMcp[]): Promise<void> {

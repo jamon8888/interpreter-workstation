@@ -1,7 +1,7 @@
-export { PII_COLORS, getPiiColor } from './colors';
+export { PII_COLORS, getPiiColor, getAllPiiCategories } from './colors';
 export { detectRegex } from './regex-detector';
 export type { PiiDetection } from './regex-detector';
-export { shouldBlockAttachmentSend } from './redaction';
+export { needsRedactionForProvider, shouldBlockAttachmentSend } from './redaction';
 export {
   buildPiiLabelAttributes,
   buildRedactedText,

@@ -23,6 +23,7 @@ import {
   PII_COLORS,
   noteRehydrationKey,
 } from '../lib/pii';
+import { PII_UNRESTORABLE_MARKER_KEY } from '@/lib/pii/labels';
 import { markdownToTiptap } from '../utils/markdown-parser';
 import { resolveLocalLinkTarget } from '../utils/localLinkDetection';
 import { shouldRefreshUnlinkedMentionCandidatesFromWorkspaceEvent } from '../utils/unlinkedMentionRefresh';
@@ -72,6 +73,24 @@ export interface TipTapViewerRef {
   setContentJSON: (json: Record<string, unknown>) => void;
 }
 
+export interface PiiViewerOptions {
+  /** Render PII labels: stored tokens (`view`) or live regex (`compose`). Omit to disable. */
+  mode?: 'view' | 'compose';
+  /** Vault document id used for explicit decrypt-to-reveal. Labels still render without it. */
+  docId?: string;
+}
+
+interface ActivePiiLabel {
+  category: string;
+  token: string;
+  from: number;
+  to: number;
+  rect: DOMRect;
+  original?: string;
+  error?: string;
+  revealing?: boolean;
+}
+
 interface TipTapViewerProps {
   content: Record<string, unknown>; // Tiptap JSON format
   className?: string;
@@ -79,6 +98,7 @@ interface TipTapViewerProps {
   placeholder?: string;
   onUpdate?: () => void;
   filePath?: string;
+  pii?: PiiViewerOptions;
   /** Resolve a raw image path (absolute or relative) to a displayable URL. */
   resolveImageSrc?: ResolveImageSrc;
   /** Return a container element for positioning the @ mention dropdown. */
@@ -179,6 +199,7 @@ export const TipTapViewer = forwardRef<TipTapViewerRef, TipTapViewerProps>(
     rehydrationMap = {},
     onToggleShowOriginals,
     onRehydrationChange,
+    pii: piiOptions,
   }, ref) {
   "use no memo";
   const { t } = useTranslation();
@@ -194,6 +215,28 @@ export const TipTapViewer = forwardRef<TipTapViewerRef, TipTapViewerProps>(
   const [ignoredUnlinkedMentionKeys, setIgnoredUnlinkedMentionKeys] = useState<Set<string>>(() => new Set());
   const ignoredUnlinkedMentionKeysRef = useRef<Set<string>>(new Set());
   const [activeUnlinkedMention, setActiveUnlinkedMention] = useState<ActiveUnlinkedMention | null>(null);
+  const piiPopoverRef = useRef<HTMLDivElement>(null);
+  const piiCloseTimerRef = useRef<number | null>(null);
+  const piiRevealRequestRef = useRef(0);
+  const [activePiiLabel, setActivePiiLabel] = useState<ActivePiiLabel | null>(null);
+  const activePiiLabelRef = useRef<ActivePiiLabel | null>(null);
+  useEffect(() => {
+    activePiiLabelRef.current = activePiiLabel;
+  }, [activePiiLabel]);
+
+  // The popover is positioned `fixed` from the rect captured when it opened, so
+  // any viewport change leaves it stranded beside unrelated content. The
+  // unlinked-mention popover resolves this the same way: dismiss it.
+  useEffect(() => {
+    if (!activePiiLabel) return;
+    const dismiss = () => setActivePiiLabel(null);
+    window.addEventListener('scroll', dismiss, true);
+    window.addEventListener('resize', dismiss);
+    return () => {
+      window.removeEventListener('scroll', dismiss, true);
+      window.removeEventListener('resize', dismiss);
+    };
+  }, [activePiiLabel]);
 
   const getUnlinkedMentionCandidates = useCallback(() => unlinkedMentionCandidatesRef.current, []);
   const getIgnoredUnlinkedMentionKeys = useCallback(() => ignoredUnlinkedMentionKeysRef.current, []);
@@ -220,6 +263,13 @@ export const TipTapViewer = forwardRef<TipTapViewerRef, TipTapViewerProps>(
       getIgnoredKeys: getIgnoredUnlinkedMentionKeys,
     });
   }, [editable, filePath, getIgnoredUnlinkedMentionKeys, getUnlinkedMentionCandidates]);
+
+  const piiExtension = useMemo(() => {
+    if (!piiOptions?.mode) {
+      return undefined;
+    }
+    return PiiLabel.configure({ mode: piiOptions.mode });
+  }, [piiOptions?.mode]);
 
   const viewer = useEditor({
     extensions: [
@@ -266,6 +316,7 @@ export const TipTapViewer = forwardRef<TipTapViewerRef, TipTapViewerProps>(
       Wikilink,
       WikilinkAutocomplete,
       ...(unlinkedMentionExtension ? [unlinkedMentionExtension] : []),
+      ...(piiExtension ? [piiExtension] : []),
       Table.configure({
         resizable: true,
         HTMLAttributes: {
@@ -294,6 +345,15 @@ export const TipTapViewer = forwardRef<TipTapViewerRef, TipTapViewerProps>(
       },
       handleClick: (_view, _pos, event) => {
         const target = event.target as HTMLElement;
+
+        // PII labels: open the transient reveal popover. The document is never
+        // rewritten; revealing happens only through an explicit vault decrypt.
+        const piiLabel = target.closest('[data-pii-label="true"]') as HTMLElement | null;
+        if (piiLabel) {
+          event.preventDefault();
+          openPiiLabelFromElement(piiLabel);
+          return true;
+        }
 
         // Wikilinks: dispatch wikilink:open so the workspace resolver can open the target.
         const wikilink = target.closest('[data-wikilink]') as HTMLElement | null;
@@ -474,6 +534,115 @@ export const TipTapViewer = forwardRef<TipTapViewerRef, TipTapViewerProps>(
       unlinkedMentionCloseTimerRef.current = null;
     }, UNLINKED_MENTION_CLOSE_DELAY_MS);
   }, [clearUnlinkedMentionCloseTimer]);
+
+  const clearPiiCloseTimer = useCallback(() => {
+    if (piiCloseTimerRef.current !== null) {
+      window.clearTimeout(piiCloseTimerRef.current);
+      piiCloseTimerRef.current = null;
+    }
+  }, []);
+
+  const openPiiLabelPopover = useCallback((label: Omit<ActivePiiLabel, 'original' | 'error' | 'revealing'>) => {
+    clearPiiCloseTimer();
+    setActivePiiLabel(label);
+  }, [clearPiiCloseTimer]);
+
+  // The decoration is rendered with role="button" and tabindex="0", and its
+  // aria-label says "Activate to reveal". Only click opened it, so Enter and
+  // Space did nothing for keyboard and screen-reader users.
+  const openPiiLabelFromElement = useCallback((label: HTMLElement) => {
+    const from = Number(label.getAttribute('data-from'));
+    const to = Number(label.getAttribute('data-to'));
+    openPiiLabelPopover({
+      category: label.getAttribute('data-pii-category') ?? 'unknown',
+      token: label.getAttribute('data-pii-token') ?? label.textContent ?? '',
+      from: Number.isFinite(from) ? from : 0,
+      to: Number.isFinite(to) ? to : 0,
+      rect: label.getBoundingClientRect(),
+    });
+  }, [openPiiLabelPopover]);
+
+  const scheduleClosePiiPopover = useCallback((relatedTarget?: EventTarget | null) => {
+    if (relatedTarget instanceof Node) {
+      if (
+        piiPopoverRef.current?.contains(relatedTarget)
+        || (relatedTarget instanceof HTMLElement && relatedTarget.closest('[data-pii-label="true"]'))
+      ) {
+        return;
+      }
+    }
+
+    clearPiiCloseTimer();
+    piiCloseTimerRef.current = window.setTimeout(() => {
+      setActivePiiLabel(null);
+      piiCloseTimerRef.current = null;
+    }, UNLINKED_MENTION_CLOSE_DELAY_MS);
+  }, [clearPiiCloseTimer]);
+
+  const handleRevealPiiLabel = useCallback(async () => {
+    const active = activePiiLabelRef.current;
+    const docId = piiOptions?.docId;
+    if (!active || !docId) {
+      return;
+    }
+
+    // A reveal outlives the popover that started it: the passphrase prompt and
+    // the vault decrypt are both awaited, and during them the user can close
+    // the popover, focus a different label, or switch files. Writing the
+    // captured label back would put a decrypted value on screen in a context
+    // the user is no longer looking at. Every update below is dropped unless it
+    // is still the newest reveal and the popover still shows the same token.
+    const requestId = piiRevealRequestRef.current + 1;
+    piiRevealRequestRef.current = requestId;
+    const applyIfCurrent = (next: ActivePiiLabel) => {
+      if (piiRevealRequestRef.current !== requestId) return;
+      setActivePiiLabel((current) => (
+        current && current.token === active.token && current.from === active.from
+          ? next
+          : current
+      ));
+    };
+
+    applyIfCurrent({ ...active, revealing: true, error: undefined });
+    try {
+      const map = await pii.decryptRehydration(docId);
+      const original = map[active.token];
+      if (!original) {
+        applyIfCurrent({ ...active, revealing: false, error: t(PII_UNRESTORABLE_MARKER_KEY) });
+        return;
+      }
+      applyIfCurrent({ ...active, revealing: false, original });
+      // Audit only a successful reveal — a failed decrypt or an unrestorable
+      // token never exposed anything, so there is nothing to hold accountable.
+      // Fire-and-forget: a logging failure must not surface as a reveal error,
+      // and the popover has already shown the value regardless of this call.
+      void pii.recordReveal({
+        scope: docId,
+        scopeType: 'document',
+        token: active.token,
+        category: active.category,
+        surface: 'viewer',
+      }).catch(() => {});
+    } catch (error) {
+      applyIfCurrent({
+        ...active,
+        revealing: false,
+        error: error instanceof Error ? error.message : 'Reveal failed.',
+      });
+    }
+  }, [piiOptions?.docId]);
+
+  useEffect(() => {
+    // Also invalidates any reveal still in flight for the previous document.
+    piiRevealRequestRef.current += 1;
+    setActivePiiLabel(null);
+  }, [filePath]);
+
+  useEffect(() => () => {
+    if (piiCloseTimerRef.current !== null) {
+      window.clearTimeout(piiCloseTimerRef.current);
+    }
+  }, []);
 
   // Search function to find all matches of a query
   const searchText = useCallback((query: string): SearchMatch[] => {
@@ -666,6 +835,17 @@ export const TipTapViewer = forwardRef<TipTapViewerRef, TipTapViewerProps>(
     };
 
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        const target = event.target;
+        const piiLabel = target instanceof HTMLElement
+          ? target.closest('[data-pii-label="true"]')
+          : null;
+        if (piiLabel instanceof HTMLElement) {
+          event.preventDefault();
+          openPiiLabelFromElement(piiLabel);
+          return;
+        }
+      }
       if (event.key === 'Escape') {
         clearUnlinkedMentionCloseTimer();
         setActiveUnlinkedMention(null);
@@ -698,6 +878,7 @@ export const TipTapViewer = forwardRef<TipTapViewerRef, TipTapViewerProps>(
   }, [
     clearUnlinkedMentionCloseTimer,
     editable,
+    openPiiLabelFromElement,
     filePath,
     openUnlinkedMentionPopover,
     scheduleCloseUnlinkedMentionPopover,
@@ -1042,6 +1223,57 @@ export const TipTapViewer = forwardRef<TipTapViewerRef, TipTapViewerProps>(
               {t('editors.tipOpenNote')}
             </button>
           </div>
+        </div>
+      ) : null}
+      {activePiiLabel ? (
+        <div
+          ref={piiPopoverRef}
+          className="rounded-[14px] px-3 py-2 shadow-[var(--oa-shadow-md)]"
+          style={{
+            position: 'fixed',
+            width: `${UNLINKED_MENTION_POPOVER_WIDTH}px`,
+            ...getUnlinkedMentionPopoverPosition(activePiiLabel.rect),
+            border: 'var(--border-width) solid color-mix(in srgb, var(--oa-border) 82%, transparent)',
+            background: 'color-mix(in srgb, var(--oa-bg-app) 94%, white)',
+            zIndex: 80,
+          }}
+          onMouseEnter={clearPiiCloseTimer}
+          onMouseLeave={(event) => scheduleClosePiiPopover(event.relatedTarget)}
+        >
+          <p className="text-ui-sm text-[var(--oa-text)]">
+            Redacted <span className="font-medium">{activePiiLabel.category}</span>
+          </p>
+          <p className="pt-1 font-mono text-ui-xs text-[var(--oa-text-muted)]">
+            {activePiiLabel.token}
+          </p>
+          {activePiiLabel.original ? (
+            <p className="pt-2 text-ui-sm text-[var(--oa-text)]">
+              Original: <span className="font-medium">{activePiiLabel.original}</span>
+            </p>
+          ) : null}
+          {activePiiLabel.error ? (
+            <p className="pt-2 text-ui-xs text-[var(--oa-danger)]">
+              {activePiiLabel.error}
+            </p>
+          ) : null}
+          {!activePiiLabel.original ? (
+            <div className="flex items-center gap-2 pt-3">
+              <Button
+                type="button"
+                size="sm"
+                className="h-7 px-2.5 text-ui-sm"
+                disabled={activePiiLabel.revealing || !piiOptions?.docId}
+                onClick={() => void handleRevealPiiLabel()}
+              >
+                {activePiiLabel.revealing ? 'Revealing…' : 'Reveal'}
+              </Button>
+              {!piiOptions?.docId ? (
+                <span className="text-ui-xs text-[var(--oa-text-muted)]">
+                  No vault entry linked for this document.
+                </span>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       ) : null}
     </div>

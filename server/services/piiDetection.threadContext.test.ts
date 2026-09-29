@@ -110,3 +110,41 @@ describe('ner_model_dir wiring (GLiNER2 spec #37)', () => {
     }
   });
 });
+
+describe('detectPii confidence policy', () => {
+  test('drops spans below their category bar by default, keeps the rest', async () => {
+    nextDetections = [
+      // Below the medium name bar (0.6): dropped by default.
+      { category: 'person_full_name', start: 0, end: 8, text: 'Jane Doe', confidence: 0.55 },
+      // Below the strict IBAN bar (0.85) but above the global default:
+      // dropped by default, since regex already nets IBANs.
+      { category: 'iban', start: 14, end: 33, text: 'FR7630006000011234567890189', confidence: 0.7 },
+      // Above the global default (0.5), no category override: kept.
+      { category: 'email', start: 38, end: 54, text: 'jane@example.com', confidence: 0.55 },
+    ];
+    const { piiDetectionService } = await import('./piiDetection');
+    const detections = await piiDetectionService.detectPii(
+      'Jane Doe sent FR7630006000011234567890189 to jane@example.com',
+    );
+
+    expect(detections.map((d) => d.category)).toEqual(['email']);
+  });
+
+  test('an explicit minConfidence overrides the policy for every category', async () => {
+    nextDetections = [
+      { category: 'person_full_name', start: 0, end: 8, text: 'Jane Doe', confidence: 0.55 },
+      { category: 'iban', start: 14, end: 33, text: 'FR7630006000011234567890189', confidence: 0.7 },
+      { category: 'email', start: 38, end: 54, text: 'jane@example.com', confidence: 0.55 },
+    ];
+    const { piiDetectionService } = await import('./piiDetection');
+
+    // 0 accepts everything the tool returned, including the two spans the
+    // default policy would have dropped.
+    const permissive = await piiDetectionService.detectPii('text', { minConfidence: 0 });
+    expect(permissive).toHaveLength(3);
+
+    // 0.9 is stricter than even the IBAN/credit-card bar, so nothing survives.
+    const strict = await piiDetectionService.detectPii('text', { minConfidence: 0.9 });
+    expect(strict).toHaveLength(0);
+  });
+});

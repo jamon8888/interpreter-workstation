@@ -9,6 +9,7 @@ import {
   clearRuntimeRehydrationMaps,
   deleteRuntimeRehydrationMap,
   getRuntimeRehydrationMap,
+  isFileReadTool,
   maybeRedactOutboundText,
   maybeRedactToolResult,
 } from './runtimeRedaction';
@@ -35,6 +36,30 @@ const stubDeps = {
   isNerReady: () => false,
   detectNer: async (_text: string): Promise<never[]> => [],
 };
+
+describe('isFileReadTool', () => {
+  test('matches builtin tools with read fileAccess', () => {
+    expect(isFileReadTool('builtin-workspace', 'read_file', {
+      fileAccess: { mode: 'read', pathArg: 'path' },
+    } as never)).toBe(true);
+  });
+
+  test('exempts the permission-test stub server (verbatim E2E output)', () => {
+    expect(isFileReadTool('builtin-test-filesystem', 'read_file', {
+      fileAccess: { mode: 'read', pathArg: 'path' },
+    } as never)).toBe(false);
+  });
+
+  test('matches upstream builtin-fs read_file by name', () => {
+    expect(isFileReadTool('builtin-fs', 'read_file')).toBe(true);
+  });
+
+  test('ignores write and delete tools', () => {
+    expect(isFileReadTool('builtin-fs', 'write_file')).toBe(false);
+    expect(isFileReadTool('builtin-fs', 'delete_file')).toBe(false);
+    expect(isFileReadTool('builtin-fs', 'list_directory')).toBe(false);
+  });
+});
 
 describe('applyFileReadRedaction', () => {
   test('redacts PII in MCP text content to tokens only', async () => {
@@ -239,20 +264,51 @@ describe('maybeRedactToolResult', () => {
     expect(text).not.toContain(PROBE_EMAIL);
   });
 
-  test('redacts non-read tool results when armed (spec §7 all tool results)', async () => {
+  test('redacts file reads on untrusted providers', async () => {
     clearRuntimeRehydrationMaps();
     const result = await maybeRedactToolResult(
       {
         serverId: 'builtin-fs',
-        toolName: 'write_file',
+        toolName: 'read_file',
         result: { content: [{ type: 'text', text: `mail ${PROBE_EMAIL}` }] },
-        workspacePath: workspace(true),
-        threadKey: 'thread-9',
+        modelConfig: { provider: 'api', modelId: 'gpt-4o' } as never,
+        threadKey: 'thread-10',
       },
       stubDeps,
     );
     const text = (result as { content: Array<{ text: string }> }).content[0].text;
     expect(text).not.toContain(PROBE_EMAIL);
+  });
+
+  test('passes file reads through on trusted providers', async () => {
+    const raw = { content: [{ type: 'text', text: `mail ${PROBE_EMAIL}` }] };
+    const result = await maybeRedactToolResult(
+      {
+        serverId: 'builtin-fs',
+        toolName: 'read_file',
+        result: raw,
+        modelConfig: { provider: 'local', modelId: 'mistral-nemo:12b' } as never,
+        threadKey: 'thread-11',
+      },
+      stubDeps,
+    );
+    expect(result).toBe(raw);
+  });
+
+  test('ignores non-read tools', async () => {
+    const raw = { content: [{ type: 'text', text: `mail ${PROBE_EMAIL}` }] };
+    const result = await maybeRedactToolResult(
+      {
+        serverId: 'builtin-fs',
+        toolName: 'write_file',
+        result: raw,
+        modelConfig: { provider: 'api', modelId: 'gpt-4o' } as never,
+        workspacePath: workspace(true),
+        threadKey: 'thread-9',
+      },
+      stubDeps,
+    );
+    expect(result).toBe(raw);
   });
 
   test('exempts the permission-test stub server (verbatim E2E output)', async () => {

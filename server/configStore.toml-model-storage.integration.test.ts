@@ -63,7 +63,9 @@ async function restoreFile(filePath: string, content: string | null) {
 
   try {
     await unlink(filePath);
-  } catch {}
+  } catch {
+    // intentionally empty
+  }
 }
 
 async function backupConfig() {
@@ -80,7 +82,9 @@ async function restoreConfig() {
 async function writeLegacyConfig(content: string) {
   try {
     await unlink(CONFIG_FILE);
-  } catch {}
+  } catch {
+    // intentionally empty
+  }
 
   await mkdir(LEGACY_CONFIG_DIR, { recursive: true });
   await writeFile(LEGACY_CONFIG_FILE, content, 'utf-8');

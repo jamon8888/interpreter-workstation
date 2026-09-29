@@ -16,6 +16,7 @@ export interface PiiLabelStorage {
   rehydrationMap: Record<string, string>;
   /** Injected by the viewer from basemind.pii.tokenAriaLabel. */
   tokenAriaLabel?: (categoryLabel: string) => string;
+  refresh: () => void;
 }
 
 export interface PiiSpan {
@@ -90,6 +91,7 @@ function scanRange(
   state: { doc: { nodesBetween: ProseMirrorNode['nodesBetween'] } },
   from: number,
   to: number,
+  mode: PiiLabelMode,
   storage: PiiLabelStorage,
 ): InstanceType<typeof Decoration>[] {
   const decorations: InstanceType<typeof Decoration>[] = [];
@@ -99,7 +101,7 @@ function scanRange(
     if (node.marks.some((mark) => mark.type.name === 'link' || mark.type.name === 'code')) {
       return true;
     }
-    for (const span of piiSpansForText(node.text, storage.mode)) {
+    for (const span of piiSpansForText(node.text, mode)) {
       const range = { from: pos + span.from, to: pos + span.to };
       decorations.push(...decorationsForSpan(span, range, storage));
     }
@@ -120,17 +122,23 @@ export const PiiLabel = Extension.create<PiiLabelOptions>({
       mode: 'compose',
       showOriginals: true,
       rehydrationMap: {},
+      refresh: () => {},
     };
   },
 
   addDecorations() {
     return {
+      update: 'changedRanges',
       create: ({ state }) => {
         const storage = this.storage as PiiLabelStorage;
-        return scanRange(state, 0, state.doc.content.size, storage);
+        return scanRange(state, 0, state.doc.content.size, this.options.mode, storage);
       },
       // Storage edits (Show Originals / mode) do not change the doc; force a
       // rebuild via editor.commands.updateDecorations('piiLabel').
+      createInRange: ({ state, from, to }) => {
+        const storage = this.storage as PiiLabelStorage;
+        return scanRange(state, from, to, this.options.mode, storage);
+      },
     };
   },
 });

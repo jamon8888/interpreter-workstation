@@ -41,6 +41,7 @@ export async function fetchWithTimeout(
     return response;
   } catch (error: any) {
     if (error.name === 'AbortError') {
+      // eslint-disable-next-line preserve-caught-error
       throw new Error(`Request timed out after ${timeoutMs / 1000} seconds`);
     }
     throw error;
@@ -116,6 +117,7 @@ export async function saveNylasCredentials(credentials: NylasCredentials): Promi
     );
   } catch (error) {
     console.error('Error saving Nylas credentials:', error);
+    // eslint-disable-next-line preserve-caught-error
     throw new Error(`Failed to save Nylas credentials: ${error}`);
   }
 }
@@ -130,6 +132,7 @@ export async function deleteNylasCredentials(): Promise<void> {
     // Don't throw error if file doesn't exist
     if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
       console.error('Error deleting Nylas credentials:', error);
+      // eslint-disable-next-line preserve-caught-error
       throw new Error(`Failed to delete Nylas credentials: ${error}`);
     }
   }
@@ -215,6 +218,7 @@ export async function refreshAccessToken(): Promise<string> {
     return tokenData.access_token;
   } catch (error) {
     console.error('Error refreshing access token:', error);
+    // eslint-disable-next-line preserve-caught-error
     throw new Error(`Failed to refresh Nylas access token: ${error}`);
   }
 }

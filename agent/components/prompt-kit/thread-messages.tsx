@@ -27,6 +27,7 @@ import {
   type DetachedToolCall,
 } from './tool-fallback';
 import { Markdown } from './markdown';
+import { PiiRehydrationProvider } from './PiiTokenContext';
 import { TextShimmer } from './text-shimmer';
 import { ThreadErrorWithLayout } from './thread-error-display';
 import {
@@ -1989,6 +1990,9 @@ export const ThreadMessages: FC<ThreadMessagesProps> = ({
   });
 
   return (
+    // One provider for the whole thread, not one per bubble: the thread's
+    // rehydration map is decrypted once and cached behind it.
+    <PiiRehydrationProvider threadId={activeThreadId ?? null}>
     <StickyUserMessageContext.Provider value={contextValue}>
       <div ref={wrapperRef} className="flex-1 flex flex-col min-h-0 overflow-hidden">
         <ChatContainerRoot
@@ -2193,5 +2197,6 @@ export const ThreadMessages: FC<ThreadMessagesProps> = ({
         </ChatContainerRoot>
       </div>
     </StickyUserMessageContext.Provider>
+    </PiiRehydrationProvider>
   );
 };

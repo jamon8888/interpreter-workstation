@@ -16,9 +16,11 @@ type SupportedRemoteProvider = 'anthropic' | 'openai' | 'groq' | 'openrouter';
 
 const MODELS_DEV_URL = 'https://models.dev/api.json';
 const OUTPUT_PATH = new URL('../shared/generated/modelCatalog.ts', import.meta.url);
+// The ids are the hosted API's model identifiers and are not ours to rename;
+// only the display names follow the product.
 const INTERPRETER_MODEL_OPTIONS = [
-  { id: 'interpreter-smart', name: 'Interpreter Smart' },
-  { id: 'interpreter-fast', name: 'Interpreter Fast' },
+  { id: 'interpreter-smart', name: 'Hacienda Smart' },
+  { id: 'interpreter-fast', name: 'Hacienda Fast' },
 ];
 const REMOTE_PROVIDERS: readonly SupportedRemoteProvider[] = ['anthropic', 'openai', 'groq', 'openrouter'];
 

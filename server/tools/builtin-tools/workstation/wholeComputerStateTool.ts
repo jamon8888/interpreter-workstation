@@ -245,7 +245,7 @@ async function getBoundedBrowserControlState(input: {
 export const wholeComputerStateGetTool: BuiltinToolDefinition = {
   name: 'interpreter_whole_computer_state_get',
   description:
-    'Read bounded local Interpreter whole-computer state: known Interpreter windows, registered agent-window metadata, and browser-control profile/window/tab inventory. This read-only tool never returns caller tokens, prompts, full messages, attachments, or API keys.',
+    'Read bounded local Hacienda whole-computer state: known Hacienda windows, registered agent-window metadata, and browser-control profile/window/tab inventory. This read-only tool never returns caller tokens, prompts, full messages, attachments, or API keys.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -255,11 +255,11 @@ export const wholeComputerStateGetTool: BuiltinToolDefinition = {
       },
       window_session_key: {
         type: ['string', 'null'],
-        description: 'Optional exact Interpreter window session key filter.',
+        description: 'Optional exact Hacienda window session key filter.',
       },
       max_windows: {
         type: 'number',
-        description: 'Maximum number of Interpreter and agent windows to return, capped at 100.',
+        description: 'Maximum number of Hacienda and agent windows to return, capped at 100.',
       },
       max_browser_tabs: {
         type: 'number',
@@ -361,7 +361,7 @@ export const wholeComputerStateGetTool: BuiltinToolDefinition = {
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
       return {
-        content: [{ type: 'text', text: `Failed to read Interpreter whole-computer state: ${message}` }],
+        content: [{ type: 'text', text: `Failed to read Hacienda whole-computer state: ${message}` }],
         isError: true,
       };
     }

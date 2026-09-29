@@ -20,6 +20,11 @@ import { createSkillMentionSuggestion, setSkillItemRegistry, getSkillItemById } 
 import type { SkillMentionDropdownData, SkillMentionItem } from './mention/SkillMentionDropdown';
 import { ToolKeywordHighlight } from './ToolKeywordHighlight';
 import { VoiceDiffMark } from './VoiceDiffMark';
+import { PiiLabel } from '../../../src/extensions/PiiLabel';
+import { detectRegex } from '../../../src/lib/pii/regex-detector';
+import { shouldBlockAttachmentSend } from '../../../src/lib/pii/redaction';
+import { buildRedactedText, mergeDetections } from '../../../src/lib/pii/labels';
+import { pii as piiIpc } from '@/ipc';
 import { parseDragData, isFileDragData, isBrowserTabDragData } from '../../../shared/types/drag';
 import { MAIN_COMPOSER_INPUT_ID, MAIN_COMPOSER_SEND_BUTTON_ID } from '../../../shared/element-ids';
 import { humanizeSkillName } from '../../../shared/utils/skillDisplay';
@@ -35,6 +40,7 @@ import { resolveProfileShortcutSlot } from './profileShortcut';
 import type { FocusComposerDetail } from '../../utils/focusComposer';
 import { AttachmentChip } from './attachment/AttachmentChipExtension';
 import { AttachmentPreviewPopover } from './attachment/AttachmentPreviewPopover';
+import { FileRedactionNotice } from './FileRedactionNotice';
 import { createAttachmentStore, type AttachmentStore } from './attachment/attachmentStore';
 import { serializeEditorWithAttachments } from './attachment/serialize';
 import {
@@ -423,6 +429,7 @@ export interface BaseTiptapComposerRef {
   setPreviewText: (text: string | null) => void;
   getContent: () => string;
   getSubmission: () => SerializedComposerSubmission;
+  getRehydrationMap: () => Record<string, string>;
   clearContent: () => void;
 }
 
@@ -455,6 +462,29 @@ interface BaseTiptapComposerProps {
   highlightToolKeywords?: boolean;
   disableSkillMentions?: boolean;
   skillsWorkspacePath?: string | null;
+  modelProvider?: string | null;
+  /**
+   * Codex thread id, used to key this thread's persisted rehydration map.
+   * Null until the first turn assigns one; the map accumulates and the next
+   * send persists everything, so turn one is recovered rather than lost.
+   */
+  threadId?: string | null;
+}
+
+/** True when the doc stages file context: attachment chips or file mentions. */
+function docHasAttachments(editor: Editor): boolean {
+  let found = false;
+  editor.state.doc.descendants((descendantNode) => {
+    if (
+      descendantNode.type.name === 'attachmentChip'
+      || descendantNode.type.name === 'fileMention'
+    ) {
+      found = true;
+      return false;
+    }
+    return true;
+  });
+  return found;
 }
 
 export const BaseTiptapComposer = forwardRef<BaseTiptapComposerRef, BaseTiptapComposerProps>(
@@ -484,6 +514,8 @@ export const BaseTiptapComposer = forwardRef<BaseTiptapComposerRef, BaseTiptapCo
     highlightToolKeywords = false,
     disableSkillMentions = false,
     skillsWorkspacePath,
+    modelProvider = null,
+    threadId = null,
   }, ref) => {
   "use no memo";
 
@@ -492,12 +524,34 @@ export const BaseTiptapComposer = forwardRef<BaseTiptapComposerRef, BaseTiptapCo
   const [editorInstance, setEditorInstance] = useState<Editor | null>(null);
   const [isFocused, setIsFocused] = useState(false);
   const [hasContent, setHasContent] = useState(false);
+  const [hasAttachments, setHasAttachments] = useState(false);
+  const hasAttachmentsRef = useRef(false);
+  const syncHasAttachments = useCallback((targetEditor: Editor) => {
+    const nextHasAttachments = docHasAttachments(targetEditor);
+    if (nextHasAttachments !== hasAttachmentsRef.current) {
+      hasAttachmentsRef.current = nextHasAttachments;
+      setHasAttachments(nextHasAttachments);
+    }
+  }, []);
   const [composerPreviewText, setComposerPreviewText] = useState<string | null>(null);
   const hasContentRef = useRef(false);
   const { showToast } = useToast();
   const composerRef = useRef<HTMLDivElement>(null);
   const voiceDiffClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const attachmentStoreRef = useRef<AttachmentStore>(createAttachmentStore());
+  // Session-scoped token→original entries for messages sent from this composer
+  // instance. Kept in memory only: vault file persistence waits on the
+  // passphrase UX decision, and nothing here ever writes raw PII to disk.
+  const sessionRehydrationMapRef = useRef<Record<string, string>>({});
+  // Track the threadId this map belongs to, so we can persist the pending map
+  // when threadId changes (PersistentLayer swaps threads without remounting).
+  const mapThreadIdRef = useRef<string | null>(threadId);
+  // PII detection and `onSend` are both awaited while the editor still holds the
+  // text, so a second Enter would serialize the same content and send it twice.
+  const sendInFlightRef = useRef(false);
+  // `session-only` means the vault refused the write, so the tokens sent this
+  // session stop resolving once it ends. Surfaced, never fatal.
+  const [rehydrationStorage, setRehydrationStorage] = useState<'unknown' | 'persisted' | 'session-only'>('unknown');
   const resolveAttachmentRecord = useCallback(
     (attachmentId: string) => attachmentStoreRef.current.get(attachmentId),
     [],
@@ -530,6 +584,35 @@ export const BaseTiptapComposer = forwardRef<BaseTiptapComposerRef, BaseTiptapCo
   useEffect(() => {
     tabsRef.current = layout?.state.tabs ?? {};
   }, [layout?.state.tabs]);
+
+  // When threadId changes (PersistentLayer swaps threads without remounting),
+  // persist the pending map under the old threadId, then reset for the new one.
+  // If the old threadId was null (first turn before Codex assigns an ID),
+  // flush those accumulated mappings when the real threadId arrives.
+  useEffect(() => {
+    const prevThreadId = mapThreadIdRef.current;
+    const currentMap = sessionRehydrationMapRef.current;
+    const hasMap = Object.keys(currentMap).length > 0;
+
+    if (prevThreadId !== threadId && hasMap) {
+      const persistThreadId = prevThreadId ?? threadId;
+      if (persistThreadId) {
+        // Fire-and-forget: the server resolves failures without throwing.
+        piiIpc.persistRehydration(persistThreadId, currentMap).catch(() => {
+          // Ignore: the server already logs the failure.
+        });
+      }
+      // Only a real thread swap resets the map. A null previous id is this
+      // same conversation receiving its id, and clearing there would empty the
+      // reserved-token set: the next turn would mint `[EMAIL_0]` again for a
+      // different address, the server merge would keep only the newer one, and
+      // turn one's token would then reveal the wrong value.
+      if (prevThreadId !== null) {
+        sessionRehydrationMapRef.current = {};
+      }
+    }
+    mapThreadIdRef.current = threadId;
+  }, [threadId]);
 
   const getSerializedSubmission = useCallback((
     editorLike?: Editor | null,
@@ -641,6 +724,7 @@ export const BaseTiptapComposer = forwardRef<BaseTiptapComposerRef, BaseTiptapCo
     },
     getContent: () => getSerializedSubmission(editorInstance).text,
     getSubmission: () => getSerializedSubmission(editorInstance),
+    getRehydrationMap: () => ({ ...sessionRehydrationMapRef.current }),
     clearContent: () => {
       if (editorInstance) {
         editorInstance.commands.clearContent();
@@ -683,6 +767,7 @@ export const BaseTiptapComposer = forwardRef<BaseTiptapComposerRef, BaseTiptapCo
       ...(highlightToolKeywords ? [ToolKeywordHighlight] : []),
       VoiceDiffMark,
       AttachmentChip,
+      PiiLabel.configure({ mode: 'compose' }),
     ],
     content: parseContentWithMentions(initialContent),
     editable,
@@ -1018,6 +1103,7 @@ export const BaseTiptapComposer = forwardRef<BaseTiptapComposerRef, BaseTiptapCo
       const nextHasContent = hasSubmissionContent(getSerializedSubmission(editor));
       hasContentRef.current = nextHasContent;
       setHasContent(nextHasContent);
+      syncHasAttachments(editor);
       if (autoFocus) {
         editor.commands.focus();
       }
@@ -1048,6 +1134,7 @@ export const BaseTiptapComposer = forwardRef<BaseTiptapComposerRef, BaseTiptapCo
         hasContentRef.current = nextHasContent;
         setHasContent(nextHasContent);
       }
+      syncHasAttachments(editor);
       applyMentionCompactClasses(editor.view.dom);
       // Drop attachment records whose chips were removed from the document.
       const liveIds = new Set<string>();
@@ -1068,6 +1155,7 @@ export const BaseTiptapComposer = forwardRef<BaseTiptapComposerRef, BaseTiptapCo
     getSerializedSubmission,
     hasSubmissionContent,
     highlightToolKeywords,
+    syncHasAttachments,
   ]);
 
   const lastAppliedInitialContentRef = useRef<string | null>(null);
@@ -1198,17 +1286,73 @@ export const BaseTiptapComposer = forwardRef<BaseTiptapComposerRef, BaseTiptapCo
     };
   }, []);
 
+  /**
+   * Persist this thread's accumulated map, not just the turn's delta: the
+   * first turn has no thread id yet, so sending the whole map on the next one
+   * recovers it. The server merges, so repeating entries costs nothing.
+   */
+  const persistRehydrationForThread = useCallback(async () => {
+    const map = sessionRehydrationMapRef.current;
+    if (!threadId || Object.keys(map).length === 0) return;
+    try {
+      const result = await piiIpc.persistRehydration(threadId, map);
+      setRehydrationStorage(result.persisted ? 'persisted' : 'session-only');
+    } catch {
+      // The route resolves rather than rejects for the expected failures, so
+      // reaching here means the bridge itself is down. Same user-visible
+      // consequence: reversibility lasts only this session.
+      setRehydrationStorage('session-only');
+    }
+  }, [threadId]);
+
   // Handle send action
-  const handleSend = useCallback(async () => {
+  // PII redaction runs at this boundary: regex detections are instant and
+  // always available, full NER merges in when the IPC path answers. The model
+  // only ever receives the redacted text. The rehydration map is kept in the
+  // session ref; vault file persistence waits on the passphrase UX decision.
+  const sendSubmission = useCallback(async (submission: SerializedComposerSubmission) => {
     if (!editor) return;
+    const fallback = detectRegex(submission.text);
+    // `fallback` stands until model-based detection answers; the catch keeps it
+    // rather than reassigning the same value, which is what made the initial
+    // assignment look dead to no-useless-assignment.
+    let detections = fallback;
+    let nerFailed = false;
+    try {
+      detections = mergeDetections(await piiIpc.detectPii(submission.text), fallback);
+    } catch {
+      // Regex-only detection: `detections` already holds it.
+      nerFailed = true;
+    }
+    // Fail closed for attachment payloads: pasted-text bodies and images must
+    // never ride on the regex-only fallback. Text-only turns keep it.
+    const hasAttachmentPayload = submission.attachments.length > 0
+      || attachmentStoreRef.current.snapshot().some(
+        (record) => record.kind === 'pasted-text' && (record.text ?? '').length > 0,
+      );
+    if (shouldBlockAttachmentSend({ hasAttachmentPayload, nerFailed })) {
+      showToast(t('basemind.attachmentRedactionUnavailable'), 'error', 4000);
+      return;
+    }
+    // Tokens already issued this thread are reserved, or a later turn would
+    // mint `[EMAIL_0]` a second time for a different address and the merged
+    // map would keep only one of the two.
+    const { redactedText, rehydrationMap } = buildRedactedText(
+      submission.text,
+      detections,
+      new Set(Object.keys(sessionRehydrationMapRef.current)),
+    );
+    sessionRehydrationMapRef.current = { ...sessionRehydrationMapRef.current, ...rehydrationMap };
+    const redactedSubmission = { ...submission, text: redactedText };
 
-    const submission = getSerializedSubmission(editor);
-    if (!hasSubmissionContent(submission)) return;
-
-    const handled = await onSend(submission.text, submission);
+    const handled = await onSend(redactedSubmission.text, redactedSubmission);
     if (handled === false) {
       return;
     }
+
+    // After the send, never before: what was sent is what has to be
+    // recoverable, and a vault failure must not cost the user their turn.
+    void persistRehydrationForThread();
 
     attachmentStoreRef.current.clear();
 
@@ -1216,7 +1360,22 @@ export const BaseTiptapComposer = forwardRef<BaseTiptapComposerRef, BaseTiptapCo
       editor.commands.clearContent();
       refocusMainComposer(editor);
     }
-  }, [editor, getSerializedSubmission, hasSubmissionContent, isMainComposer, onSend]);
+  }, [editor, isMainComposer, onSend, persistRehydrationForThread]);
+
+  const handleSend = useCallback(async () => {
+    if (!editor) return;
+    if (sendInFlightRef.current) return;
+
+    const submission = getSerializedSubmission(editor);
+    if (!hasSubmissionContent(submission)) return;
+
+    sendInFlightRef.current = true;
+    try {
+      await sendSubmission(submission);
+    } finally {
+      sendInFlightRef.current = false;
+    }
+  }, [editor, getSerializedSubmission, hasSubmissionContent, sendSubmission]);
 
   // Handle keyboard shortcuts
   useEffect(() => {
@@ -1528,6 +1687,11 @@ export const BaseTiptapComposer = forwardRef<BaseTiptapComposerRef, BaseTiptapCo
                 </div>
               )}
               {contextContent}
+              <FileRedactionNotice
+                modelProvider={modelProvider}
+                hasAttachments={hasAttachments}
+                rehydrationStorage={rehydrationStorage}
+              />
             </div>
 
             <div className="flex items-center gap-1">

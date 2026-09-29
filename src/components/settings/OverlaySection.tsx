@@ -955,10 +955,10 @@ export function OverlaySectionContent() {
                   {isReadyToEnable
                     ? "Overlay has the system access it needs. Turn it on now, then use the global shortcut right away."
                     : requiresAccessibilityPermission
-                      ? "Interpreter needs system access before Overlay can work in other apps. Grant both permissions, then finish setup."
+                      ? "Hacienda needs system access before Overlay can work in other apps. Grant both permissions, then finish setup."
                       : isLinuxPlatform
-                        ? "Interpreter needs screen-capture access from your desktop environment before Overlay can work in other apps. Approve the screen-share prompt, then finish setup."
-                        : "Interpreter needs to verify that screen capture works in this Windows session before Overlay can be enabled."}
+                        ? "Hacienda needs screen-capture access from your desktop environment before Overlay can work in other apps. Approve the screen-share prompt, then finish setup."
+                        : "Hacienda needs to verify that screen capture works in this Windows session before Overlay can be enabled."}
                 </AlertDialogDescription>
                 <p className="text-ui-sm text-muted-foreground">
                   {isReadyToEnable
@@ -1384,7 +1384,7 @@ export function OverlaySectionIntroContent() {
       <div className="min-w-0 space-y-2">
         <div className="flex items-center gap-2">
           <div className="text-ui-sm font-medium text-foreground">
-            Interpreter Overlay
+            Hacienda Overlay
           </div>
           <span
             className="rounded-full px-2 py-0.5 text-ui-xs font-medium text-muted-foreground"

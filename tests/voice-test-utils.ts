@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { randomUUID } from 'crypto';
+import { DEFAULT_AMBIENT_TRIGGER_PHRASES } from '../shared/types/stt';
 import type { Page } from '@playwright/test';
 import { expect } from './fixtures';
 import { sel } from './selectors';
@@ -243,20 +244,23 @@ export async function configureOverlayVoiceForTest(page: Page): Promise<void> {
 }
 
 export async function configureAmbientVoice(page: Page, backend = getPreferredTestVoiceBackend()): Promise<void> {
-  await page.evaluate(async ({ backend }) => {
+  // The callback is serialized into the page, where this file's imports do not
+  // exist; the phrases have to travel as an argument or the body throws a
+  // ReferenceError before `setSettings` is ever called.
+  await page.evaluate(async ({ backend, ambientTriggerPhrases }) => {
     const response = await window.electron.stt.setSettings({
       settings: {
         voiceMode: 'ambient',
         backend,
         previewBeforeSendMs: 0,
-        ambientTriggerPhrases: ['Interpreter', 'Repertor'],
+        ambientTriggerPhrases,
         ambientEndPhrases: ['make it so', 'take it so'],
       },
     });
     if (!response.success) {
       throw new Error(response.error ?? `Failed to configure ${backend} ambient voice settings`);
     }
-  }, { backend });
+  }, { backend, ambientTriggerPhrases: [...DEFAULT_AMBIENT_TRIGGER_PHRASES] });
 }
 
 export async function ensureQwenVoiceAssets(page: Page): Promise<void> {

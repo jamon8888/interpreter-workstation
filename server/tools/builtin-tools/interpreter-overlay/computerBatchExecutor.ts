@@ -53,7 +53,7 @@ export interface AdvancedVoiceComputerBatchCallInput {
   ) => Promise<string | null>;
 }
 
-const COMPUTER_BATCH_SHAPE_INSTRUCTION = 'Send arguments as { "actions": [...] } where each action is { seq, server_id, tool_name, arguments } for an Interpreter tool call or { seq, tool: { name: "click"|"type"|"hotkey"|"scroll", params } } for a selected-target action.';
+const COMPUTER_BATCH_SHAPE_INSTRUCTION = 'Send arguments as { "actions": [...] } where each action is { seq, server_id, tool_name, arguments } for a Hacienda tool call or { seq, tool: { name: "click"|"type"|"hotkey"|"scroll", params } } for a selected-target action.';
 const toolArgumentsValidator = new Ajv({
   allErrors: true,
   strict: false,

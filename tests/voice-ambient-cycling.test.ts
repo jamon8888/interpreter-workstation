@@ -10,7 +10,10 @@
  * 2. macOS: SFSpeechRecognizer only detects the wake word / end phrase while
  *    qwen owns the command transcript with preroll audio across the trigger.
  *
- * Audio fixtures:
+ * Audio fixtures. These recordings predate the rename and still speak the old
+ * wake word, while the harness below matches the current one. The five tests
+ * that consume them therefore need re-recorded audio before they can pass; they
+ * skip when the qwen assets are absent, which is the case in CI.
  *   scenario1-fast.wav    — silence → fast "Interpreter turn on lights make it so"
  *   scenario2-spread.wav  — chatter → trigger → pause → command → pause → end phrase
  *   scenario3-silence-trigger.wav — chatter → trigger → command → end phrase
@@ -31,6 +34,9 @@ function stripLeadingPunctuation(text: string): string {
 function findQwenBinary(): { binaryPath: string; modelDir: string } | null {
   const candidates = [
     process.env.QWEN_ASR_ASSET_DIR,
+    path.join(process.env.HOME ?? '', 'Library/Application Support/Hacienda/qwen-asr'),
+    // Kept after the current name: assets downloaded by a pre-rename build are
+    // still where that build put them, and nothing migrates them.
     path.join(process.env.HOME ?? '', 'Library/Application Support/Interpreter/qwen-asr'),
     path.join(process.env.HOME ?? '', 'Library/Application Support/Electron/qwen-asr'),
   ].filter(Boolean) as string[];
@@ -80,7 +86,7 @@ async function runCyclingWithOverlap(audioFile: string): Promise<CyclingResult> 
   const { binaryPath, modelDir } = qwenPaths!;
   const pcm = loadAudioPcm(audioFile);
   const allChunks = splitIntoChunks(pcm);
-  const triggerPattern = buildTolerantPhrasePattern('Interpreter');
+  const triggerPattern = buildTolerantPhrasePattern('Hacienda');
   const endPattern = buildTolerantPhrasePattern('make it so');
 
   const cycleTranscripts: string[] = [];
@@ -180,7 +186,7 @@ async function runCyclingWithOverlap(audioFile: string): Promise<CyclingResult> 
 // ---- Pure logic tests ----
 
 function simulateAmbientCycling(cycleTranscripts: string[]): { sentTexts: string[]; phase: string; accumulatedTranscript: string } {
-  const triggerPattern = buildTolerantPhrasePattern('Interpreter');
+  const triggerPattern = buildTolerantPhrasePattern('Hacienda');
   const endPattern = buildTolerantPhrasePattern('make it so');
   let ambientState: 'waiting' | 'accumulating' = 'waiting';
   let accumulatedTranscript = '';
@@ -245,14 +251,14 @@ function simulateAmbientCycling(cycleTranscripts: string[]): { sentTexts: string
 
 describe('ambient cycling logic (pure)', () => {
   test('detects trigger in single cycle transcript', () => {
-    const result = simulateAmbientCycling(['Interpreter turn on the lights make it so']);
+    const result = simulateAmbientCycling(['Hacienda turn on the lights make it so']);
     expect(result.sentTexts).toEqual(['turn on the lights']);
   });
 
   test('accumulates across multiple cycles', () => {
     const result = simulateAmbientCycling([
       'blah blah',
-      'Interpreter',
+      'Hacienda',
       'turn on the lights',
       'in the living room make it so',
     ]);
@@ -263,8 +269,8 @@ describe('ambient cycling logic (pure)', () => {
 
   test('handles trigger word in overlap', () => {
     const result = simulateAmbientCycling([
-      'hello Interpreter turn on',
-      'Interpreter turn on the lights',
+      'hello Hacienda turn on',
+      'Hacienda turn on the lights',
       'the lights make it so',
     ]);
     expect(result.sentTexts.length).toBe(1);
@@ -273,8 +279,8 @@ describe('ambient cycling logic (pure)', () => {
 
   test('two commands back-to-back', () => {
     const result = simulateAmbientCycling([
-      'Interpreter turn on lights make it so',
-      'Interpreter what time is it make it so',
+      'Hacienda turn on lights make it so',
+      'Hacienda what time is it make it so',
     ]);
     expect(result.sentTexts.length).toBe(2);
     expect(result.sentTexts[0]!.toLowerCase()).toContain('light');
@@ -285,7 +291,7 @@ describe('ambient cycling logic (pure)', () => {
     const result = simulateAmbientCycling([
       'I was just thinking about dinner',
       'and how the weather is nice today',
-      'anyway Interpreter turn on the lights make it so',
+      'anyway Hacienda turn on the lights make it so',
     ]);
     expect(result.sentTexts.length).toBe(1);
     expect(result.sentTexts[0]!.toLowerCase()).toContain('light');
@@ -293,24 +299,24 @@ describe('ambient cycling logic (pure)', () => {
   });
 
   test('handles empty cycles gracefully', () => {
-    const result = simulateAmbientCycling(['', '   ', 'Interpreter do something make it so', '']);
+    const result = simulateAmbientCycling(['', '   ', 'Hacienda do something make it so', '']);
     expect(result.sentTexts.length).toBe(1);
   });
 
   test('tolerates punctuation in trigger and end phrase', () => {
-    const result = simulateAmbientCycling(['Interpreter, turn on the lights. Make. It. So!']);
+    const result = simulateAmbientCycling(['Hacienda, turn on the lights. Make. It. So!']);
     expect(result.sentTexts.length).toBe(1);
   });
 
   test('end phrase with no command text resets', () => {
-    const result = simulateAmbientCycling(['Interpreter make it so']);
+    const result = simulateAmbientCycling(['Hacienda make it so']);
     expect(result.sentTexts.length).toBe(0);
     expect(result.phase).toBe('waiting');
   });
 
   test('stays accumulating when no end phrase yet', () => {
     const result = simulateAmbientCycling([
-      'Interpreter turn on the lights',
+      'Hacienda turn on the lights',
       'in the living room',
       'and also the kitchen',
     ]);

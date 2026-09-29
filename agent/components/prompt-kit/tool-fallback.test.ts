@@ -261,7 +261,7 @@ describe('ToolCallGroup', () => {
           timestamp: 0,
           questions: [],
           context: {
-            message: 'Interpreter wants to run a command.',
+            message: 'Hacienda wants to run a command.',
             description: 'Review this command before continuing.',
             command: '/bin/zsh -lc interpreter --help',
           },
@@ -284,8 +284,8 @@ describe('ToolCallGroup', () => {
           timestamp: 0,
           questions: [],
           context: {
-            message: 'Let Interpreter list your running apps and windows?',
-            warning: 'Let Interpreter list your running apps and windows?',
+            message: 'Let Hacienda list your running apps and windows?',
+            warning: 'Let Hacienda list your running apps and windows?',
           },
         },
       }),
@@ -304,8 +304,8 @@ describe('ToolCallGroup', () => {
           timestamp: 0,
           questions: [],
           context: {
-            message: 'Let Interpreter list your running apps and windows?',
-            warning: 'Interpreter can see app names, window titles, and which window is currently active.',
+            message: 'Let Hacienda list your running apps and windows?',
+            warning: 'Hacienda can see app names, window titles, and which window is currently active.',
             toolName: 'list_windows',
             target: 'the selected Windows app',
           },
@@ -313,7 +313,7 @@ describe('ToolCallGroup', () => {
       }),
     );
 
-    assert.match(html, /Interpreter can see app names/);
+    assert.match(html, /Hacienda can see app names/);
     assert.doesNotMatch(html, /Tool Name/);
     assert.doesNotMatch(html, /Target/);
     assert.doesNotMatch(html, /the selected Windows app/);
@@ -329,7 +329,7 @@ describe('ToolCallGroup', () => {
           timestamp: 0,
           questions: [],
           context: {
-            message: 'Interpreter wants to use an MCP tool.',
+            message: 'Hacienda wants to use an MCP tool.',
             description: 'Review this MCP tool call before continuing.',
             serverId: 'pubmed',
             toolName: 'search_articles',
@@ -339,7 +339,7 @@ describe('ToolCallGroup', () => {
               date_to: 2026,
             },
             threadId: 'thr_pubmed',
-            warning: 'Interpreter wants to call pubmed__search_articles.',
+            warning: 'Hacienda wants to call pubmed__search_articles.',
             sessionAware: true,
           },
         },

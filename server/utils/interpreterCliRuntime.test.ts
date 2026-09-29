@@ -233,7 +233,7 @@ describe('interpreterCliRuntime', () => {
       expect(script).toContain('mktemp -d "$staging_root/req-XXXXXX"');
       expect(script).toContain('query="saveToDisk=$save_to_disk"');
       expect(script).toContain('saveToDiskPath=$(url_encode "$save_to_disk_path")');
-      expect(script).toContain('Interpreter CLI bridge disconnected while waiting for response.');
+      expect(script).toContain('Hacienda CLI bridge disconnected while waiting for response.');
       expect(script).not.toContain("printf 'req-$$-");
       expect(script).not.toContain('Timed out waiting for interpreter CLI response.');
     } finally {
@@ -1307,7 +1307,7 @@ describe('interpreterCliRuntime', () => {
     try {
       const interpreterHome = tempHome;
       const shellHome = path.join(interpreterHome, 'home');
-      const pdfcpuDir = '/Applications/Interpreter.app/Contents/Resources/pdfcpu';
+      const pdfcpuDir = '/Applications/Hacienda.app/Contents/Resources/pdfcpu';
       const policy = buildInterpreterCliShellEnvironmentPolicy(
         'agtok_pdfcpu',
         { PATH: '/usr/bin:/bin', INTERPRETER_HOME: interpreterHome },

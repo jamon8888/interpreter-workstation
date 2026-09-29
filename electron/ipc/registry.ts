@@ -126,6 +126,14 @@ export const IPC_CHANNELS = {
   WORKSPACE_REMOVE_WATCH: 'workspace:remove-watch',
   GET_INITIAL_FILE_TREE: 'get-initial-file-tree',
 
+  // Vault
+  // Must match the literal string server/services/vault.ts's
+  // triggerOrphanGcIfFirstAccess() passes to broadcastEvent() — that call
+  // reaches the renderer through the generic setElectronBroadcaster forwarder
+  // in electron/ipc/handlers.ts with no handler-side change needed; only the
+  // preload subscription needed adding.
+  VAULT_ORPHAN_BLOBS_CLEANED: 'vault:orphan-blobs-cleaned',
+
   // Tool Server Setup
   SETUP_COMPLETED: 'setup:completed',
   TOOL_SERVERS_GET_SNAPSHOT: 'toolServers:get-snapshot',
@@ -235,6 +243,7 @@ export const IPC_CHANNELS = {
   OFFICE_EXTENSION_INSTALL: 'office-extension:install',
   OFFICE_EXTENSION_INSTALL_PROGRESS: 'office-extension:install-progress',
   OFFICE_EXTENSION_UNINSTALL: 'office-extension:uninstall',
+  OFFICE_EXTENSION_HEALTHCHECK: 'office-extension:healthcheck',
 
   // VoiceExtension
   VOICE_EXTENSION_CHECK_INSTALLED: 'voice-extension:check-installed',

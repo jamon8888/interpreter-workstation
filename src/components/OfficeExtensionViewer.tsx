@@ -86,12 +86,9 @@ export function OfficeExtensionViewer({ filePath, refreshKey = 0 }: OfficeExtens
 
     while (attempts < maxAttempts) {
       try {
-        const response = await fetch(`http://localhost:${OO_EDITORS_PORT}/healthcheck`);
-        if (response.ok) {
-          const text = await response.text();
-          if (text.includes('true')) {
-            return;
-          }
+        const result = await window.electron?.officeExtension?.healthcheck?.();
+        if (result?.status?.includes('true')) {
+          return;
         }
       } catch {
         // Server not ready yet.

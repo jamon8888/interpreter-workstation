@@ -108,6 +108,11 @@ export function listVaultBlobs(userDataDir?: string): Array<{ docId: string; ful
   return blobs;
 }
 
+/** Doc ids of every stored blob, workspace segments included. */
+export function listVaultBlobDocIds(userDataDir?: string): string[] {
+  return listVaultBlobs(userDataDir).map((blob) => blob.docId);
+}
+
 function asRecord(value: unknown): Record<string, unknown> | null {
   return typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : null;
 }

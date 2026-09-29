@@ -90,6 +90,7 @@ export function MarkdownViewer({ filePath }: MarkdownViewerProps) {
   const [initialNoteContextError, setInitialNoteContextError] = useState<string | null>(null);
   const [noteContextReady, setNoteContextReady] = useState(false);
   const [showToolbar, setShowToolbar] = useState(true);
+  const [piiLabelsEnabled, setPiiLabelsEnabled] = useState(true);
   const [toolbarTransitionsEnabled, setToolbarTransitionsEnabled] = useState(false);
   const [reloadTrigger, setReloadTrigger] = useState(0);
   // Show Originals: default ON (cleartext). Toggle is view-only — the doc
@@ -1349,6 +1350,21 @@ export function MarkdownViewer({ filePath }: MarkdownViewerProps) {
 
             <EditorToolbarSeparator className="mx-1" />
 
+            {/* PII labels toggle */}
+            <Button
+              variant="ghost"
+              size="row"
+              title={piiLabelsEnabled ? 'Hide PII labels' : 'Show PII labels'}
+              data-help-title="PII labels"
+              data-help-description="Render stored redaction tokens as colored category labels. Revealing an original always requires an explicit vault decrypt."
+              className={`text-xs ${piiLabelsEnabled ? 'bg-hover' : ''}`}
+              onMouseDown={(e) => { e.preventDefault(); setPiiLabelsEnabled((enabled) => !enabled); }}
+            >
+              PII
+            </Button>
+
+            <EditorToolbarSeparator className="mx-1" />
+
             {/* Raw toggle */}
             <Button
               variant="ghost"
@@ -1610,6 +1626,7 @@ export function MarkdownViewer({ filePath }: MarkdownViewerProps) {
                 onUpdate={handleUpdate}
                 resolveImageSrc={resolveImageSrc}
                 mentionContainer={getMentionContainer}
+                pii={piiLabelsEnabled ? { mode: 'view', docId: filePath } : undefined}
                 showOriginals={showOriginals}
                 rehydrationMap={rehydrationMap}
                 onToggleShowOriginals={() => setShowOriginals(prev => !prev)}

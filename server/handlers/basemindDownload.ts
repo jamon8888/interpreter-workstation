@@ -173,8 +173,17 @@ export async function* basemindDownload(onlyStage?: BasemindDownloadStage): Asyn
         const message = err instanceof Error ? err.message : String(err);
         result = { ok: false, error: `${stage} model cache setup failed: ${message}` };
       }
-      // rerankerWorkspace activation deferred (phase-2): #22 ports preseed
-      // + embeddings warmup only; workspace GTE materialization lands later.
+      if (result.ok && stage === 'reranker') {
+        // Activation follows the download: workspaces this app opened resolve
+        // the GTE reranker (created when absent, never overwritten). Best
+        // effort — a workspace failure must not fail the weights download.
+        try {
+          const { ensureKnownWorkspacesRerankerModels } = await import('./rerankerWorkspace');
+          await ensureKnownWorkspacesRerankerModels();
+        } catch (err) {
+          console.warn(`[basemindDownload] workspace GTE activation failed: ${err instanceof Error ? err.message : String(err)}`);
+        }
+      }
     } else {
       let workspace: string;
       try {

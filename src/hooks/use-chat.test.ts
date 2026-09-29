@@ -152,7 +152,7 @@ describe("isHiddenRuntimeContinuationMessage", () => {
         {
           kind: "text",
           content:
-            "Continue the previous task now that Interpreter restarted. Continue from where you left off and verify the MCP/tool changes are available.",
+            "Continue the previous task now that Hacienda restarted. Continue from where you left off and verify the MCP/tool changes are available.",
         },
       ],
     };

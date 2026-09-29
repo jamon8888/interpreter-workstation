@@ -8,4 +8,5 @@
 	branch = main
 [submodule "submodules/basemind"]
 	path = submodules/basemind
-	url = https://github.com/jamon8888/basemind
+	url = https://github.com/jamon8888/basemind.git
+	branch = main

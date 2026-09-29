@@ -207,9 +207,9 @@ const CODEX_CLI_TIMEOUT_MS = 30_000;
 // this per-process config only disables the startup check for `app-server`.
 const DISABLE_INTERPRETER_AUTO_UPDATE_CONFIG = "check_for_update_on_startup=false";
 const CODEX_CONFIG_HEADER_PREFIX = [
-  "# Interpreter user configuration",
+  "# Hacienda user configuration",
   "# Hosted model IDs must be \"interpreter-smart\", \"interpreter-fast\", or <provider>/<model_id>.",
-  "# Interpreter may repair or remove invalid [interpreter_app] profiles when it reloads this file.",
+  "# Hacienda may repair or remove invalid [interpreter_app] profiles when it reloads this file.",
   "# API model IDs are supplied by OIX and preserved even when they are newer than Workstation's fallback catalog.",
   "# For API profiles, set base_url to the API root.",
   "# Responses is the default API wire format. API profiles use wire_api = \"chat\" only when Chat Completions is explicitly enabled in Settings.",
@@ -936,6 +936,7 @@ const RETRYABLE_RPC_METHODS = new Set<keyof RequestMap>([
   CLIENT_METHOD.interpreterHarnessSet,
   CLIENT_METHOD.threadList,
   CLIENT_METHOD.threadRead,
+  CLIENT_METHOD.threadQueueList,
 ]);
 
 export function resolveDefaultCodexHome(
@@ -2353,6 +2354,10 @@ export class CodexAppServerClient {
     return this.rpcRequest(CLIENT_METHOD.threadRead, params);
   }
 
+  async threadQueueList(params: RequestMap[typeof CLIENT_METHOD.threadQueueList]['params']): Promise<RequestMap[typeof CLIENT_METHOD.threadQueueList]['result']> {
+    return this.rpcRequest(CLIENT_METHOD.threadQueueList, params);
+  }
+
   async threadSetName(params: v2.ThreadSetNameParams): Promise<v2.ThreadSetNameResponse> {
     return this.rpcRequest(CLIENT_METHOD.threadSetName, params);
   }
@@ -2694,7 +2699,7 @@ export class CodexAppServerClient {
     await this.rpcRequest(CLIENT_METHOD.initialize, {
       clientInfo: {
         name: "codex_ui",
-        title: "Interpreter",
+        title: "Hacienda",
         version: "0.1.0",
       },
       capabilities: {
@@ -2707,7 +2712,7 @@ export class CodexAppServerClient {
     this.notify(CLIENT_NOTIFICATION_METHOD.initialized);
     console.log(`[interpreter-server] connectAndInitialize initializedSent requestId=${requestId}`);
 
-    // Startup API-key login is opt-in. The shared Interpreter runtime must not
+    // Startup API-key login is opt-in. The shared Hacienda runtime must not
     // infer account auth from process.env because profile selection already
     // determines how Codex should authenticate for each request.
     if (this.apiKey) {

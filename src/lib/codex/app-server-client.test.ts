@@ -801,7 +801,7 @@ describe("CodexAppServerClient", () => {
         HOMEPATH: "\\Users\\Alice",
       },
       codeHome: "C:\\Users\\Alice\\AppData\\Roaming\\interpreter\\codex-home",
-      codexBinary: "C:\\Program Files\\Interpreter\\resources\\codex.exe",
+      codexBinary: "C:\\Program Files\\Hacienda\\resources\\codex.exe",
       platform: "win32",
       pathExists: (candidatePath) => candidatePath.includes("converter"),
     });
@@ -824,7 +824,7 @@ describe("CodexAppServerClient", () => {
     const env = buildCodexSpawnEnv({
       baseEnv: { Path: "C:\\Windows\\System32" },
       codeHome: "C:\\Users\\Alice\\AppData\\Roaming\\interpreter\\codex-home",
-      codexBinary: "C:\\Program Files\\Interpreter\\resources\\codex.exe",
+      codexBinary: "C:\\Program Files\\Hacienda\\resources\\codex.exe",
       platform: "win32",
       pathExists: () => false,
     });
@@ -841,16 +841,16 @@ describe("CodexAppServerClient", () => {
         PATH: "C:\\Windows\\System32",
       },
       codeHome: "C:\\Users\\Alice\\AppData\\Roaming\\interpreter\\codex-home",
-      codexBinary: "C:\\Program Files\\Interpreter\\resources\\codex.exe",
+      codexBinary: "C:\\Program Files\\Hacienda\\resources\\codex.exe",
       platform: "win32",
       pathExists: (candidatePath) => candidatePath.includes("converter")
-        || candidatePath.includes("Program Files\\Interpreter\\resources"),
+        || candidatePath.includes("Program Files\\Hacienda\\resources"),
     });
 
     assert.equal(env.PATH, undefined);
     assert.equal(
       env.Path,
-      "C:\\Program Files\\Interpreter\\resources;C:\\Users\\Alice\\AppData\\Roaming\\interpreter\\oo-editors\\converter;C:\\Users\\Alice\\bin;C:\\Windows\\System32",
+      "C:\\Program Files\\Hacienda\\resources;C:\\Users\\Alice\\AppData\\Roaming\\interpreter\\oo-editors\\converter;C:\\Users\\Alice\\bin;C:\\Windows\\System32",
     );
   });
 
@@ -860,7 +860,7 @@ describe("CodexAppServerClient", () => {
         PATH: "C:\\Windows\\System32",
       },
       codeHome: "C:\\Users\\Alice\\AppData\\Roaming\\interpreter\\codex-home",
-      codexBinary: "C:\\Program Files\\Interpreter\\resources\\codex.exe",
+      codexBinary: "C:\\Program Files\\Hacienda\\resources\\codex.exe",
       platform: "win32",
       pathExists: () => false,
     });
@@ -873,7 +873,7 @@ describe("CodexAppServerClient", () => {
     const env = buildCodexSpawnEnv({
       baseEnv: { PATH: "/usr/bin:/bin", NODE_V8_COVERAGE: "/tmp/cov" },
       codeHome: "/Users/alice/Library/Application Support/interpreter/codex-home",
-      codexBinary: "/Applications/Interpreter.app/Contents/Resources/codex",
+      codexBinary: "/Applications/Hacienda.app/Contents/Resources/codex",
       platform: "darwin",
       pathExists: () => true,
     });
@@ -1422,7 +1422,7 @@ describe("CodexAppServerClient", () => {
       "gpt-5.3-codex",
       "/workspace/project",
       null,
-      "You are Interpreter.",
+      "You are Hacienda.",
       null,
     );
 
@@ -1435,7 +1435,7 @@ describe("CodexAppServerClient", () => {
       2,
       CLIENT_METHOD.threadResume,
     );
-    assert.equal(threadReq.params.baseInstructions, "You are Interpreter.");
+    assert.equal(threadReq.params.baseInstructions, "You are Hacienda.");
 
     transport.respond(threadReq, makeThreadResumeResponse("thr_existing"));
 
@@ -1526,7 +1526,7 @@ describe("CodexAppServerClient", () => {
     await writePromise;
 
     const contents = await readFile(configPath, "utf-8");
-    assert.ok(contents.startsWith("# Interpreter user configuration\n# Hosted model IDs must be \"interpreter-smart\", \"interpreter-fast\", or <provider>/<model_id>.\n# Interpreter may repair or remove invalid [interpreter_app] profiles when it reloads this file.\n# API model IDs are supplied by OIX and preserved even when they are newer than Workstation's fallback catalog.\n# For API profiles, set base_url to the API root.\n# Responses is the default API wire format. API profiles use wire_api = \"chat\" only when Chat Completions is explicitly enabled in Settings.\n\n"));
+    assert.ok(contents.startsWith("# Hacienda user configuration\n# Hosted model IDs must be \"interpreter-smart\", \"interpreter-fast\", or <provider>/<model_id>.\n# Hacienda may repair or remove invalid [interpreter_app] profiles when it reloads this file.\n# API model IDs are supplied by OIX and preserved even when they are newer than Workstation's fallback catalog.\n# For API profiles, set base_url to the API root.\n# Responses is the default API wire format. API profiles use wire_api = \"chat\" only when Chat Completions is explicitly enabled in Settings.\n\n"));
   });
 
   test("drops invalid lifecycle notification with console.warn", async () => {
@@ -1661,7 +1661,7 @@ describe("CodexAppServerClient", () => {
     assert.equal(result.layers?.[0]?.name.type, "user");
 
     const contents = await readFile(configPath, "utf-8");
-    assert.ok(contents.startsWith("# Interpreter user configuration\n# Hosted model IDs must be \"interpreter-smart\", \"interpreter-fast\", or <provider>/<model_id>.\n# Interpreter may repair or remove invalid [interpreter_app] profiles when it reloads this file.\n# API model IDs are supplied by OIX and preserved even when they are newer than Workstation's fallback catalog.\n# For API profiles, set base_url to the API root.\n# Responses is the default API wire format. API profiles use wire_api = \"chat\" only when Chat Completions is explicitly enabled in Settings.\n\n"));
+    assert.ok(contents.startsWith("# Hacienda user configuration\n# Hosted model IDs must be \"interpreter-smart\", \"interpreter-fast\", or <provider>/<model_id>.\n# Hacienda may repair or remove invalid [interpreter_app] profiles when it reloads this file.\n# API model IDs are supplied by OIX and preserved even when they are newer than Workstation's fallback catalog.\n# For API profiles, set base_url to the API root.\n# Responses is the default API wire format. API profiles use wire_api = \"chat\" only when Chat Completions is explicitly enabled in Settings.\n\n"));
   });
 
   test("configRead creates the header comment block when the user config file is missing", async () => {
@@ -1696,7 +1696,7 @@ describe("CodexAppServerClient", () => {
     assert.equal(result.layers?.[0]?.name.type, "user");
 
     const contents = await readFile(configPath, "utf-8");
-    assert.ok(contents.startsWith("# Interpreter user configuration\n# Hosted model IDs must be \"interpreter-smart\", \"interpreter-fast\", or <provider>/<model_id>.\n# Interpreter may repair or remove invalid [interpreter_app] profiles when it reloads this file.\n# API model IDs are supplied by OIX and preserved even when they are newer than Workstation's fallback catalog.\n# For API profiles, set base_url to the API root.\n# Responses is the default API wire format. API profiles use wire_api = \"chat\" only when Chat Completions is explicitly enabled in Settings.\n"));
+    assert.ok(contents.startsWith("# Hacienda user configuration\n# Hosted model IDs must be \"interpreter-smart\", \"interpreter-fast\", or <provider>/<model_id>.\n# Hacienda may repair or remove invalid [interpreter_app] profiles when it reloads this file.\n# API model IDs are supplied by OIX and preserved even when they are newer than Workstation's fallback catalog.\n# For API profiles, set base_url to the API root.\n# Responses is the default API wire format. API profiles use wire_api = \"chat\" only when Chat Completions is explicitly enabled in Settings.\n"));
   });
 
   test("configBatchWrite sends config/batchWrite RPC", async () => {
@@ -1704,7 +1704,7 @@ describe("CodexAppServerClient", () => {
     const client = new CodexAppServerClient(transport, null);
     const tempDir = await mkdtemp(path.join(os.tmpdir(), "codex-config-batch-"));
     const configPath = path.join(tempDir, "config.toml");
-    const header = "# Interpreter user configuration\n# Hosted model IDs must be \"interpreter-smart\", \"interpreter-fast\", or <provider>/<model_id>.\n# Interpreter may repair or remove invalid [interpreter_app] profiles when it reloads this file.\n# API model IDs are supplied by OIX and preserved even when they are newer than Workstation's fallback catalog.\n# For API profiles, set base_url to the API root.\n# Responses is the default API wire format. API profiles use wire_api = \"chat\" only when Chat Completions is explicitly enabled in Settings.\n\n";
+    const header = "# Hacienda user configuration\n# Hosted model IDs must be \"interpreter-smart\", \"interpreter-fast\", or <provider>/<model_id>.\n# Hacienda may repair or remove invalid [interpreter_app] profiles when it reloads this file.\n# API model IDs are supplied by OIX and preserved even when they are newer than Workstation's fallback catalog.\n# For API profiles, set base_url to the API root.\n# Responses is the default API wire format. API profiles use wire_api = \"chat\" only when Chat Completions is explicitly enabled in Settings.\n\n";
     await writeFile(configPath, `${header}web_search = \"disabled\"\n`, "utf-8");
 
     const writePromise = client.configBatchWrite({

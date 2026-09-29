@@ -24,8 +24,8 @@ const binaryName = process.platform === 'win32' ? 'qwen_asr.exe' : 'qwen_asr';
 function getDefaultQwenRoots() {
   if (process.platform === 'darwin') {
     return [
-      path.join(os.homedir(), 'Library/Application Support/interpreter/qwen-asr'),
-      path.join(os.homedir(), 'Library/Application Support/Interpreter/qwen-asr'),
+      path.join(os.homedir(), 'Library/Application Support/hacienda/qwen-asr'),
+      path.join(os.homedir(), 'Library/Application Support/Hacienda/qwen-asr'),
       path.join(os.homedir(), 'Library/Application Support/Electron/qwen-asr'),
       path.join(rootDir, 'resources', 'qwen-asr'),
     ];
@@ -35,7 +35,7 @@ function getDefaultQwenRoots() {
     const appData = process.env.APPDATA?.trim();
     return [
       appData ? path.join(appData, 'interpreter', 'qwen-asr') : '',
-      appData ? path.join(appData, 'Interpreter', 'qwen-asr') : '',
+      appData ? path.join(appData, 'Hacienda', 'qwen-asr') : '',
       path.join(rootDir, 'resources', 'qwen-asr'),
     ].filter(Boolean);
   }
@@ -44,7 +44,7 @@ function getDefaultQwenRoots() {
     || path.join(os.homedir(), '.config');
   return [
     path.join(configHome, 'interpreter', 'qwen-asr'),
-    path.join(configHome, 'Interpreter', 'qwen-asr'),
+    path.join(configHome, 'Hacienda', 'qwen-asr'),
     path.join(rootDir, 'resources', 'qwen-asr'),
   ];
 }

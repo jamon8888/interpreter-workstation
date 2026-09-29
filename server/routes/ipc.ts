@@ -172,6 +172,9 @@ const handlers: Record<string, Record<string, HandlerFn>> = {
   },
 
   // ========== PII (#19: Show Originals, selection NER, custom terms) ==========
+  // The renderer redacts at the send boundary, so this namespace has to exist
+  // for `pii.detectPii` in `src/ipc.ts` to reach anything. Without it the
+  // composer's call rejected and detection fell back to regex on every send.
   pii: {
     getRehydrationMap: async ([request]: [{ threadKey: string }]) => {
       const { getRehydrationMap } = await import('../handlers/pii');
@@ -188,6 +191,32 @@ const handlers: Record<string, Record<string, HandlerFn>> = {
     rememberRehydration: async ([request]: [{ threadKey: string; map: Record<string, string> }]) => {
       const { rememberRehydration } = await import('../handlers/pii');
       return rememberRehydration(request);
+    },
+    detectPii: async ([text, options]: [string, { categories?: string[]; minConfidence?: number }?]) => {
+      const { piiDetectionService } = await import('../services/piiDetection');
+      return piiDetectionService.detectPii(text, options);
+    },
+    persistRehydration: async (
+      [threadKey, map]: [string, Record<string, string>],
+    ) => {
+      const { persistThreadRehydrationMap } = await import('../services/rehydrationPersistence');
+      return persistThreadRehydrationMap(threadKey, map);
+    },
+    decryptRehydration: async ([docId]: [string]) => {
+      const { vaultManager } = await import('../services/vault');
+      // The renderer never handles the vault key: `decrypt` falls back to the
+      // OS-guarded passphrase, the same one `encrypt` defaults to.
+      return vaultManager.decrypt(docId);
+    },
+    recordReveal: async ([entry]: [{
+      scope: string;
+      scopeType: 'document' | 'thread';
+      token: string;
+      category: string;
+      surface: 'viewer' | 'composer' | 'chat';
+    }]) => {
+      const { recordPiiReveal } = await import('../services/piiAuditLog');
+      recordPiiReveal(entry);
     },
   },
 
@@ -242,15 +271,27 @@ const handlers: Record<string, Record<string, HandlerFn>> = {
     },
     status: async () => {
       const { getBasemindServerStatus } = await import('../utils/basemindManager');
-      return getBasemindServerStatus();
+      try {
+        return await getBasemindServerStatus();
+      } catch {
+        return { status: 'disconnected' };
+      }
+    },
+    download: async ([stage]: [import('../handlers/basemindDownload').BasemindDownloadStage?] = []) => {
+      const { runBasemindDownload } = await import('../handlers/basemindDownload');
+      return runBasemindDownload(stage);
     },
     cpuFeatures: async () => {
       const { cpuFeaturesWithBuild } = await import('../handlers/cpuFeatures');
       return cpuFeaturesWithBuild();
     },
-    download: async ([stage]: [import('../handlers/basemindDownload').BasemindDownloadStage?] = []) => {
-      const { runBasemindDownload } = await import('../handlers/basemindDownload');
-      return runBasemindDownload(stage);
+    getStaleRerankerCache: async () => {
+      const { getStaleRerankerCacheBytes } = await import('../handlers/rerankerWorkspace');
+      return { bytes: await getStaleRerankerCacheBytes() };
+    },
+    clearStaleRerankerCache: async () => {
+      const { clearStaleRerankerCache } = await import('../handlers/rerankerWorkspace');
+      return { freedBytes: await clearStaleRerankerCache() };
     },
   },
 
@@ -756,65 +797,45 @@ const handlers: Record<string, Record<string, HandlerFn>> = {
 
   // ========== Files ==========
   files: {
-    read: async ([filePath]: [string]) => {
-      const { readWorkspaceTextFile } = await import('../handlers/workspaceFiles');
-      return readWorkspaceTextFile(filePath);
-    },
-    write: async ([filePath, content]: [string, string]) => {
-      const { writeWorkspaceTextFile } = await import('../handlers/workspaceFiles');
-      return writeWorkspaceTextFile(filePath, content);
-    },
-    isDirectory: async ([filePath]: [string]) => {
-      const { isWorkspaceDirectory } = await import('../handlers/workspaceFiles');
-      return isWorkspaceDirectory(filePath);
-    },
-    listDirectory: async ([filePath]: [string]) => {
-      const { listWorkspaceDirectory } = await import('../handlers/workspaceFiles');
-      return listWorkspaceDirectory(filePath);
-    },
-    getThumbnails: async ([paths, size]: [string[], number | undefined]) => {
-      const { getWorkspaceFileThumbnails } = await import('../handlers/workspaceFiles');
-      return getWorkspaceFileThumbnails(paths, size);
-    },
     move: async ([sourcePath, destPath]: [string, string]) => {
-      const { moveWorkspaceFile } = await import('../handlers/workspaceFiles');
-      return moveWorkspaceFile(sourcePath, destPath);
+      const { moveFile } = await import('../handlers/files');
+      return moveFile(sourcePath, destPath);
     },
     rename: async ([filePath, newName]: [string, string]) => {
-      const { renameWorkspaceFile } = await import('../handlers/workspaceFiles');
-      return renameWorkspaceFile(filePath, newName);
+      const { renameFile } = await import('../handlers/files');
+      return renameFile(filePath, newName);
     },
     delete: async ([filePath]: [string]) => {
-      const { trashWorkspaceFile } = await import('../handlers/workspaceFiles');
-      return trashWorkspaceFile(filePath);
+      const { trashFile } = await import('../handlers/files');
+      return trashFile(filePath);
     },
     trash: async ([filePath]: [string]) => {
-      const { trashWorkspaceFile } = await import('../handlers/workspaceFiles');
-      return trashWorkspaceFile(filePath);
+      const { trashFile } = await import('../handlers/files');
+      return trashFile(filePath);
     },
     duplicate: async ([filePath]: [string]) => {
-      const { duplicateWorkspaceFile } = await import('../handlers/workspaceFiles');
-      return duplicateWorkspaceFile(filePath);
+      const { duplicateFile } = await import('../handlers/files');
+      return duplicateFile(filePath);
     },
     copyPath: async ([filePath]: [string]) => {
       const { copyPath } = await import('../handlers/files');
       return copyPath(filePath);
     },
     create: async ([type, workspacePath]: ['note' | 'document' | 'spreadsheet' | 'slides' | 'automation' | 'remotion' | 'movie', string]) => {
-      const { createWorkspaceFile } = await import('../handlers/workspaceFiles');
-      return createWorkspaceFile(type, workspacePath);
+      const { createFile } = await import('../handlers/files');
+      return createFile(type, workspacePath);
     },
     createFolder: async ([parentPath, name]: [string, string | undefined]) => {
-      const { createWorkspaceFolder } = await import('../handlers/workspaceFiles');
-      return createWorkspaceFolder(parentPath, name);
+      const { createFolder } = await import('../handlers/files');
+      return createFolder(parentPath, name);
     },
     createBookmark: async ([url, title, faviconUrl, destFolder]: [string, string, string | undefined, string]) => {
-      const { createWorkspaceBookmark } = await import('../handlers/workspaceFiles');
-      return createWorkspaceBookmark(url, title, faviconUrl, destFolder);
+      const { createBookmark } = await import('../handlers/files');
+      return createBookmark(url, title, faviconUrl, destFolder);
     },
     getStats: async ([filePath]: [string]) => {
-      const { getWorkspaceFileStats } = await import('../handlers/workspaceFiles');
-      return getWorkspaceFileStats(filePath);
+      const { getFileStats } = await import('../handlers/files');
+      return getFileStats(filePath);
     },
   },
 
@@ -1488,10 +1509,7 @@ router.post('/:namespace/:method', async (req: Request, res: Response) => {
         );
       }
     }
-    const status = Number.isInteger(error?.status) && error.status >= 400 && error.status < 600
-      ? error.status
-      : 500;
-    res.status(status).json({ error: message });
+    res.status(500).json({ error: message });
   }
 });
 

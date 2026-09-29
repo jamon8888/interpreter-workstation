@@ -14,10 +14,10 @@ import {
 import { emitToolServersChanged } from '../utils/ipcBridge';
 import { getCurrentWorkspace } from '../utils/workspace';
 import { enforceFilesystemBoundary } from './filesystemBoundary';
+import { maybeRedactToolResult } from '../services/runtimeRedaction';
 import { getToolCallMetadata } from '../utils/codexMcpBridge';
 import { getCurrentTurnMessageId } from '../utils/turnMessageIdRegistry';
 import { runWithWorkspaceOverride } from '../utils/workspace';
-import { maybeRedactToolResult } from '../services/runtimeRedaction';
 import type { McpServerEntry } from '../../src/lib/codex/protocol';
 import type { ToolServerInfo } from '../../electron/ipc/registry';
 import type { McpServerConfig } from './mcpTypes';
@@ -1069,14 +1069,17 @@ export class ToolManager {
           maxDepth,
           messageId,
         });
-        // NOTE(linked-file-redaction): every tool result is redacted before it
-        // reaches model context (#19, workspace safe/-gated, spec §7). threadKey
-        // is a real thread id only; without one the output still redacts but
-        // stores no rehydration map. See server/services/runtimeRedaction.ts.
+        // NOTE(linked-file-redaction): file-read outputs are redacted before
+        // they reach model context (#113), under the workspace safe/ opt-in
+        // (#19). threadKey is a real thread id only; without one the output
+        // still redacts but stores no rehydration map. See
+        // server/services/runtimeRedaction.ts.
         return await maybeRedactToolResult({
           serverId,
           toolName,
+          builtinTool,
           result: rawResult,
+          modelConfig,
           workspacePath: workspace || null,
           threadKey: toolContext?.threadId
             ?? getToolCallMetadata(externalToolCallId)?.threadId,
@@ -1133,7 +1136,7 @@ export class ToolManager {
         approvalToolName,
         serverId,
         {
-          message: 'Interpreter wants to use an MCP tool.',
+          message: 'Hacienda wants to use an MCP tool.',
           description: 'Review this action before continuing.',
           serverId,
           toolName,
@@ -1169,11 +1172,15 @@ export class ToolManager {
       },
     );
     // NOTE(linked-file-redaction): same post-execution redaction as the
-    // builtin path above — all MCP tool results redact under safe/ too.
+    // builtin path above — upstream harness reads (builtin-fs) return here.
+    // builtinTool is intentionally omitted: harness tools carry no local
+    // metadata, so isFileReadTool matches them by server/tool name. workspace
+    // still gates every MCP result on safe/ opt-in.
     return await maybeRedactToolResult({
       serverId,
       toolName,
       result: mcpResult,
+      modelConfig: toolContext?.modelConfig,
       workspacePath: toolContext?.workspace ?? getCurrentWorkspace() ?? null,
       threadKey: threadId,
     });

@@ -28,7 +28,7 @@ async function writeZipArchive(zipPath: string, entries: Record<string, string>)
 describe('buildMacUpdateInstallScript', () => {
   test('replaces the existing app bundle instead of merging into it', () => {
     const script = buildMacUpdateInstallScript({
-      appName: 'Interpreter',
+      appName: 'Hacienda',
       currentPid: 123,
       updaterPendingDir: '/tmp/pending',
     });
@@ -50,7 +50,7 @@ describe('buildMacUpdateInstallScript', () => {
     const pendingDir = path.join(rootDir, 'pending');
     const applicationsDir = path.join(rootDir, 'Applications');
     const tempDirRoot = path.join(rootDir, 'tmp');
-    const installedAppDir = path.join(applicationsDir, 'Interpreter.app');
+    const installedAppDir = path.join(applicationsDir, 'Hacienda.app');
     const staleRelayFile = path.join(
       installedAppDir,
       'Contents',
@@ -60,18 +60,18 @@ describe('buildMacUpdateInstallScript', () => {
       'hono',
       'package.json',
     );
-    const stagedZipPath = path.join(pendingDir, 'Interpreter-mac-arm64-9.9.9.zip');
+    const stagedZipPath = path.join(pendingDir, 'Hacienda-mac-arm64-9.9.9.zip');
 
     mkdirSync(path.dirname(staleRelayFile), { recursive: true });
     mkdirSync(tempDirRoot, { recursive: true });
     writeFileSync(staleRelayFile, 'stale');
 
     await writeZipArchive(stagedZipPath, {
-      'Interpreter.app/Contents/Resources/browser-extension-relay/package.json': 'fresh relay payload',
+      'Hacienda.app/Contents/Resources/browser-extension-relay/package.json': 'fresh relay payload',
     });
 
     const script = buildMacUpdateInstallScript({
-      appName: 'Interpreter',
+      appName: 'Hacienda',
       currentPid: 999_999,
       updaterPendingDir: pendingDir,
       applicationsDir,
@@ -102,9 +102,9 @@ describe('buildMacUpdateInstallScript', () => {
     const pendingDir = path.join(rootDir, 'pending');
     const applicationsDir = path.join(rootDir, 'Applications');
     const tempDirRoot = path.join(rootDir, 'tmp');
-    const installedAppDir = path.join(applicationsDir, 'Interpreter.app');
+    const installedAppDir = path.join(applicationsDir, 'Hacienda.app');
     const oldMarkerPath = path.join(installedAppDir, 'Contents', 'Resources', 'old-marker.txt');
-    const stagedZipPath = path.join(pendingDir, 'Interpreter-mac-arm64-9.9.9.zip');
+    const stagedZipPath = path.join(pendingDir, 'Hacienda-mac-arm64-9.9.9.zip');
 
     mkdirSync(path.dirname(oldMarkerPath), { recursive: true });
     mkdirSync(tempDirRoot, { recursive: true });
@@ -115,7 +115,7 @@ describe('buildMacUpdateInstallScript', () => {
     });
 
     const script = buildMacUpdateInstallScript({
-      appName: 'Interpreter',
+      appName: 'Hacienda',
       currentPid: 999_999,
       updaterPendingDir: pendingDir,
       applicationsDir,
