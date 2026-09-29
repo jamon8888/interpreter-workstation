@@ -171,6 +171,129 @@ const handlers: Record<string, Record<string, HandlerFn>> = {
     },
   },
 
+  // ========== Workspace Scan (basemind) ==========
+  workspaceScan: {
+    status: async () => {
+      const { getWorkspaceScanStatus } = await import('../handlers/workspaceScan');
+      return getWorkspaceScanStatus();
+    },
+  },
+
+  // ========== Search (basemind code/document search) ==========
+  search: {
+    searchCode: async ([params]: [{
+      query: string;
+      limit?: number;
+      maxTokens?: number;
+      format?: string;
+      lane?: string;
+      rerankerEnabled?: boolean;
+      rerankerPreset?: string;
+      rerankerTopK?: number;
+    }]) => {
+      const { basemindSearchCode } = await import('../handlers/search');
+      return basemindSearchCode(params);
+    },
+    getRerankerEnabled: async () => {
+      const { getRerankerState } = await import('../handlers/rerankerPreference');
+      return getRerankerState();
+    },
+    getRerankerDefault: async () => {
+      const { getRerankerDefault } = await import('../handlers/rerankerPreference');
+      return { enabled: await getRerankerDefault() };
+    },
+    setRerankerEnabled: async ([value]: [boolean | null]) => {
+      const { setRerankerEnabled } = await import('../handlers/rerankerPreference');
+      return setRerankerEnabled(value);
+    },
+  },
+
+  // ========== PII redaction and rehydration ==========
+  // The renderer redacts at the send boundary, so this namespace has to exist
+  // for `pii.detectPii` in `src/ipc.ts` to reach anything. Without it the
+  // composer's call rejected and detection fell back to regex on every send.
+  pii: {
+    detectPii: async ([text, options]: [string, { categories?: string[]; minConfidence?: number }?]) => {
+      const { piiDetectionService } = await import('../services/piiDetection');
+      return piiDetectionService.detectPii(text, options);
+    },
+    persistRehydration: async (
+      [threadKey, map]: [string, Record<string, string>],
+    ) => {
+      const { persistThreadRehydrationMap } = await import('../services/rehydrationPersistence');
+      return persistThreadRehydrationMap(threadKey, map);
+    },
+    decryptRehydration: async ([docId]: [string]) => {
+      const { vaultManager } = await import('../services/vault');
+      // The renderer never handles the vault key: `decrypt` falls back to the
+      // OS-guarded passphrase, the same one `encrypt` defaults to.
+      return vaultManager.decrypt(docId);
+    },
+    recordReveal: async ([entry]: [{
+      scope: string;
+      scopeType: 'document' | 'thread';
+      token: string;
+      category: string;
+      surface: 'viewer' | 'composer' | 'chat';
+    }]) => {
+      const { recordPiiReveal } = await import('../services/piiAuditLog');
+      recordPiiReveal(entry);
+    },
+  },
+
+  // ========== Basemind MCP Server Lifecycle ==========
+  basemind: {
+    register: async () => {
+      const { registerBasemindServer } = await import('../utils/basemindManager');
+      const serverId = await registerBasemindServer();
+      return { serverId };
+    },
+    unregister: async () => {
+      const { unregisterBasemindServer } = await import('../utils/basemindManager');
+      await unregisterBasemindServer();
+      return { success: true };
+    },
+    status: async () => {
+      const { getBasemindServerStatus } = await import('../utils/basemindManager');
+      try {
+        return await getBasemindServerStatus();
+      } catch {
+        return { status: 'disconnected' };
+      }
+    },
+    download: async ([stage]: [import('../handlers/basemindDownload').BasemindDownloadStage?] = []) => {
+      const { basemindDownload } = await import('../handlers/basemindDownload');
+      const results: Array<{ stage: string; success: boolean; error?: string }> = [];
+      for await (const update of basemindDownload(stage)) {
+        if (update.done || update.error) {
+          results.push({
+            stage: update.stage,
+            success: update.done,
+            error: update.error,
+          });
+        }
+      }
+      return { stages: results, success: results.every(r => r.success) };
+    },
+    cpuFeatures: async () => {
+      const { cpuFeatures } = await import('../handlers/cpuFeatures');
+      const { isNoAvx2BasemindBinary, resolveBasemindBinary } = await import('../utils/basemindManager');
+      const features = await cpuFeatures();
+      // The UI gates AVX2-only model downloads on cpuFeatures.avx2. A staged
+      // noavx2 binary runs those models on any x86_64 CPU, so report it and
+      // let the UI stand down the gate.
+      return { ...features, noavx2Build: isNoAvx2BasemindBinary(resolveBasemindBinary()) };
+    },
+    getStaleRerankerCache: async () => {
+      const { getStaleRerankerCacheBytes } = await import('../handlers/rerankerWorkspace');
+      return { bytes: await getStaleRerankerCacheBytes() };
+    },
+    clearStaleRerankerCache: async () => {
+      const { clearStaleRerankerCache } = await import('../handlers/rerankerWorkspace');
+      return { freedBytes: await clearStaleRerankerCache() };
+    },
+  },
+
   // ========== Settings ==========
   settings: {
     get: async () => {
@@ -673,65 +796,45 @@ const handlers: Record<string, Record<string, HandlerFn>> = {
 
   // ========== Files ==========
   files: {
-    read: async ([filePath]: [string]) => {
-      const { readWorkspaceTextFile } = await import('../handlers/workspaceFiles');
-      return readWorkspaceTextFile(filePath);
-    },
-    write: async ([filePath, content]: [string, string]) => {
-      const { writeWorkspaceTextFile } = await import('../handlers/workspaceFiles');
-      return writeWorkspaceTextFile(filePath, content);
-    },
-    isDirectory: async ([filePath]: [string]) => {
-      const { isWorkspaceDirectory } = await import('../handlers/workspaceFiles');
-      return isWorkspaceDirectory(filePath);
-    },
-    listDirectory: async ([filePath]: [string]) => {
-      const { listWorkspaceDirectory } = await import('../handlers/workspaceFiles');
-      return listWorkspaceDirectory(filePath);
-    },
-    getThumbnails: async ([paths, size]: [string[], number | undefined]) => {
-      const { getWorkspaceFileThumbnails } = await import('../handlers/workspaceFiles');
-      return getWorkspaceFileThumbnails(paths, size);
-    },
     move: async ([sourcePath, destPath]: [string, string]) => {
-      const { moveWorkspaceFile } = await import('../handlers/workspaceFiles');
-      return moveWorkspaceFile(sourcePath, destPath);
+      const { moveFile } = await import('../handlers/files');
+      return moveFile(sourcePath, destPath);
     },
     rename: async ([filePath, newName]: [string, string]) => {
-      const { renameWorkspaceFile } = await import('../handlers/workspaceFiles');
-      return renameWorkspaceFile(filePath, newName);
+      const { renameFile } = await import('../handlers/files');
+      return renameFile(filePath, newName);
     },
     delete: async ([filePath]: [string]) => {
-      const { trashWorkspaceFile } = await import('../handlers/workspaceFiles');
-      return trashWorkspaceFile(filePath);
+      const { trashFile } = await import('../handlers/files');
+      return trashFile(filePath);
     },
     trash: async ([filePath]: [string]) => {
-      const { trashWorkspaceFile } = await import('../handlers/workspaceFiles');
-      return trashWorkspaceFile(filePath);
+      const { trashFile } = await import('../handlers/files');
+      return trashFile(filePath);
     },
     duplicate: async ([filePath]: [string]) => {
-      const { duplicateWorkspaceFile } = await import('../handlers/workspaceFiles');
-      return duplicateWorkspaceFile(filePath);
+      const { duplicateFile } = await import('../handlers/files');
+      return duplicateFile(filePath);
     },
     copyPath: async ([filePath]: [string]) => {
       const { copyPath } = await import('../handlers/files');
       return copyPath(filePath);
     },
     create: async ([type, workspacePath]: ['note' | 'document' | 'spreadsheet' | 'slides' | 'automation' | 'remotion' | 'movie', string]) => {
-      const { createWorkspaceFile } = await import('../handlers/workspaceFiles');
-      return createWorkspaceFile(type, workspacePath);
+      const { createFile } = await import('../handlers/files');
+      return createFile(type, workspacePath);
     },
     createFolder: async ([parentPath, name]: [string, string | undefined]) => {
-      const { createWorkspaceFolder } = await import('../handlers/workspaceFiles');
-      return createWorkspaceFolder(parentPath, name);
+      const { createFolder } = await import('../handlers/files');
+      return createFolder(parentPath, name);
     },
     createBookmark: async ([url, title, faviconUrl, destFolder]: [string, string, string | undefined, string]) => {
-      const { createWorkspaceBookmark } = await import('../handlers/workspaceFiles');
-      return createWorkspaceBookmark(url, title, faviconUrl, destFolder);
+      const { createBookmark } = await import('../handlers/files');
+      return createBookmark(url, title, faviconUrl, destFolder);
     },
     getStats: async ([filePath]: [string]) => {
-      const { getWorkspaceFileStats } = await import('../handlers/workspaceFiles');
-      return getWorkspaceFileStats(filePath);
+      const { getFileStats } = await import('../handlers/files');
+      return getFileStats(filePath);
     },
   },
 
@@ -1405,10 +1508,7 @@ router.post('/:namespace/:method', async (req: Request, res: Response) => {
         );
       }
     }
-    const status = Number.isInteger(error?.status) && error.status >= 400 && error.status < 600
-      ? error.status
-      : 500;
-    res.status(status).json({ error: message });
+    res.status(500).json({ error: message });
   }
 });
 

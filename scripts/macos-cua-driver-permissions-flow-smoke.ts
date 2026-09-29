@@ -70,7 +70,7 @@ function parseArgs(argv: string[]): Args {
 function printHelp(): void {
   console.log(`Usage: pnpm run test:mac-desktop-permissions -- [--yes] [--binary <path>] [--timeout-ms <ms>]
 
-Resets macOS TCC grants for Interpreter and the native desktop helper, launches
+Resets macOS TCC grants for Hacienda and the native desktop helper, launches
 the real desktop-control daemon, waits for the native permission panel to be granted,
 verifies check_permissions through the daemon, then stops the daemon.
 
@@ -102,8 +102,8 @@ function resolveCuaDriverBinary(args: Args): string {
   const candidates = [
     ...(envPath ? [envPath] : []),
     path.join(process.cwd(), 'dist-electron', 'cua-driver', 'cua-driver'),
-    path.join(SYSTEM_APPLICATIONS_DIR, 'Interpreter.app', 'Contents', 'Resources', 'cua-driver', 'cua-driver'),
-    path.join(homedir(), 'Applications', 'Interpreter.app', 'Contents', 'Resources', 'cua-driver', 'cua-driver'),
+    path.join(SYSTEM_APPLICATIONS_DIR, 'Hacienda.app', 'Contents', 'Resources', 'cua-driver', 'cua-driver'),
+    path.join(homedir(), 'Applications', 'Hacienda.app', 'Contents', 'Resources', 'cua-driver', 'cua-driver'),
     path.join(SYSTEM_APPLICATIONS_DIR, 'CuaDriver.app', 'Contents', 'MacOS', 'cua-driver'),
     path.join(homedir(), 'Applications', 'CuaDriver.app', 'Contents', 'MacOS', 'cua-driver'),
   ];
@@ -111,7 +111,7 @@ function resolveCuaDriverBinary(args: Args): string {
   if (!binary) {
     throw new Error(
       `Unable to find native desktop helper binary. Checked: ${candidates.join(', ')}. `
-      + 'Run `pnpm run build:electron`, install Interpreter, or pass --binary.',
+      + 'Run `pnpm run build:electron`, install Hacienda, or pass --binary.',
     );
   }
   return binary;
@@ -207,8 +207,8 @@ async function bundleIdsForReset(binary: string): Promise<string[]> {
   const ids = new Set<string>([CUA_DRIVER_BUNDLE_ID, ...INTERPRETER_BUNDLE_IDS]);
   for (const appPath of [
     ...appBundleAncestors(binary),
-    path.join(SYSTEM_APPLICATIONS_DIR, 'Interpreter.app'),
-    path.join(homedir(), 'Applications', 'Interpreter.app'),
+    path.join(SYSTEM_APPLICATIONS_DIR, 'Hacienda.app'),
+    path.join(homedir(), 'Applications', 'Hacienda.app'),
     path.join(SYSTEM_APPLICATIONS_DIR, 'CuaDriver.app'),
     path.join(homedir(), 'Applications', 'CuaDriver.app'),
   ]) {
@@ -306,7 +306,7 @@ async function main(): Promise<void> {
   console.log(`[mac-desktop-permissions] resetting TCC for: ${bundleIds.join(', ')}`);
   if (!args.yes) {
     const ok = await confirm(
-      'This will reset local macOS Accessibility and Screen Recording grants for Interpreter and the native helper. Continue?',
+      'This will reset local macOS Accessibility and Screen Recording grants for Hacienda and the native helper. Continue?',
     );
     if (!ok) {
       console.log('Aborted.');
@@ -319,7 +319,7 @@ async function main(): Promise<void> {
 
   console.log('');
   console.log('[mac-desktop-permissions] Launching the native desktop helper daemon.');
-  console.log('[mac-desktop-permissions] Grant both permissions in the native Interpreter permission window.');
+  console.log('[mac-desktop-permissions] Grant both permissions in the native Hacienda permission window.');
   console.log('');
 
   const child = spawn(binary, ['serve'], {

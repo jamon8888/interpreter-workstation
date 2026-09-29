@@ -206,6 +206,11 @@ export interface AppConfig {
   telemetryEnabled?: boolean; // Whether to share anonymous usage analytics
   deviceId?: string; // Anonymous device identifier for telemetry (UUID)
 
+  // Search quality (reranker toggle). Explicit user override only: null/undefined
+  // means "automatic" (resolved per machine in rerankerPreference handler).
+  // Kept out of SettingsSnapshot: it describes this device, not portable UI prefs.
+  rerankerEnabledOverride?: boolean | null;
+
   // Onboarding: user email (from Stay Connected screen)
   userEmail?: string;
 
@@ -231,7 +236,7 @@ export interface AppConfig {
   skillFolders?: string[]; // Custom skill folder paths (in addition to default locations)
   allowModelSkillEditing?: boolean; // Allow model to write to the skills folder (default: false)
 
-  // Interpreter Overlay settings
+  // Hacienda Overlay settings
   interpreterOverlay?: InterpreterOverlaySettings;
 
   // i18n
@@ -867,7 +872,9 @@ async function moveInvalidModelConfigFileAside(filePath: string): Promise<string
   try {
     await rename(filePath, backupPath);
     return backupPath;
-  } catch {}
+  } catch {
+    // intentionally empty
+  }
 
   try {
     await copyFile(filePath, backupPath);
@@ -2345,7 +2352,7 @@ export function getBooleanUISettingSync(id: BooleanUISettingId): boolean {
 }
 
 /**
- * Get the Interpreter Overlay settings.
+ * Get the Hacienda Overlay settings.
  */
 export async function getInterpreterOverlaySettings(): Promise<InterpreterOverlaySettings> {
   const config = await loadConfig();
@@ -2353,7 +2360,7 @@ export async function getInterpreterOverlaySettings(): Promise<InterpreterOverla
 }
 
 /**
- * Set the Interpreter Overlay settings.
+ * Set the Hacienda Overlay settings.
  */
 export async function setInterpreterOverlaySettings(
   settings: InterpreterOverlaySettings,
@@ -2516,6 +2523,28 @@ export async function setTelemetryEnabled(enabled: boolean): Promise<void> {
   } catch {
     // Telemetry module may not be loaded yet during startup
   }
+}
+
+/**
+ * Get the explicit reranker override (search quality toggle).
+ * Returns null when unset — the caller resolves the per-machine default.
+ */
+export async function getRerankerEnabledOverride(): Promise<boolean | null> {
+  const config = await loadConfig();
+  return config.rerankerEnabledOverride ?? null;
+}
+
+/**
+ * Set the explicit reranker override. Pass null to return to automatic.
+ */
+export async function setRerankerEnabledOverride(value: boolean | null): Promise<void> {
+  const config = await loadConfig();
+  if (value === null) {
+    delete config.rerankerEnabledOverride;
+  } else {
+    config.rerankerEnabledOverride = value;
+  }
+  await saveConfig(config);
 }
 
 // =============================================================================

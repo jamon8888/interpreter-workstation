@@ -1384,13 +1384,13 @@ describe("CodexService", () => {
     const run = service.runTurn({
       message: "hello",
       model: "test-model",
-      baseInstructions: "You are Interpreter.",
+      baseInstructions: "You are Hacienda.",
       developerInstructions: "Use interpreter-specific behavior.",
       onEvent: () => {},
     });
 
     await waitFor(() => fake.calls.startTurn === 1);
-    assert.equal(fake.calls.startThreadBaseInstructions[0], "You are Interpreter.");
+    assert.equal(fake.calls.startThreadBaseInstructions[0], "You are Hacienda.");
     assert.equal(
       fake.calls.startThreadDeveloperInstructions[0],
       "Use interpreter-specific behavior.",
@@ -1637,13 +1637,13 @@ describe("CodexService", () => {
       threadId: "thr_existing",
       message: "hello",
       model: "test-model",
-      baseInstructions: "You are Interpreter.",
+      baseInstructions: "You are Hacienda.",
       developerInstructions: "Use interpreter-specific behavior.",
       onEvent: () => {},
     });
 
     await waitFor(() => fake.calls.startTurn === 1);
-    assert.equal(fake.calls.resumeThreadBaseInstructions[0], "You are Interpreter.");
+    assert.equal(fake.calls.resumeThreadBaseInstructions[0], "You are Hacienda.");
     assert.equal(
       fake.calls.resumeThreadDeveloperInstructions[0],
       "Use interpreter-specific behavior.",
@@ -1809,11 +1809,11 @@ describe("CodexService", () => {
 
     const profile: Profile = {
       id: "interpreter",
-      label: "Interpreter",
+      label: "Hacienda",
       modelProvider: "interpreter",
       providerConfig: {
         base_url: "https://example.com",
-        name: "Interpreter",
+        name: "Hacienda",
         requires_openai_auth: false,
       },
     };

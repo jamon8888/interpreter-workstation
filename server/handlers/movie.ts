@@ -711,6 +711,7 @@ async function renderMovieFramesWithElectron({
 
   assertMovieExportNotCancelled(signal);
 
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- sync Electron API access for window creation
   const { BrowserWindow } = require('electron') as typeof import('electron');
   const renderWindow = new BrowserWindow({
     show: false,

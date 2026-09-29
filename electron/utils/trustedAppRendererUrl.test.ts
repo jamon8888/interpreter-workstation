@@ -8,7 +8,7 @@ const options = {
 
 describe('isTrustedAppRendererUrl', () => {
   test('accepts packaged file renderer URLs', () => {
-    expect(isTrustedAppRendererUrl('file:///Applications/Interpreter.app/index.html', options)).toBe(true);
+    expect(isTrustedAppRendererUrl('file:///Applications/Hacienda.app/index.html', options)).toBe(true);
   });
 
   test('accepts localhost dev renderer URLs inside the configured port range', () => {

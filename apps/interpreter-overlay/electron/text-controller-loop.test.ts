@@ -74,7 +74,7 @@ describe('overlay text controller loop tools and prompt', () => {
     ]);
     expect(tools[0].description).toContain('Submit one batch of approved Interpreter tool calls.');
     expect(JSON.stringify(tools[0].parameters)).toContain('"click","type","hotkey","scroll"');
-    expect(tools[1].description).toContain('Delegate a bounded task to a hidden Interpreter agent');
+    expect(tools[1].description).toContain('Delegate a bounded task to a hidden Hacienda agent');
     expect(JSON.stringify(tools[1].parameters)).toContain('"message"');
     expect(tools[2].description).toContain('Answer a focused question from the locally attached selected-file or selected-text context.');
     expect(JSON.stringify(tools[2].parameters)).toContain('"question"');

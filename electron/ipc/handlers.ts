@@ -276,8 +276,8 @@ function buildReferenceUpdateConfirmationEvent(options: {
     requestId: randomUUID(),
     workspacePath: options.workspacePath,
     title: 'Update Note References',
-    message: `“${noteName}” is referenced elsewhere in this workspace. Should Interpreter update those references after the rename or move?`,
-    permissionNote: 'Interpreter can rewrite markdown note references in these workspace files:',
+    message: `“${noteName}” is referenced elsewhere in this workspace. Should Hacienda update those references after the rename or move?`,
+    permissionNote: 'Hacienda can rewrite markdown note references in these workspace files:',
     backupNote: 'This is limited to markdown files inside the current workspace. The rename or move still happens either way.',
     confirmLabel: 'Update References',
     cancelLabel: 'Leave References',
@@ -1171,7 +1171,7 @@ export function setupIpcHandlers(deps: HandlerDependencies): void {
     ): Promise<InterpreterOverlayStartWindowVoiceResponse> => {
       const service = getInterpreterOverlayService();
       if (!service) {
-        return { success: false, error: 'Interpreter Overlay is not ready.' };
+        return { success: false, error: 'Hacienda Overlay is not ready.' };
       }
       return service.startWindowVoiceMode(request);
     },
@@ -2661,6 +2661,16 @@ export function setupIpcHandlers(deps: HandlerDependencies): void {
   );
 
   registerHandle(
+    IPC_CHANNELS.OFFICE_EXTENSION_HEALTHCHECK,
+    async (): Promise<{ status: string; port: string }> => {
+      const port = process.env.OO_EDITORS_PORT || '38123';
+      const response = await fetch(`http://localhost:${port}/healthcheck`);
+      const text = await response.text();
+      return { status: text, port };
+    }
+  );
+
+  registerHandle(
     IPC_CHANNELS.VOICE_EXTENSION_CHECK_INSTALLED,
     async (
       _event,
@@ -3124,7 +3134,7 @@ export function setupIpcHandlers(deps: HandlerDependencies): void {
       try {
         const appWindow = BrowserWindow.fromWebContents(event.sender);
         if (!appWindow) {
-          return { success: false, error: 'Interpreter window is unavailable.' };
+          return { success: false, error: 'Hacienda window is unavailable.' };
         }
 
         if (appWindow.isFullScreen()) {

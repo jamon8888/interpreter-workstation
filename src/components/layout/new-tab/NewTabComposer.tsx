@@ -175,6 +175,7 @@ export function NewTabProfileSelector() {
           selectedProfileId={defaultProfileId || undefined}
           onProfileSelect={handleProfileSelect}
           onNavigateToSettings={handleNavigateToSettings}
+          showPrivacyHint={true}
         />
       </PopoverContent>
     </Popover>
@@ -211,6 +212,7 @@ function NewTabComposerInner({ agentId, onSend, showFirstStartupNudge, placehold
       composerRef.current?.setContentWithTokenFlash(text, ranges),
     getContent: () => composerRef.current?.getContent() ?? '',
     getSubmission: () => composerRef.current?.getSubmission() ?? { text: '', attachments: [] },
+    getRehydrationMap: () => composerRef.current?.getRehydrationMap() ?? {},
     clearContent: () => composerRef.current?.clearContent(),
   }));
 

@@ -137,10 +137,12 @@ function tryLoadServer<T>(serverId: string, loader: () => T): T | null {
 let remotionServerDefinition: BuiltinServerDefinition | null = null;
 if (process.versions.electron) {
   remotionServerDefinition = tryLoadServer('builtin-remotion', () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- sync Electron API in conditional guard
     const { app } = require('electron') as typeof import('electron');
     if (app.isPackaged) {
       return null;
     }
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- sync require for dev-only Remotion tools
     return require('./builtin-tools/remotion/index').remotionServerDefinition as BuiltinServerDefinition;
   });
 }

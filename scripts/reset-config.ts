@@ -217,7 +217,7 @@ async function stopRunningInterpreterProcesses(targetPaths: string[]): Promise<v
   }
 
   console.log(
-    `Stopping ${processes.length} running Interpreter process(es) using reset state...`,
+    `Stopping ${processes.length} running Hacienda process(es) using reset state...`,
   );
   await terminateProcesses(processes);
 }
@@ -326,7 +326,7 @@ export function resolveDarwinTccBundleIds(productConfig: ProductConfig | null): 
   // Preserve cleanup support for pre-OSS development builds that used this ID.
   candidates.add('com.openinterpreter.interpreter');
 
-  // Known local/dev bundle identifiers used by source-built Interpreter apps.
+  // Known local/dev bundle identifiers used by source-built Hacienda apps.
   candidates.add('com.interpreter.dev');
   candidates.add('com.openinterpreter.interpreter.dev');
   candidates.add('com.openinterpreter.interpreter-internal.dev');
@@ -336,12 +336,12 @@ export function resolveDarwinTccBundleIds(productConfig: ProductConfig | null): 
 
 export function resolveDarwinBundleRegistrationPaths(homeDir = homedir()): string[] {
   return [...new Set([
-    join(homeDir, 'Applications', 'Interpreter.app'),
-    '/Applications/Interpreter.app',
+    join(homeDir, 'Applications', 'Hacienda.app'),
+    '/Applications/Hacienda.app',
     new URL('../node_modules/electron/dist/Electron.app', import.meta.url).pathname,
-    new URL('../.cache/dev-electron-bundles/Interpreter.app', import.meta.url).pathname,
-    new URL('../.cache/dev-electron-bundles/Interpreter Internal.app', import.meta.url).pathname,
-    new URL('../.cache/dev-electron-bundles/Interpreter-Internal.app', import.meta.url).pathname,
+    new URL('../.cache/dev-electron-bundles/Hacienda.app', import.meta.url).pathname,
+    new URL('../.cache/dev-electron-bundles/Hacienda Internal.app', import.meta.url).pathname,
+    new URL('../.cache/dev-electron-bundles/Hacienda-Internal.app', import.meta.url).pathname,
   ])];
 }
 
@@ -433,7 +433,7 @@ async function resetMacOsInterpreterPermissions(): Promise<void> {
     return;
   }
 
-  console.log('Resetting macOS privacy permissions for Interpreter...');
+  console.log('Resetting macOS privacy permissions for Hacienda...');
   for (const bundleId of bundleIds) {
     try {
       await execFile('tccutil', ['reset', 'All', bundleId]);

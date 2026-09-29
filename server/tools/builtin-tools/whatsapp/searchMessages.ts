@@ -43,7 +43,7 @@ export const searchMessagesTool: BuiltinToolDefinition = {
       const chatId = args.chat_id as string | undefined;
       const limit = (args.limit as number) || 20;
 
-      let allMessages = getCachedMessages(chatId);
+      const allMessages = getCachedMessages(chatId);
 
       const matches = allMessages
         .filter(m => m.body.toLowerCase().includes(query))

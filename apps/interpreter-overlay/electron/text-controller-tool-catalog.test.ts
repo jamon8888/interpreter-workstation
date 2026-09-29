@@ -42,13 +42,13 @@ describe('overlay text controller tool catalog', () => {
       expect(catalog).toContain(`server_id="builtin-agent-windows" name="${toolName}"`);
     }
     expect(catalog).toContain('server_id="builtin-interpreter-overlay" name="computer_batch"');
-    expect(catalog).toContain('Run one ordered batch through the unified Interpreter tool layer');
+    expect(catalog).toContain('Run one ordered batch through the unified Hacienda tool layer');
     expect(catalog).toContain('server_id="builtin-interpreter-overlay" name="overlay_show_drawings"');
-    expect(catalog).toContain('Show visual-only rectangle annotations inside the granted Interpreter Overlay square');
+    expect(catalog).toContain('Show visual-only rectangle annotations inside the granted Hacienda Overlay square');
     expect(catalog).toContain('server_id="builtin-interpreter-overlay" name="overlay_clear_drawings"');
-    expect(catalog).toContain('Clear visual-only drawings from the granted Interpreter Overlay square');
+    expect(catalog).toContain('Clear visual-only drawings from the granted Hacienda Overlay square');
     expect(catalog).toContain('server_id="builtin-interpreter-overlay" name="call_hidden_agent"');
-    expect(catalog).toContain('Delegate a bounded task to a hidden Interpreter agent');
+    expect(catalog).toContain('Delegate a bounded task to a hidden Hacienda agent');
     expect(catalog).toContain('server_id="builtin-cua-driver" name="list_windows"');
     expect(catalog).toContain('List top-level app windows with normalized target_identity objects, titles, and bounds.');
     expect(catalog).toContain('server_id="builtin-cua-driver" name="get_ui_elements"');
@@ -73,7 +73,7 @@ describe('overlay text controller tool catalog', () => {
     expect(catalog).toContain('server_id="builtin-selection" name="read_current_selection"');
     expect(catalog).toContain('Read the current desktop selection as selected text and permission-filtered selected file refs.');
     expect(catalog).toContain('server_id="builtin-interpreter" name="interpreter_whole_computer_state_get"');
-    expect(catalog).toContain('Read bounded local Interpreter whole-computer state');
+    expect(catalog).toContain('Read bounded local Hacienda whole-computer state');
     expect(catalog).toContain('input_schema: run `interpreter-app tools builtin-interpreter interpreter_whole_computer_state_get --help` for the authoritative schema');
     for (const toolName of OVERLAY_INTERPRETER_TOOL_NAMES) {
       expect(catalog).toContain(`server_id="builtin-interpreter" name="${toolName}"`);
@@ -95,19 +95,19 @@ describe('overlay text controller tool catalog', () => {
     expect(catalog).not.toContain('server_id="browser-extension"');
     expect(catalog).not.toContain('server_id="browser-control-relay"');
     expect(catalog).toContain('server_id="builtin-agent-windows" name="list_agent_windows"');
-    expect(catalog).toContain('List Interpreter-owned agent windows and safe thread/status metadata.');
+    expect(catalog).toContain('List Hacienda-owned agent windows and safe thread/status metadata.');
     expect(catalog).toContain('server_id="builtin-agent-windows" name="launch_agent_window"');
-    expect(catalog).toContain('Launch a normal visible Interpreter agent window and send it an initial message.');
+    expect(catalog).toContain('Launch a normal visible Hacienda agent window and send it an initial message.');
     expect(catalog).toContain('server_id="builtin-agent-windows" name="send_agent_window_message"');
-    expect(catalog).toContain('Send a follow-up message to an existing visible Interpreter agent window.');
+    expect(catalog).toContain('Send a follow-up message to an existing visible Hacienda agent window.');
     expect(catalog).toContain('server_id="builtin-agent-windows" name="reveal_agent_window"');
-    expect(catalog).toContain('Reveal and focus an existing visible Interpreter agent window/tab');
+    expect(catalog).toContain('Reveal and focus an existing visible Hacienda agent window/tab');
     expect(catalog).toContain('server_id="builtin-agent-windows" name="stop_agent_window"');
-    expect(catalog).toContain('Request cancellation of a running visible Interpreter agent window');
+    expect(catalog).toContain('Request cancellation of a running visible Hacienda agent window');
     expect(catalog).toContain('server_id="builtin-agent-windows" name="close_agent_window"');
-    expect(catalog).toContain('Close an existing visible Interpreter agent window/tab');
+    expect(catalog).toContain('Close an existing visible Hacienda agent window/tab');
     expect(catalog).toContain('server_id="builtin-agent-windows" name="await_agent_window"');
-    expect(catalog).toContain('Wait for an Interpreter-owned agent window to finish its current task');
+    expect(catalog).toContain('Wait for a Hacienda-owned agent window to finish its current task');
   });
 
   test('fails loudly when a requested catalog tool is missing', () => {

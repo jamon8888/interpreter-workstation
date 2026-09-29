@@ -268,7 +268,7 @@ describe('interpreterCli handlers', () => {
     });
   });
 
-  test('blocks read-only Interpreter CLI output when the prompt-injection guard flags it', async () => {
+  test('blocks read-only Hacienda CLI output when the prompt-injection guard flags it', async () => {
     const guardCalls: Array<{ modelProfileId: string; resultText: string }> = [];
     setReadToolPromptInjectionGuardRunnerForTests(async (input, modelProfileId) => {
       guardCalls.push({ modelProfileId, resultText: input.resultText });
@@ -330,7 +330,7 @@ describe('interpreterCli handlers', () => {
     }]);
   });
 
-  test('does not run the prompt-injection guard for write Interpreter CLI tools', async () => {
+  test('does not run the prompt-injection guard for write Hacienda CLI tools', async () => {
     let guardCallCount = 0;
     setReadToolPromptInjectionGuardRunnerForTests(async () => {
       guardCallCount += 1;
@@ -409,7 +409,7 @@ describe('interpreterCli handlers', () => {
     expect(guardCallCount).toBe(0);
   });
 
-  test('guards annotated read-only built-in Interpreter CLI tools', async () => {
+  test('guards annotated read-only built-in Hacienda CLI tools', async () => {
     const guardCalls: string[] = [];
     setReadToolPromptInjectionGuardRunnerForTests(async (input) => {
       guardCalls.push(`${input.serverId}/${input.toolName}:${input.resultText}`);
@@ -702,7 +702,7 @@ describe('interpreterCli handlers', () => {
           {
             id: 'builtin-interpreter',
             name: 'Interpreter',
-            description: 'Interpreter tools',
+            description: 'Hacienda tools',
             state: {
               status: 'connected',
               tools: [
@@ -740,7 +740,7 @@ describe('interpreterCli handlers', () => {
           server: {
             id: 'builtin-interpreter',
             name: 'Interpreter',
-            description: 'Interpreter tools',
+            description: 'Hacienda tools',
           },
           tool: {
             name: 'interpreter_vault',
@@ -1190,7 +1190,7 @@ describe('interpreterCli handlers', () => {
     expect(request.serverId).toBe('builtin-test-approval');
     expect(request.agentId).toBe('agent-cli-approval-owner');
     expect(request.owner?.approvalOwnerKind).toBe('normal-agent');
-    expect(request.owner?.displayName).toBe('Interpreter agent (profile-cli-approval-owner)');
+    expect(request.owner?.displayName).toBe('Hacienda agent (profile-cli-approval-owner)');
     expect(request.owner?.identity).toEqual({
       agentId: 'agent-cli-approval-owner',
       threadId: 'thr_cli_approval_owner',

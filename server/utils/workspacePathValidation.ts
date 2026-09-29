@@ -18,7 +18,9 @@ export function canWritePathInWorkspace(targetPath: string, workspacePath: strin
     const candidate = segments.slice(0, i).join(sep) || sep;
     try {
       return isWithin(realWorkspace, realpathSync(candidate));
-    } catch {}
+    } catch {
+      // intentionally empty
+    }
   }
 
   return false;

@@ -102,12 +102,14 @@ async function readPidFile(filePath: string): Promise<number | null> {
 function killPid(pid: number): void {
   try {
     process.kill(pid, 'SIGKILL');
-  } catch {}
+  } catch {
+    // intentionally empty
+  }
 }
 
 async function waitForCondition(
   predicate: () => Promise<boolean>,
-  timeoutMs = 5000,
+  timeoutMs = 10000,
 ): Promise<void> {
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {

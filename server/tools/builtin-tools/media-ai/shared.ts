@@ -396,6 +396,7 @@ export function extractInputParameters(model: UnknownRecord): UnknownRecord {
 
 export function sanitizeFileName(input: string): string {
   const trimmed = input.trim();
+  // eslint-disable-next-line no-control-regex -- intentional: strip control characters from filenames
   const withoutInvalid = trimmed.replace(/[<>:"/\\|?*\x00-\x1F]/g, "_");
   const collapsed = withoutInvalid.replace(/\s+/g, "_");
   const clean = collapsed.replace(/_+/g, "_").replace(/^_+|_+$/g, "");

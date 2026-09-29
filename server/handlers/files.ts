@@ -26,6 +26,7 @@ const isElectron = !!process.versions.electron;
 let electronShell: Electron.Shell | null = null;
 if (isElectron) {
   try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- sync lazy-load for Electron guard
     const electron = require('electron');
     electronShell = electron.shell;
   } catch {
@@ -266,6 +267,7 @@ function isPackagedElectronApp(): boolean {
   }
 
   try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- sync lazy-load for Electron guard
     return require('electron').app.isPackaged;
   } catch {
     return true;

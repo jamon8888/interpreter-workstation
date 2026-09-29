@@ -228,12 +228,13 @@ class JsReplKernel {
         type: 'run_tool_result',
         id: message.id,
         ok: false,
-        error: 'interpreter.tool(...) is not available in this app; run other Interpreter tools through the interpreter-app CLI from shell instead.',
+        error: 'interpreter.tool(...) is not available in this app; run other Hacienda tools through the interpreter-app CLI from shell instead.',
       });
       return;
     }
 
     if (message.type === 'emit_image') {
+      // eslint-disable-next-line no-useless-assignment -- initial null needed for try/catch scope
       let savedPath: string | null = null;
       let error: string | null = null;
       try {

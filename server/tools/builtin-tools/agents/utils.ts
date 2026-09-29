@@ -419,6 +419,7 @@ export async function logConversationHistory(
   path: any
 ): Promise<string> {
   // Import getSandboxDir dynamically to avoid circular dependencies
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- sync require for dynamic utility
   const { getSandboxDir } = require('../../../utils/sandboxManager');
 
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -465,6 +466,7 @@ export async function captureFileContent(
         return { content, raw: content };
       }
       case 'word': {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports -- sync require for document utility
         const { readDocxText } = require('../../../utils/documentText');
         const buffer = await fs.readFile(filePath);
         const plaintext = await readDocxText(buffer);
@@ -472,6 +474,7 @@ export async function captureFileContent(
       }
       case 'excel': {
         try {
+          // eslint-disable-next-line @typescript-eslint/no-require-imports -- sync require for spreadsheet utility
           const { readSpreadsheetTextPreview } = require('../../../utils/spreadsheetText');
           const plaintext = await readSpreadsheetTextPreview(filePath);
           const buffer = await fs.readFile(filePath);
@@ -483,6 +486,7 @@ export async function captureFileContent(
       }
       case 'pdf': {
         try {
+          // eslint-disable-next-line @typescript-eslint/no-require-imports -- sync require for PDF utility
           const { readPdfStructure } = require('../../../utils/pdfStructure');
           const structure = await readPdfStructure(filePath);
           const plaintext = structure.elements

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Switch } from '../ui/switch';
 import { SettingsRow } from './SettingsSection';
-import { uiSettings } from '@/ipc';
+import { search, uiSettings, workspaceScan } from '@/ipc';
 import type { BooleanSettingChangedEvent } from '../../../shared/booleanSettings';
 import { trackSettingChanged } from '../../utils/telemetry';
 
@@ -11,6 +11,9 @@ export function AppBehaviorSectionContent() {
 
   const { t } = useTranslation();
   const [launchAtLogin, setLaunchAtLogin] = useState(false);
+  const [rerankerEnabled, setRerankerEnabled] = useState(false);
+  const [rerankerOverride, setRerankerOverride] = useState<boolean | null>(null);
+  const [rerankerReady, setRerankerReady] = useState(true);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -20,6 +23,17 @@ export function AppBehaviorSectionContent() {
         setLaunchAtLogin(launchAtLoginResponse.enabled);
       } catch (error) {
         console.error('Failed to load app behavior settings:', error);
+      }
+      try {
+        const [rerankerState, scanStatus] = await Promise.all([
+          search.getRerankerEnabled(),
+          workspaceScan.status(),
+        ]);
+        setRerankerEnabled(rerankerState.enabled);
+        setRerankerOverride(rerankerState.override);
+        setRerankerReady(scanStatus.resourcesReady.reranker);
+      } catch (error) {
+        console.error('Failed to load reranker setting:', error);
       } finally {
         setLoading(false);
       }
@@ -58,6 +72,46 @@ export function AppBehaviorSectionContent() {
     return <div className="text-ui-sm text-muted-foreground">{t('common.loading')}</div>;
   }
 
+  async function handleRerankerChange(enabled: boolean) {
+    const previous = rerankerEnabled;
+    const previousOverride = rerankerOverride;
+    setRerankerEnabled(enabled);
+    setRerankerOverride(enabled);
+    try {
+      const result = await search.setRerankerEnabled(enabled);
+      setRerankerEnabled(result.enabled);
+      trackSettingChanged({
+        settingKey: 'rerankerEnabled', tabId: 'general', sectionId: 'preferences',
+        valueType: 'boolean', oldValue: previous, newValue: result.enabled,
+      });
+    } catch (error) {
+      console.error('Failed to save reranker setting:', error);
+      setRerankerEnabled(previous);
+      setRerankerOverride(previousOverride);
+    }
+  }
+
+  async function handleRerankerResetAuto() {
+    const previous = rerankerEnabled;
+    const previousOverride = rerankerOverride;
+    try {
+      const [result, state] = await Promise.all([
+        search.setRerankerEnabled(null),
+        search.getRerankerEnabled(),
+      ]);
+      setRerankerEnabled(result.enabled);
+      setRerankerOverride(state.override);
+      trackSettingChanged({
+        settingKey: 'rerankerEnabled', tabId: 'general', sectionId: 'preferences',
+        valueType: 'boolean', oldValue: previous, newValue: result.enabled,
+      });
+    } catch (error) {
+      console.error('Failed to reset reranker setting:', error);
+      setRerankerEnabled(previous);
+      setRerankerOverride(previousOverride);
+    }
+  }
+
   return (
     <>
       <SettingsRow
@@ -65,6 +119,30 @@ export function AppBehaviorSectionContent() {
         description={t('settings.general.launchAtLoginDescription')}
       >
         <Switch checked={launchAtLogin} onCheckedChange={handleLaunchAtLoginChange} />
+      </SettingsRow>
+      <SettingsRow
+        label={t('settings.search.rerankLabel')}
+        description={
+          rerankerReady
+            ? t('settings.search.rerankDescription')
+            : t('settings.search.rerankNoModel')
+        }
+      >
+        <span className="flex items-center gap-2">
+          {rerankerOverride === null && (
+            <span className="text-ui-xs text-muted-foreground">{t('settings.search.rerankAuto')}</span>
+          )}
+          {rerankerOverride !== null && (
+            <button
+              type="button"
+              onClick={handleRerankerResetAuto}
+              className="text-ui-xs text-muted-foreground transition-colors hover:text-foreground"
+            >
+              {t('settings.search.rerankAutoReset')}
+            </button>
+          )}
+          <Switch checked={rerankerEnabled} onCheckedChange={handleRerankerChange} />
+        </span>
       </SettingsRow>
     </>
   );

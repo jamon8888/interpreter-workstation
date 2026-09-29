@@ -678,7 +678,7 @@ describe('whole computer state tool', () => {
 
     expect(result.isError).toBe(true);
     expect(textFromResult(result)).toBe(
-      'Failed to read Interpreter whole-computer state: max_windows must be a positive integer.',
+      'Failed to read Hacienda whole-computer state: max_windows must be a positive integer.',
     );
   });
 });

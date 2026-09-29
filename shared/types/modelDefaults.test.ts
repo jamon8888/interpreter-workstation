@@ -73,7 +73,7 @@ describe('ONBOARDING_MODEL_PACKS', () => {
   test('includes the Interpreter hosted model pack with Smart/Fast', () => {
     const pack = ONBOARDING_MODEL_PACKS.hosted;
     expect(pack.profiles.length).toBe(2);
-    expect(pack.profiles.map(profile => profile.name)).toEqual(['Interpreter Smart', 'Interpreter Fast']);
+    expect(pack.profiles.map(profile => profile.name)).toEqual(['Hacienda Smart', 'Hacienda Fast']);
     expect(pack.profiles[0].helpDescription).toContain('smartest model');
     expect(pack.profiles[1].helpDescription).toContain('fastest model');
     expect(getHostedOnboardingFastProfileId(pack)).toBe('onboarding:interpreter-fast');

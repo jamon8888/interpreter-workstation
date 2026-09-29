@@ -181,7 +181,6 @@ async function runTests() {
 }
 
 // Run if executed directly (ESM only)
-// @ts-ignore - import.meta requires ESM module mode
 if (typeof import.meta !== 'undefined' && import.meta.url === `file://${process.argv[1]}`) {
   runTests().catch(console.error);
 }

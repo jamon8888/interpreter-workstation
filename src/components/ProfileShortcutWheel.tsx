@@ -209,7 +209,7 @@ export function ProfileShortcutWheel({
        * - If the resting label is derived from the wheel's current row, React will render the
        *   first preview item instead of the actual selected profile. That produces the exact bug
        *   we hit here: the checkmark and real model switch are correct, but the closed trigger
-       *   text looks stuck on an unrelated early item such as "Interpreter Smart".
+       *   text looks stuck on an unrelated early item such as "Hacienda Smart".
        *
        * In other words, there are two different concepts here and they must stay separate:
        * - `fallbackLabel`: authoritative label for the real selected profile
