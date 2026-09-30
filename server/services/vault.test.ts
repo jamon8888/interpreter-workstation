@@ -7,10 +7,13 @@ import {
   deleteVaultBlob,
   extractRehydrationMap,
   listVaultBlobDocIds,
+  listVaultBlobs,
   resolveVaultBlobPath,
   sanitizeVaultDocId,
   vaultManager,
 } from './vault';
+import { setCurrentWorkspace } from '../utils/workspace';
+import { workspaceVaultSegment } from '../../src/lib/pii/vaultScope';
 
 describe('sanitizeVaultDocId', () => {
   test('accepts safe document ids', () => {
@@ -24,8 +27,20 @@ describe('sanitizeVaultDocId', () => {
 });
 
 describe('resolveVaultBlobPath', () => {
-  test('keeps blobs inside the vaults directory', () => {
+  test('keeps blobs inside the vaults directory when no workspace is active', () => {
     expect(resolveVaultBlobPath('doc-1', '/data/user')).toBe('/data/user/vaults/doc-1.enc');
+  });
+
+  test('scopes blobs under the active workspace segment', () => {
+    setCurrentWorkspace('/ws/alpha');
+    try {
+      const segment = workspaceVaultSegment('/ws/alpha');
+      expect(resolveVaultBlobPath('doc-1', '/data/user')).toBe(
+        `/data/user/vaults/${segment}/doc-1.enc`,
+      );
+    } finally {
+      setCurrentWorkspace(null);
+    }
   });
 });
 
@@ -169,6 +184,31 @@ describe('deleteVaultBlob', () => {
 
   test('rejects invalid doc ids', () => {
     expect(() => deleteVaultBlob('../escape', '/tmp')).toThrow();
+  });
+});
+
+describe('listVaultBlobs', () => {
+  test('returns blobs from the root and each workspace segment', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'vault-gc-'));
+    const vaultsDir = join(dir, 'vaults');
+    mkdirSync(join(vaultsDir, 'deadbeef'), { recursive: true });
+    writeFileSync(join(vaultsDir, 'thread-aaa.enc'), 'a');
+    writeFileSync(join(vaultsDir, '.vault-key.enc'), 'k');
+    writeFileSync(join(vaultsDir, 'deadbeef', 'thread-ccc.enc'), 'c');
+    writeFileSync(join(vaultsDir, 'deadbeef', '.vault-key.enc'), 'k2');
+    writeFileSync(join(vaultsDir, 'not-a-blob.txt'), 'x');
+    const blobs = listVaultBlobs(dir);
+    expect(blobs.map((b) => b.docId).sort()).toEqual(['thread-aaa', 'thread-ccc']);
+    expect(blobs.find((b) => b.docId === 'thread-ccc')?.fullPath).toBe(
+      join(vaultsDir, 'deadbeef', 'thread-ccc.enc'),
+    );
+    rmSync(dir, { recursive: true });
+  });
+
+  test('returns empty array when vaults directory does not exist', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'vault-gc-'));
+    expect(listVaultBlobs(dir)).toEqual([]);
+    rmSync(dir, { recursive: true });
   });
 });
 

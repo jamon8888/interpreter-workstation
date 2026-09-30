@@ -70,4 +70,25 @@ describe('runOrphanBlobGcOnce', () => {
     expect(result.cleaned).toBe(0);
     expect(existsSync(join(vaultsDir, '.vault-key.enc'))).toBe(true);
   });
+
+  test('never deletes note rehydration blobs (thread-note<hex>)', () => {
+    const vaultsDir = join(dir, 'vaults');
+    mkdirSync(vaultsDir, { recursive: true });
+    const notePath = join(vaultsDir, 'thread-note8a9b0c1d.enc');
+    writeFileSync(notePath, 'note-map');
+
+    const result = runOrphanBlobGcOnce({ activeThreadIds: [], userDataDir: dir });
+    expect(result.cleaned).toBe(0);
+    expect(existsSync(notePath)).toBe(true);
+  });
+
+  test('cleans orphans inside workspace segments', () => {
+    const segmentDir = join(dir, 'vaults', 'deadbeef');
+    mkdirSync(segmentDir, { recursive: true });
+    writeFileSync(join(segmentDir, 'thread-orphan.enc'), 'orphan');
+
+    const result = runOrphanBlobGcOnce({ activeThreadIds: [], userDataDir: dir });
+    expect(result.cleaned).toBe(1);
+    expect(existsSync(join(segmentDir, 'thread-orphan.enc'))).toBe(false);
+  });
 });

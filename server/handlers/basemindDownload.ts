@@ -18,10 +18,11 @@ export interface BasemindDownloadProgress {
   error?: string;
 }
 
+// Spec §9 order: preseed pinned weights first, embeddings warmup last.
 const STAGES: Array<{ stage: BasemindDownloadStage; resource: ModelResource }> = [
-  { stage: 'embeddings', resource: 'embeddings' },
-  { stage: 'reranker', resource: 'reranker' },
   { stage: 'nerModel', resource: 'nerModel' },
+  { stage: 'reranker', resource: 'reranker' },
+  { stage: 'embeddings', resource: 'embeddings' },
 ];
 
 const WARMUP_TIMEOUT_MS = 5 * 60_000;
@@ -37,12 +38,11 @@ const WARMUP_QUERY = 'quarterly report renewable energy';
  *
  * Each call creates an isolated private temp dir (mkdtemp, 0700) so a
  * pre-existing /tmp path can't be used for symlink attacks. Caller must
- * remove it via cleanupTempDir in a finally block.
- * `needGit` stays for documentation: no current stage needs git anymore
- * (reranker/NER are pre-seeded; embeddings warm up via `memory documents`,
- * which doesn't enumerate via git), which keeps packaged builds git-free.
+ * remove it via cleanupTempDir in a finally block. No stage needs git:
+ * reranker/NER are pre-seeded and embeddings warms via `memory documents`,
+ * which keeps packaged builds git-free.
  */
-async function ensureWarmupWorkspace(needGit: boolean): Promise<string> {
+async function ensureWarmupWorkspace(): Promise<string> {
   const dir = mkdtempSync(path.join(tmpdir(), 'basemind-model-warmup-'));
   try {
     const docPath = path.join(dir, 'warmup.html');
@@ -60,16 +60,6 @@ async function ensureWarmupWorkspace(needGit: boolean): Promise<string> {
       + '}\n'
       + 'module.exports = { sumQuarterlyReport };\n',
     );
-
-    // basemind's `code` domain (used by the reranker warmup) enumerates files
-    // via git and returns an empty corpus outside one — `memory documents`
-    // (the embeddings warmup) doesn't need this, but code semantic does.
-    if (needGit) {
-      const gitEnv = { ...process.env, GIT_AUTHOR_NAME: 'basemind-warmup', GIT_AUTHOR_EMAIL: 'basemind-warmup@local', GIT_COMMITTER_NAME: 'basemind-warmup', GIT_COMMITTER_EMAIL: 'basemind-warmup@local' };
-      await execFileAsync('git', ['init', '-q'], { cwd: dir });
-      await execFileAsync('git', ['add', '-A'], { cwd: dir });
-      await execFileAsync('git', ['commit', '-q', '--no-gpg-sign', '-m', 'warmup'], { cwd: dir, env: gitEnv });
-    }
     return dir;
   } catch (err) {
     cleanupTempDir(dir);
@@ -169,12 +159,13 @@ export async function* basemindDownload(onlyStage?: BasemindDownloadStage): Asyn
       // onboarding needs (scan never initializes NER; `code --rerank` only
       // knows compiled-in presets, not the GTE Custom model) — pre-seed the
       // weights directly so onboarding actually delivers "models downloaded"
-      // (see basemindPreseed.ts). nerModel = gliner-pii-edge (engine #231),
-      // reranker = GTE-multilingual int8 (decision #228).
-      const { preseedNerModel, EDGE_REPO, EDGE_REV, EDGE_FILES, GTE_REPO, GTE_REV, GTE_FILES } =
+      // (see basemindPreseed.ts). nerModel = fastino GLiNER2 run through
+      // candle (GLiNER2-redaction spec #37), reranker = GTE-multilingual
+      // int8 (decision #228).
+      const { preseedNerModel, FASTINO_REPO, FASTINO_REV, FASTINO_FILES, GTE_REPO, GTE_REV, GTE_FILES } =
         await import('./basemindPreseed');
       const opts = stage === 'nerModel'
-        ? { repo: EDGE_REPO, rev: EDGE_REV, files: EDGE_FILES }
+        ? { repo: FASTINO_REPO, rev: FASTINO_REV, files: FASTINO_FILES }
         : { repo: GTE_REPO, rev: GTE_REV, files: GTE_FILES };
       try {
         result = await preseedNerModel(opts);
@@ -198,7 +189,7 @@ export async function* basemindDownload(onlyStage?: BasemindDownloadStage): Asyn
       try {
         // Only the embeddings stage still warms up (no git needed: `memory
         // documents` doesn't enumerate via git). Reranker/NER are pre-seeded.
-        workspace = await ensureWarmupWorkspace(false);
+        workspace = await ensureWarmupWorkspace();
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         yield { stage, progress: 0, done: false, error: `warmup workspace setup failed: ${message}` };
@@ -211,12 +202,16 @@ export async function* basemindDownload(onlyStage?: BasemindDownloadStage): Asyn
       try {
         result = await runWarmup(binary, stage, workspace, commsDir);
       } finally {
-        try { cleanupTempDir(workspace); } catch (err) {
+        try {
+          cleanupTempDir(workspace);
+        } catch (err) {
           console.warn(`[basemindDownload] warmup workspace cleanup failed for ${workspace}: ${err instanceof Error ? err.message : String(err)}`);
-      }
-      try { cleanupTempDir(commsDir); } catch (err) {
-        console.warn(`[basemindDownload] warmup comms cleanup failed for ${commsDir}: ${err instanceof Error ? err.message : String(err)}`);
-      }
+        }
+        try {
+          cleanupTempDir(commsDir);
+        } catch (err) {
+          console.warn(`[basemindDownload] warmup comms cleanup failed for ${commsDir}: ${err instanceof Error ? err.message : String(err)}`);
+        }
       }
     }
 
@@ -235,4 +230,35 @@ export async function* basemindDownload(onlyStage?: BasemindDownloadStage): Asyn
       };
     }
   }
+}
+
+/** Drain the stage generator into the IPC result shape (router stays thin). */
+export async function runBasemindDownload(
+  onlyStage?: BasemindDownloadStage,
+): Promise<{ stages: Array<{ stage: string; success: boolean; error?: string }>; success: boolean }> {
+  const results: Array<{ stage: string; success: boolean; error?: string }> = [];
+  for await (const update of basemindDownload(onlyStage)) {
+    if (update.done || update.error) {
+      results.push({ stage: update.stage, success: update.done, error: update.error });
+    }
+  }
+  const success = results.every((r) => r.success);
+  if (success) {
+    // Opt-in succeeded → arm safe/ and mirror the workspace once, so the
+    // banner's fileCount, the redaction gate and the RAG corpus reflect
+    // reality. Population failure must never fail the download itself.
+    try {
+      const { getCurrentWorkspace } = await import('../utils/workspace');
+      const workspacePath = getCurrentWorkspace();
+      if (workspacePath) {
+        const { runInitialPopulation } = await import('../utils/safeArm');
+        await runInitialPopulation(workspacePath);
+      }
+    } catch (err) {
+      console.warn(
+        `[basemindDownload] safe population failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  }
+  return { stages: results, success };
 }

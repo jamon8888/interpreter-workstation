@@ -12,3 +12,27 @@
 export function threadVaultDocId(threadKey: string): string {
   return `thread-${threadKey}`;
 }
+
+function fnv1aHex(input: string): string {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < input.length; i += 1) {
+    hash ^= input.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (hash >>> 0).toString(16);
+}
+
+/**
+ * Session key for a note's rehydration map (#19 Show Originals). FNV-1a of the
+ * absolute path so the id fits `sanitizeVaultDocId` (no path separators).
+ * Collisions are negligible for a single workspace's note set; upgrade to a
+ * full-path encoding if two notes ever share a key.
+ */
+export function noteRehydrationKey(filePath: string): string {
+  return `note${fnv1aHex(filePath)}`;
+}
+
+/** Per-workspace vault segment: FNV-1a of the absolute workspace path. */
+export function workspaceVaultSegment(workspacePath: string): string {
+  return fnv1aHex(workspacePath);
+}

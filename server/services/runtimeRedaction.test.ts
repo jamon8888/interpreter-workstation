@@ -1,4 +1,8 @@
-import { describe, expect, test } from 'bun:test';
+import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+import { afterEach, describe, expect, test } from 'bun:test';
 
 import {
   applyFileReadRedaction,
@@ -6,10 +10,26 @@ import {
   deleteRuntimeRehydrationMap,
   getRuntimeRehydrationMap,
   isFileReadTool,
+  maybeRedactOutboundText,
   maybeRedactToolResult,
 } from './runtimeRedaction';
 
 const PROBE_EMAIL = 'john@example.com';
+
+const tempDirs: string[] = [];
+
+function workspace(armed: boolean): string {
+  const dir = mkdtempSync(join(tmpdir(), 'pii-ws-'));
+  if (armed) mkdirSync(join(dir, 'safe'));
+  tempDirs.push(dir);
+  return dir;
+}
+
+afterEach(() => {
+  while (tempDirs.length > 0) {
+    rmSync(tempDirs.pop()!, { recursive: true, force: true });
+  }
+});
 
 const stubDeps = {
   // NER down by default: regex-only fallback must still redact.
@@ -198,6 +218,52 @@ describe('applyFileReadRedaction', () => {
 });
 
 describe('maybeRedactToolResult', () => {
+  test('redacts file reads when the workspace opted into safe/', async () => {
+    clearRuntimeRehydrationMaps();
+    const result = await maybeRedactToolResult(
+      {
+        serverId: 'builtin-fs',
+        toolName: 'read_file',
+        result: { content: [{ type: 'text', text: `mail ${PROBE_EMAIL}` }] },
+        workspacePath: workspace(true),
+        threadKey: 'thread-6',
+      },
+      stubDeps,
+    );
+    const text = (result as { content: Array<{ text: string }> }).content[0].text;
+    expect(text).not.toContain(PROBE_EMAIL);
+  });
+
+  test('passes file reads through outside a safe workspace', async () => {
+    const raw = { content: [{ type: 'text', text: `mail ${PROBE_EMAIL}` }] };
+    const result = await maybeRedactToolResult(
+      {
+        serverId: 'builtin-fs',
+        toolName: 'read_file',
+        result: raw,
+        workspacePath: workspace(false),
+        threadKey: 'thread-7',
+      },
+      stubDeps,
+    );
+    expect(result).toBe(raw);
+  });
+
+  test('fails closed when the workspace path is unknown', async () => {
+    clearRuntimeRehydrationMaps();
+    const result = await maybeRedactToolResult(
+      {
+        serverId: 'builtin-fs',
+        toolName: 'read_file',
+        result: { content: [{ type: 'text', text: `mail ${PROBE_EMAIL}` }] },
+        threadKey: 'thread-8',
+      },
+      stubDeps,
+    );
+    const text = (result as { content: Array<{ text: string }> }).content[0].text;
+    expect(text).not.toContain(PROBE_EMAIL);
+  });
+
   test('redacts file reads on untrusted providers', async () => {
     clearRuntimeRehydrationMaps();
     const result = await maybeRedactToolResult(
@@ -206,7 +272,7 @@ describe('maybeRedactToolResult', () => {
         toolName: 'read_file',
         result: { content: [{ type: 'text', text: `mail ${PROBE_EMAIL}` }] },
         modelConfig: { provider: 'api', modelId: 'gpt-4o' } as never,
-        threadKey: 'thread-6',
+        threadKey: 'thread-10',
       },
       stubDeps,
     );
@@ -222,26 +288,11 @@ describe('maybeRedactToolResult', () => {
         toolName: 'read_file',
         result: raw,
         modelConfig: { provider: 'local', modelId: 'mistral-nemo:12b' } as never,
-        threadKey: 'thread-7',
+        threadKey: 'thread-11',
       },
       stubDeps,
     );
     expect(result).toBe(raw);
-  });
-
-  test('fails closed when the provider is unknown', async () => {
-    clearRuntimeRehydrationMaps();
-    const result = await maybeRedactToolResult(
-      {
-        serverId: 'builtin-fs',
-        toolName: 'read_file',
-        result: { content: [{ type: 'text', text: `mail ${PROBE_EMAIL}` }] },
-        threadKey: 'thread-8',
-      },
-      stubDeps,
-    );
-    const text = (result as { content: Array<{ text: string }> }).content[0].text;
-    expect(text).not.toContain(PROBE_EMAIL);
   });
 
   test('ignores non-read tools', async () => {
@@ -252,7 +303,53 @@ describe('maybeRedactToolResult', () => {
         toolName: 'write_file',
         result: raw,
         modelConfig: { provider: 'api', modelId: 'gpt-4o' } as never,
+        workspacePath: workspace(true),
         threadKey: 'thread-9',
+      },
+      stubDeps,
+    );
+    expect(result).toBe(raw);
+  });
+
+  test('exempts the permission-test stub server (verbatim E2E output)', async () => {
+    const raw = { content: [{ type: 'text', text: `mail ${PROBE_EMAIL}` }] };
+    const result = await maybeRedactToolResult(
+      {
+        serverId: 'builtin-test-filesystem',
+        toolName: 'read_file',
+        result: raw,
+        workspacePath: workspace(true),
+        threadKey: 'thread-tf',
+      },
+      stubDeps,
+    );
+    expect(result).toBe(raw);
+  });
+
+  test('exempts basemind redact_text (the hook re-enters itself through it)', async () => {
+    const raw = { content: [{ type: 'text', text: `mail ${PROBE_EMAIL}` }] };
+    const result = await maybeRedactToolResult(
+      {
+        serverId: 'basemind',
+        toolName: 'redact_text',
+        result: raw,
+        workspacePath: workspace(true),
+        threadKey: 'thread-rt',
+      },
+      stubDeps,
+    );
+    expect(result).toBe(raw);
+  });
+
+  test('exempts basemind vault (returns originals for Show Originals)', async () => {
+    const raw = { content: [{ type: 'text', text: `mail ${PROBE_EMAIL}` }] };
+    const result = await maybeRedactToolResult(
+      {
+        serverId: 'basemind',
+        toolName: 'vault',
+        result: raw,
+        workspacePath: workspace(true),
+        threadKey: 'thread-v',
       },
       stubDeps,
     );
@@ -266,7 +363,7 @@ describe('maybeRedactToolResult', () => {
         serverId: 'builtin-fs',
         toolName: 'read_file',
         result: { content: [{ type: 'text', text: `mail ${PROBE_EMAIL}` }] },
-        modelConfig: { provider: 'api', modelId: 'gpt-4o' } as never,
+        workspacePath: workspace(true),
       },
       stubDeps,
     );
@@ -275,5 +372,62 @@ describe('maybeRedactToolResult', () => {
     expect(text).toMatch(/\[EMAIL_\d+\]/);
     // Tokens without reveal: nothing stored under any other key.
     expect(getRuntimeRehydrationMap('no-such-thread')).toEqual({});
+  });
+});
+
+describe('maybeRedactOutboundText', () => {
+  test('redacts free text when the workspace opted into safe/', async () => {
+    clearRuntimeRehydrationMaps();
+    const { text, redacted } = await maybeRedactOutboundText(
+      `mail ${PROBE_EMAIL}`,
+      { workspacePath: workspace(true), threadKey: 'thread-out-1' },
+      stubDeps,
+    );
+    expect(redacted).toBe(true);
+    expect(text).not.toContain(PROBE_EMAIL);
+    expect(getRuntimeRehydrationMap('thread-out-1')['[EMAIL_0]']).toBe(PROBE_EMAIL);
+  });
+
+  test('passes free text through outside a safe workspace', async () => {
+    const { text, redacted } = await maybeRedactOutboundText(
+      `mail ${PROBE_EMAIL}`,
+      { workspacePath: workspace(false), threadKey: 'thread-out-2' },
+      stubDeps,
+    );
+    expect(redacted).toBe(false);
+    expect(text).toBe(`mail ${PROBE_EMAIL}`);
+  });
+
+  test('fails closed when the workspace path is unknown', async () => {
+    clearRuntimeRehydrationMaps();
+    const { text, redacted } = await maybeRedactOutboundText(
+      `mail ${PROBE_EMAIL}`,
+      { threadKey: 'thread-out-3' },
+      stubDeps,
+    );
+    expect(redacted).toBe(true);
+    expect(text).not.toContain(PROBE_EMAIL);
+  });
+
+  test('redacts without storing when no thread key exists', async () => {
+    clearRuntimeRehydrationMaps();
+    const { text, redacted } = await maybeRedactOutboundText(
+      `mail ${PROBE_EMAIL}`,
+      { workspacePath: workspace(true) },
+      stubDeps,
+    );
+    expect(redacted).toBe(true);
+    expect(text).toMatch(/\[EMAIL_\d+\]/);
+    expect(getRuntimeRehydrationMap('no-such-thread')).toEqual({});
+  });
+
+  test('leaves clean free text unchanged even when armed', async () => {
+    const { text, redacted } = await maybeRedactOutboundText(
+      'just a normal message',
+      { workspacePath: workspace(true), threadKey: 'thread-out-4' },
+      stubDeps,
+    );
+    expect(redacted).toBe(false);
+    expect(text).toBe('just a normal message');
   });
 });

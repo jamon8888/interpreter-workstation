@@ -19,6 +19,7 @@ import {
 import { Readable, Transform } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { Worker } from 'node:worker_threads';
+// @ts-ignore - no type declarations for tar-stream
 import tar from 'tar-stream';
 // @ts-ignore - no type declarations for unbzip2-stream
 import unbzip2Stream from 'unbzip2-stream';

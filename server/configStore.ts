@@ -210,6 +210,8 @@ export interface AppConfig {
   // means "automatic" (resolved per machine in rerankerPreference handler).
   // Kept out of SettingsSnapshot: it describes this device, not portable UI prefs.
   rerankerEnabledOverride?: boolean | null;
+  /** #13/#18: raw-code semantic indexing opt-in; absent = off. */
+  codeIndexingEnabled?: boolean;
 
   // Onboarding: user email (from Stay Connected screen)
   userEmail?: string;
@@ -2525,6 +2527,10 @@ export async function setTelemetryEnabled(enabled: boolean): Promise<void> {
   }
 }
 
+// =============================================================================
+// Search quality (reranker) override
+// =============================================================================
+
 /**
  * Get the explicit reranker override (search quality toggle).
  * Returns null when unset — the caller resolves the per-machine default.
@@ -2544,6 +2550,22 @@ export async function setRerankerEnabledOverride(value: boolean | null): Promise
   } else {
     config.rerankerEnabledOverride = value;
   }
+  await saveConfig(config);
+}
+
+// =============================================================================
+// Code indexing opt-in (#13/#18)
+// =============================================================================
+
+/** Raw-code semantic indexing is off unless explicitly enabled. */
+export async function getCodeIndexingEnabled(): Promise<boolean> {
+  const config = await loadConfig();
+  return config.codeIndexingEnabled === true;
+}
+
+export async function setCodeIndexingEnabled(value: boolean): Promise<void> {
+  const config = await loadConfig();
+  config.codeIndexingEnabled = value;
   await saveConfig(config);
 }
 

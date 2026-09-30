@@ -356,7 +356,7 @@ export function GlobalSettings({
               className="w-full justify-center"
               onClick={handleAskAgent}
             >
-              Ask Agent
+              {t('settings.askAgent')}
             </Button>
           </div>
         </aside>
@@ -428,6 +428,30 @@ export function GlobalSettings({
                     >
                       <div data-settings-section="telemetry">
                         <TelemetrySectionContent />
+                      </div>
+                      <div className="mt-3" data-settings-section="safe-repropose">
+                        <Button
+                          variant="ghost"
+                          className="justify-start px-0 text-sm"
+                          onClick={() => {
+                            try {
+                              for (let i = window.localStorage.length - 1; i >= 0; i--) {
+                                const key = window.localStorage.key(i);
+                                if (key?.startsWith('interpreter:safe-banner:') && window.localStorage.getItem(key) === 'skipped') {
+                                  window.localStorage.removeItem(key);
+                                }
+                              }
+                            } catch {
+                              // Storage unavailable — nothing to clear.
+                            }
+                            window.dispatchEvent(new Event('safe-banner:repropose'));
+                          }}
+                        >
+                          {t("basemind.banner.reproposeTitle")}
+                        </Button>
+                        <p className="text-sm text-muted-foreground">
+                          {t("basemind.banner.reproposeDescription")}
+                        </p>
                       </div>
                     </SettingsSection>
 
@@ -556,14 +580,14 @@ export function GlobalSettings({
                 {activeTab === "permissions" && (
                   <SettingsPane>
                     <SettingsSection
-                      title="MCP Permissions"
+                      title={t("settings.global.mcpPermissions")}
                       sectionId="mcpPermissions"
                     >
                       <McpSettingsSectionContent />
                     </SettingsSection>
 
                     <SettingsSection
-                      title="Runtime Permissions"
+                      title={t("settings.global.runtimePermissions")}
                       sectionId="runtimePermissions"
                       className={blinkSectionId === 'runtimePermissions' ? 'animate-blink-border' : undefined}
                     >

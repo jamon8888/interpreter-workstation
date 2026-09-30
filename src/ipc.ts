@@ -326,6 +326,39 @@ export function resolveSelect(value: string | null): void {
   }
 }
 
+// Store for pending prompt resolution
+let pendingPromptResolve: ((value: string | null) => void) | null = null;
+
+interface PromptDetail {
+  message: string;
+  defaultValue: string;
+}
+
+/**
+ * Modal text prompt resolved by the BrowserPrompt overlay.
+ *
+ * Electron does not implement `window.prompt` (it throws), so every mode goes
+ * through the shared overlay rather than a native dialog. Returns null when
+ * the user dismisses without submitting.
+ */
+export function showPrompt(message: string, defaultValue = ''): Promise<string | null> {
+  return new Promise((resolve) => {
+    // A second prompt supersedes an unanswered one.
+    pendingPromptResolve?.(null);
+    pendingPromptResolve = resolve;
+    window.dispatchEvent(
+      new CustomEvent<PromptDetail>('show-prompt', { detail: { message, defaultValue } })
+    );
+  });
+}
+
+// Called by BrowserPrompt when the user submits or dismisses
+export function resolvePrompt(value: string | null): void {
+  if (!pendingPromptResolve) return;
+  pendingPromptResolve(value);
+  pendingPromptResolve = null;
+}
+
 // ============================================================================
 // Proxy-based Client
 // ============================================================================
@@ -436,25 +469,80 @@ function createElectronFallbackProxy(namespace: string): any {
   );
 }
 
+// One underlying window.electron subscription per (namespace, method),
+// fanning out to every renderer callback. Without this each subscriber calls
+// `ipcRenderer.on` directly and Electron warns once the shared channels
+// (`workspace:files-changed`, `workspace:changed`) pass Node's default
+// listener cap of 10.
+const electronSubscriptions = new Map<
+  string,
+  { callbacks: Set<EventCallback>; unsubscribe?: () => void }
+>();
+
+function subscribeElectron(namespace: string, method: string, callback: EventCallback): () => void {
+  const key = `${namespace}.${method}`;
+  let entry = electronSubscriptions.get(key);
+  if (!entry) {
+    const created: { callbacks: Set<EventCallback>; unsubscribe?: () => void } = {
+      callbacks: new Set(),
+    };
+    electronSubscriptions.set(key, created);
+    const namespaceApi = (window.electron as any)[namespace];
+    created.unsubscribe = namespaceApi[method]((data: unknown) => {
+      created.callbacks.forEach((cb) => {
+        try {
+          cb(data);
+        } catch (error) {
+          console.error(`[IPC] Error in listener for ${key}:`, error);
+        }
+      });
+    });
+    entry = created;
+  }
+  entry.callbacks.add(callback);
+  return () => {
+    entry.callbacks.delete(callback);
+    if (entry.callbacks.size === 0) {
+      try {
+        entry.unsubscribe?.();
+      } catch (error) {
+        console.error(`[IPC] Failed to unsubscribe ${key}:`, error);
+      }
+      electronSubscriptions.delete(key);
+    }
+  };
+}
+
 function createElectronClient(): any {
   return new Proxy(
     {},
     {
       get(_, namespace: string) {
+        // If namespace exists in window.electron, use it (proper IPC)
         const preloadNs = window.electron && (window.electron as any)[namespace];
-        if (preloadNs) {
-          const fallback = createElectronFallbackProxy(namespace);
-          // Merge preload methods (e.g. event subscriptions) with fallback proxy
-          // so methods not in the preload still route through apiRequest.
-          return new Proxy(preloadNs, {
-            get(target, method: string | symbol) {
-              if (method in target) return Reflect.get(target, method);
-              return Reflect.get(fallback, method);
-            },
-          });
+        if (!preloadNs) {
+          // Otherwise, use fallback that routes through apiRequest
+          return createElectronFallbackProxy(namespace);
         }
-        // No preload namespace — pure fallback
-        return createElectronFallbackProxy(namespace);
+        const fallback = createElectronFallbackProxy(namespace);
+        // Merge preload methods (e.g. event subscriptions) with fallback proxy
+        // so methods not in the preload still route through apiRequest.
+        // contextBridge own properties are non-configurable, so proxy
+        // invariants reject returning a wrapper in their place; hold the
+        // namespace on the prototype so the target has no own properties.
+        const holder = Object.create(preloadNs);
+        return new Proxy(holder, {
+          get(_, method: string) {
+            const value = preloadNs[method];
+            // Preload event subscriptions go through the shared mux, not a
+            // direct `ipcRenderer.on` per subscriber (listener-cap warnings).
+            if (typeof value === 'function' && /^on[A-Z]/.test(method)) {
+              return (callback: EventCallback) => subscribeElectron(namespace, method, callback);
+            }
+            if (method in preloadNs) return typeof value === 'function' ? value.bind(preloadNs) : value;
+            return Reflect.get(fallback, method);
+          },
+        });
       },
     }
   );
@@ -725,10 +813,6 @@ export interface PiiRevealAuditEntry {
   category: string;
   surface: PiiRevealSurface;
 }
-interface WorkspaceScanIpc {
-  status(): Promise<WorkspaceScanStatus>;
-}
-
 interface BasemindDownloadResult {
   stages: Array<{ stage: string; success: boolean; skipped?: boolean; skipReason?: string; error?: string }>;
   success: boolean;
@@ -755,6 +839,49 @@ interface BasemindIpc {
   getStaleRerankerCache(): Promise<{ bytes: number }>;
   /** Remove stale v2-m3 preset dirs; resolves the freed estimate. */
   clearStaleRerankerCache(): Promise<{ freedBytes: number }>;
+}
+
+/** #19: Show Originals rehydration, selection NER, gesture custom-term pin. */
+interface PiiIpc {
+  getRehydrationMap(request: { threadKey: string }): Promise<Record<string, string>>;
+  detectSelection(request: {
+    text: string;
+    categories?: string[];
+  }): Promise<{ detections: Array<{ category: string; start: number; end: number; text: string; confidence: number }> }>;
+  addCustomTerm(request: {
+    label: string;
+    value: string;
+    caseSensitive?: boolean;
+  }): Promise<{ success: boolean; configPath: string }>;
+  rememberRehydration(request: {
+    threadKey: string;
+    map: Record<string, string>;
+  }): Promise<{ success: boolean }>;
+}
+
+export interface WorkspaceScanStatus {
+  redactionActive: boolean;
+  indexing: boolean;
+  fileCount: number;
+  /** #37: anonymised redaction tokens written under safe/. */
+  entities: number;
+  /** #37: initial-population progress; null when no run is active. */
+  progress: { done: number; total: number } | null;
+  lastScanAt: string | null;
+  xbergAvailable: boolean;
+  basemindAvailable: boolean;
+  resourcesReady: {
+    nerModel: boolean;
+    embeddings: boolean;
+    reranker: boolean;
+  };
+}
+
+interface WorkspaceScanIpc {
+  status(): Promise<WorkspaceScanStatus>;
+  /** #13/#18: raw-code semantic indexing opt-in; off by default. */
+  getCodeIndexingEnabled(): Promise<{ enabled: boolean }>;
+  setCodeIndexingEnabled(value: boolean): Promise<{ enabled: boolean }>;
 }
 
 interface ProjectRunnerIpc {
@@ -810,7 +937,11 @@ export const agentThreads: AgentThreadsIpc = isMarketingDemoMode()
 export const workspace = isMarketingDemoMode() ? marketingDemoWorkspaceIpc : client.workspace;
 export const vault: VaultIpc = isMarketingDemoMode() ? marketingDemoVaultIpc : client.vault;
 export const workspaceScan: WorkspaceScanIpc = isMarketingDemoMode()
-  ? { status: async () => { throw new Error('Not available in demo mode'); } }
+  ? {
+    status: async () => { throw new Error('Not available in demo mode'); },
+    getCodeIndexingEnabled: async () => { throw new Error('Not available in demo mode'); },
+    setCodeIndexingEnabled: async () => { throw new Error('Not available in demo mode'); },
+  }
   : (client.workspaceScan as WorkspaceScanIpc);
 export const search: SearchIpc = isMarketingDemoMode()
   ? {
@@ -829,6 +960,14 @@ export const pii: PiiIpc = isMarketingDemoMode()
       persistRehydration: async () => ({ persisted: false as const, reason: 'write-failed' as const, message: 'Not available in demo mode' }),
       decryptRehydration: async () => { throw new Error('Not available in demo mode'); },
       recordReveal: async () => {},
+      getRehydrationMap: async () => ({}),
+      detectSelection: async () => ({ detections: [] }),
+      addCustomTerm: async () => {
+        throw new Error('Not available in demo mode');
+      },
+      rememberRehydration: async () => {
+        throw new Error('Not available in demo mode');
+      },
     }
   : client.pii;
 export const setup = client.setup;

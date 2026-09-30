@@ -10,3 +10,4 @@ export {
   tokenLabelForCategory,
 } from './labels';
 export type { RedactedToken } from './labels';
+export { noteRehydrationKey, threadVaultDocId } from './vaultScope';

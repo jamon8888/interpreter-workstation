@@ -8,15 +8,21 @@
  * `buildRedactedText`) so linked files produce artifacts indistinguishable
  * from pasted-file redaction.
  *
- * Hook point: `ToolManager.callTool` passes builtin and MCP results through
- * `maybeRedactToolResult` before they return to the agent loop. NER runs
- * through basemind `redact_text` (never a file-read tool), so the hook
- * cannot recurse into itself.
+ * Hook point: `ToolManager.callTool` passes every builtin and MCP result
+ * through `maybeRedactToolResult` before it returns to the agent loop
+ * (spec §7: all tool results, not only file reads). The hook re-enters
+ * itself via basemind `redact_text`, so both `redact_text` and `vault`
+ * (which returns originals for Show Originals) are exempted by name.
+ * NER therefore runs through `redact_text` (never a file-read tool), so the
+ * hook cannot recurse into itself.
  *
  * Rehydration maps accumulate in a thread-scoped in-memory store. Nothing
  * here writes to disk: vault persistence waits on the passphrase UX
  * decision (#114), and a missing key degrades to tokens-without-reveal.
  */
+
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 
 import { buildRedactedText, mergeDetections } from '../../src/lib/pii/labels';
 import { detectRegex } from '../../src/lib/pii/regex-detector';
@@ -27,12 +33,6 @@ import type { AgentModelConfig } from '../../shared/types/model';
 
 export const RUNTIME_REDACTION_DEFERRED_MARKER =
   '[redaction deferred: non-text content is not scanned for PII]';
-
-/** Upstream harness file-read tools have no local metadata; match by name.
- * Deliberately an explicit allowlist (not a read_* prefix): the set is the
- * audit point, and harness tool-surface changes are reviewed — extend it
- * when the harness adds file-read tools. */
-const MCP_FILE_READ_TOOLS: ReadonlySet<string> = new Set(['read_file']);
 
 export interface RuntimeRedactionDeps {
   isNerReady?: () => boolean;
@@ -103,29 +103,6 @@ function storeRuntimeRehydrationMap(threadKey: string, map: Record<string, strin
 export function deleteRuntimeRehydrationMap(threadKey: string): void {
   runtimeRehydrationMaps.delete(threadKey);
   deletedThreadKeys.add(threadKey);
-}
-
-export function isFileReadTool(
-  serverId: string,
-  toolName: string,
-  builtinTool?: Pick<BuiltinToolDefinition, 'fileAccess'> | null,
-): boolean {
-  // builtin-test-filesystem is test infrastructure asserting verbatim tool
-  // output (permission E2E); the production gate must not rewrite its results.
-  if (serverId === 'builtin-test-filesystem') return false;
-  const fileAccess = builtinTool?.fileAccess as
-    | { mode?: string; pathArg?: string | string[]; pathArgModes?: Record<string, string> }
-    | undefined;
-  if (fileAccess) {
-    const pathArgs = Array.isArray(fileAccess.pathArg) ? fileAccess.pathArg : [fileAccess.pathArg];
-    for (const argName of pathArgs) {
-      if (typeof argName !== 'string') continue;
-      const mode = fileAccess.pathArgModes?.[argName] ?? fileAccess.mode;
-      if (mode === 'read') return true;
-    }
-    return false;
-  }
-  return serverId === 'builtin-fs' && MCP_FILE_READ_TOOLS.has(toolName);
 }
 
 function isNonTextContent(text: string): boolean {
@@ -221,12 +198,43 @@ export async function applyFileReadRedaction(
   return result;
 }
 
+/** Upstream harness file-read tools have no local metadata; match by name.
+ * Deliberately an explicit allowlist (not a read_* prefix): the set is the
+ * audit point, and harness tool-surface changes are reviewed — extend it
+ * when the harness adds file-read tools. */
+const MCP_FILE_READ_TOOLS: ReadonlySet<string> = new Set(['read_file']);
+
+export function isFileReadTool(
+  serverId: string,
+  toolName: string,
+  builtinTool?: Pick<BuiltinToolDefinition, 'fileAccess'> | null,
+): boolean {
+  // builtin-test-filesystem is test infrastructure asserting verbatim tool
+  // output (permission E2E); the production gate must not rewrite its results.
+  if (serverId === 'builtin-test-filesystem') return false;
+  const fileAccess = builtinTool?.fileAccess as
+    | { mode?: string; pathArg?: string | string[]; pathArgModes?: Record<string, string> }
+    | undefined;
+  if (fileAccess) {
+    const pathArgs = Array.isArray(fileAccess.pathArg) ? fileAccess.pathArg : [fileAccess.pathArg];
+    for (const argName of pathArgs) {
+      if (typeof argName !== 'string') continue;
+      const mode = fileAccess.pathArgModes?.[argName] ?? fileAccess.mode;
+      if (mode === 'read') return true;
+    }
+    return false;
+  }
+  return serverId === 'builtin-fs' && MCP_FILE_READ_TOOLS.has(toolName);
+}
+
 export interface MaybeRedactOptions {
   serverId: string;
   toolName: string;
   builtinTool?: Pick<BuiltinToolDefinition, 'fileAccess'> | null;
   result: unknown;
   modelConfig?: Pick<AgentModelConfig, 'provider'> | null;
+  /** Workspace root; redaction arms only when `<workspace>/safe/` exists (#19). */
+  workspacePath?: string | null;
   threadKey?: string | null;
 }
 
@@ -234,13 +242,51 @@ export async function maybeRedactToolResult(
   options: MaybeRedactOptions,
   deps: RuntimeRedactionDeps = {},
 ): Promise<unknown> {
-  const { serverId, toolName, builtinTool, result, modelConfig, threadKey } = options;
+  const { serverId, toolName, builtinTool, result, modelConfig, workspacePath, threadKey } = options;
+  // redact_text is this hook's own NER backend (recursion) and vault returns
+  // the decrypted originals Show Originals displays; both pass through raw.
+  if (
+    serverId === 'basemind'
+    && (toolName === 'redact_text' || toolName === 'vault')
+  ) return result;
   if (!isFileReadTool(serverId, toolName, builtinTool)) return result;
   // Server-side trust is ModelProvider-level: only on-device `local` models
   // (which include local Mistral) skip redaction. Anything else — including a
-  // missing provider — fails closed. The renderer's richer runtime-profile
-  // resolution (remote Mistral API) is a client-side notice concern, not a
-  // reason to let raw file bytes reach an API model from the server path.
+  // missing provider — fails closed.
   if (!needsRedactionForProvider(modelConfig?.provider ?? null)) return result;
+  // Workspace-gated (#19 §9): redaction arms only on safe/ opt-in. Outside a
+  // safe workspace the workspace sends cleartext — no provider heuristic.
+  // An unknown workspacePath fails closed (treat as armed) so a missing
+  // resolution never leaks file bytes to a remote model.
+  if (workspacePath != null && !existsSync(join(workspacePath, 'safe'))) return result;
   return applyFileReadRedaction(result, threadKey ? { threadKey } : {}, deps);
+}
+
+export interface OutboundTextOptions {
+  /** Workspace root; redaction arms only when `<workspace>/safe/` exists (#19). */
+  workspacePath?: string | null;
+  threadKey?: string | null;
+}
+
+/**
+ * Outbound free-text leg of #19: user message and system prompt are redacted
+ * before `runCodexAgentTurn`, under the same workspace `safe/` gate as tool
+ * results. threadKey may be a provisional key for a new thread; the caller
+ * re-keys when the real thread id arrives.
+ */
+export async function maybeRedactOutboundText(
+  text: string,
+  options: OutboundTextOptions = {},
+  deps: RuntimeRedactionDeps = {},
+): Promise<{ text: string; redacted: boolean }> {
+  if (!text) return { text, redacted: false };
+  if (options.workspacePath != null && !existsSync(join(options.workspacePath, 'safe'))) {
+    return { text, redacted: false };
+  }
+  const result = await redactFileReadOutputText(
+    text,
+    options.threadKey ? { threadKey: options.threadKey } : {},
+    deps,
+  );
+  return { text: result.text, redacted: result.redacted || result.deferred };
 }

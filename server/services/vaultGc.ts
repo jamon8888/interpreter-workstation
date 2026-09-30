@@ -1,4 +1,4 @@
-import { listVaultBlobDocIds, deleteVaultBlob } from './vault';
+import { listVaultBlobs, deleteVaultBlobPath } from './vault';
 import { threadVaultDocId } from '../../src/lib/pii/vaultScope';
 
 let gcRanThisSession = false;
@@ -6,6 +6,11 @@ let gcRanThisSession = false;
 export function resetGcFlagForTests(): void {
   gcRanThisSession = false;
 }
+
+/** Note rehydration blobs are keyed `thread-note<fnv1a-hex>`, not by a thread
+ * id, so the active-thread list never contains them — exempt by shape rather
+ * than deleting every note map on first vault access. */
+const NOTE_BLOB_DOC_ID = /^thread-note[0-9a-f]+$/;
 
 export function runOrphanBlobGcOnce(options: {
   activeThreadIds: string[];
@@ -16,12 +21,12 @@ export function runOrphanBlobGcOnce(options: {
 
   const { activeThreadIds, userDataDir } = options;
   const activeBlobIds = new Set(activeThreadIds.map(threadVaultDocId));
-  const allDocIds = listVaultBlobDocIds(userDataDir);
 
   let cleaned = 0;
-  for (const docId of allDocIds) {
+  for (const { docId, fullPath } of listVaultBlobs(userDataDir)) {
+    if (NOTE_BLOB_DOC_ID.test(docId)) continue;
     if (!activeBlobIds.has(docId)) {
-      deleteVaultBlob(docId, userDataDir);
+      deleteVaultBlobPath(fullPath);
       cleaned++;
     }
   }

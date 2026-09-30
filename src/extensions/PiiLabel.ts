@@ -10,6 +10,15 @@ export interface PiiLabelOptions {
   mode: PiiLabelMode;
 }
 
+export interface PiiLabelStorage {
+  mode: PiiLabelMode;
+  showOriginals: boolean;
+  rehydrationMap: Record<string, string>;
+  /** Injected by the viewer from basemind.pii.tokenAriaLabel. */
+  tokenAriaLabel?: (categoryLabel: string) => string;
+  refresh: () => void;
+}
+
 export interface PiiSpan {
   category: string;
   token: string;
@@ -20,23 +29,62 @@ export interface PiiSpan {
 /**
  * Find PII spans within a single text node's text, with offsets relative to
  * the start of that text. View mode scans stored `[TYPE_N]` tokens; compose
- * mode runs the structured regex detector for instant feedback.
+ * mode runs the structured regex detector for instant feedback and still
+ * surfaces existing tokens so a redacted note stays labelled while editing.
  */
 export function piiSpansForText(text: string, mode: PiiLabelMode): PiiSpan[] {
-  if (mode === 'view') {
-    return findRedactedTokens(text).map((token) => ({
-      category: token.category,
-      token: token.token,
-      from: token.start,
-      to: token.end,
-    }));
-  }
-  return detectRegex(text).map((detection) => ({
+  const tokenSpans = findRedactedTokens(text).map((token) => ({
+    category: token.category,
+    token: token.token,
+    from: token.start,
+    to: token.end,
+  }));
+  if (mode === 'view') return tokenSpans;
+  const regexSpans = detectRegex(text).map((detection) => ({
     category: detection.category,
     token: detection.text,
     from: detection.start,
     to: detection.end,
   }));
+  const merged = [...tokenSpans];
+  for (const span of regexSpans) {
+    const overlaps = merged.some((existing) => span.from < existing.to && existing.from < span.to);
+    if (!overlaps) merged.push(span);
+  }
+  return merged.sort((a, b) => a.from - b.from);
+}
+
+function decorationsForSpan(
+  span: PiiSpan,
+  range: { from: number; to: number },
+  storage: PiiLabelStorage,
+): InstanceType<typeof Decoration>[] {
+  const original = storage.rehydrationMap[span.token];
+  if (storage.showOriginals && original) {
+    // View-only: hide the token and draw the original beside it so the doc
+    // (and save) keep tokens — ProseMirror has no replace-decoration.
+    return [
+      Decoration.Inline(range.from, range.to, { style: 'display: none' }),
+      Decoration.Widget(
+        range.from,
+        () => {
+          const el = document.createElement('span');
+          el.className = 'oa-pii-original';
+          el.dataset.category = span.category;
+          el.textContent = original;
+          return el;
+        },
+        { key: `pii-orig-${range.from}-${span.token}`, side: -1 },
+      ),
+    ];
+  }
+  return [
+    Decoration.Inline(
+      range.from,
+      range.to,
+      buildPiiLabelAttributes({ category: span.category, token: span.token }, range, storage.tokenAriaLabel),
+    ),
+  ];
 }
 
 function scanRange(
@@ -44,6 +92,7 @@ function scanRange(
   from: number,
   to: number,
   mode: PiiLabelMode,
+  storage: PiiLabelStorage,
 ): InstanceType<typeof Decoration>[] {
   const decorations: InstanceType<typeof Decoration>[] = [];
   state.doc.nodesBetween(from, to, (node, pos, parent) => {
@@ -54,13 +103,7 @@ function scanRange(
     }
     for (const span of piiSpansForText(node.text, mode)) {
       const range = { from: pos + span.from, to: pos + span.to };
-      decorations.push(
-        Decoration.Inline(
-          range.from,
-          range.to,
-          buildPiiLabelAttributes({ category: span.category, token: span.token }, range),
-        ),
-      );
+      decorations.push(...decorationsForSpan(span, range, storage));
     }
     return true;
   });
@@ -74,8 +117,11 @@ export const PiiLabel = Extension.create<PiiLabelOptions>({
     return { mode: 'compose' };
   },
 
-  addStorage() {
+  addStorage(): PiiLabelStorage {
     return {
+      mode: 'compose',
+      showOriginals: true,
+      rehydrationMap: {},
       refresh: () => {},
     };
   },
@@ -84,31 +130,14 @@ export const PiiLabel = Extension.create<PiiLabelOptions>({
     return {
       update: 'changedRanges',
       create: ({ state }) => {
-        const decorations: InstanceType<typeof Decoration>[] = [];
-        const mode = (this.options as PiiLabelOptions).mode;
-        state.doc.nodesBetween(0, state.doc.content.size, (node, pos, parent) => {
-          if (!node.isText || !node.text) return true;
-          if (parent?.type.name === 'codeBlock') return true;
-          if (node.marks.some((mark) => mark.type.name === 'link' || mark.type.name === 'code')) {
-            return true;
-          }
-          for (const span of piiSpansForText(node.text, mode)) {
-            const range = { from: pos + span.from, to: pos + span.to };
-            decorations.push(
-              Decoration.Inline(
-                range.from,
-                range.to,
-                buildPiiLabelAttributes({ category: span.category, token: span.token }, range),
-              ),
-            );
-          }
-          return true;
-        });
-        return decorations;
+        const storage = this.storage as PiiLabelStorage;
+        return scanRange(state, 0, state.doc.content.size, this.options.mode, storage);
       },
+      // Storage edits (Show Originals / mode) do not change the doc; force a
+      // rebuild via editor.commands.updateDecorations('piiLabel').
       createInRange: ({ state, from, to }) => {
-        const mode = (this.options as PiiLabelOptions).mode;
-        return scanRange(state, from, to, mode);
+        const storage = this.storage as PiiLabelStorage;
+        return scanRange(state, from, to, this.options.mode, storage);
       },
     };
   },
