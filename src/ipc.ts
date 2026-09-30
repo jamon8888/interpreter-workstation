@@ -527,15 +527,19 @@ function createElectronClient(): any {
         const fallback = createElectronFallbackProxy(namespace);
         // Merge preload methods (e.g. event subscriptions) with fallback proxy
         // so methods not in the preload still route through apiRequest.
-        return new Proxy(preloadNs, {
-          get(target, method: string) {
-            const value = target[method];
+        // contextBridge own properties are non-configurable, so proxy
+        // invariants reject returning a wrapper in their place; hold the
+        // namespace on the prototype so the target has no own properties.
+        const holder = Object.create(preloadNs);
+        return new Proxy(holder, {
+          get(_, method: string) {
+            const value = preloadNs[method];
             // Preload event subscriptions go through the shared mux, not a
             // direct `ipcRenderer.on` per subscriber (listener-cap warnings).
             if (typeof value === 'function' && /^on[A-Z]/.test(method)) {
               return (callback: EventCallback) => subscribeElectron(namespace, method, callback);
             }
-            if (method in target) return typeof value === 'function' ? value.bind(target) : value;
+            if (method in preloadNs) return typeof value === 'function' ? value.bind(preloadNs) : value;
             return Reflect.get(fallback, method);
           },
         });
