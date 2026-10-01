@@ -1,8 +1,9 @@
 /**
- * Vault data-protection key — one random 32-byte key per app-data directory,
- * guarded by the OS credential store via Electron safeStorage.
+ * Vault data-protection key — one random 32-byte key per vault directory
+ * (workspace-segmented, legacy root when no workspace is active), guarded by
+ * the OS credential store via Electron safeStorage.
  *
- * The key file under `{userData}/vaults/` only ever holds OS-encrypted bytes,
+ * The key file under the vault directory only ever holds OS-encrypted bytes,
  * never plaintext. Where the OS store is unavailable, every entry point throws
  * a clear degraded error instead of silently skipping persistence.
  */
@@ -11,7 +12,7 @@ import { randomBytes } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { resolveUserDataDir } from './vault';
+import { resolveUserDataDir, resolveVaultDir } from './vault';
 
 export interface OsSecureStore {
   isEncryptionAvailable(): boolean;
@@ -48,7 +49,7 @@ export const VAULT_DEGRADED_MESSAGE =
   'restart with the OS keychain available to enable encrypted persistence.';
 
 export function resolveVaultKeyPath(userDataDir = resolveUserDataDir()): string {
-  return path.join(userDataDir, 'vaults', '.vault-key.enc');
+  return path.join(resolveVaultDir(userDataDir), '.vault-key.enc');
 }
 
 function requireOsSecureStore(override?: OsSecureStore | null): OsSecureStore {

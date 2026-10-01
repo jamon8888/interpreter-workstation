@@ -160,7 +160,7 @@ describe('Approvals runtime restart UX', () => {
       );
     });
 
-    expect(screen.queryByText('Restart Hacienda?')).not.toBeInTheDocument();
+    expect(screen.queryByText('Restart Interpreter?')).not.toBeInTheDocument();
     expect(toastMocks.showToast).toHaveBeenNthCalledWith(
       1,
       'Hacienda is restarting the agent...',
@@ -192,9 +192,9 @@ describe('Approvals runtime restart UX', () => {
     await screen.findByText('Hacienda wants to restart its agent runtime.');
     await user.click(screen.getByRole('button', { name: 'Allow once' }));
 
-    expect(await screen.findByText('Restart Hacienda?')).toBeVisible();
+    expect(await screen.findByText('Restart Interpreter?')).toBeVisible();
     expect(
-      screen.getByText('2 conversations are still running. Restarting will stop those conversations for every agent.'),
+      screen.getByText('Running conversations: 2. Restarting stops them for every agent.'),
     ).toBeVisible();
     expect(apiMocks.respondApproval).not.toHaveBeenCalled();
 

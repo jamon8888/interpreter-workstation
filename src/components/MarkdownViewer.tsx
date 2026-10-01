@@ -16,7 +16,8 @@ import { shouldShowDiff, shouldUseMarkdownDiffReview } from '../utils/diffDetect
 import { scrollToHeading, scrollToLine, highlightLineRange, highlightHeadingRange, getLineElementsRect, getHeadingElementRect } from '../utils/editorScrolling';
 import { readFile, writeFile } from '../api';
 import { trackDocumentEdited } from '../utils/telemetry';
-import { showContextMenu, getFileUrl, pathBasename, pathDirname, pathJoin, isAbsolutePath, uiSettings, vault, type ContextMenuItem } from '@/ipc';
+import { showContextMenu, getFileUrl, pathBasename, pathDirname, pathJoin, isAbsolutePath, pii, uiSettings, vault, type ContextMenuItem } from '@/ipc';
+import { noteRehydrationKey } from '../lib/pii';
 import type { BooleanSettingChangedEvent } from '../../shared/booleanSettings';
 import type { VaultNoteContext } from '../../shared/types/vault';
 import { useFileRefresh } from '../hooks/useFileRefresh';
@@ -92,6 +93,10 @@ export function MarkdownViewer({ filePath }: MarkdownViewerProps) {
   const [piiLabelsEnabled, setPiiLabelsEnabled] = useState(true);
   const [toolbarTransitionsEnabled, setToolbarTransitionsEnabled] = useState(false);
   const [reloadTrigger, setReloadTrigger] = useState(0);
+  // Show Originals: default ON (cleartext). Toggle is view-only — the doc
+  // keeps tokens; PiiLabel replaceWith never writes originals back.
+  const [showOriginals, setShowOriginals] = useState(true);
+  const [rehydrationMap, setRehydrationMap] = useState<Record<string, string>>({});
 
   // Diff state
   const [diffSegments, setDiffSegments] = useState<DiffSegment[]>([]);
@@ -136,6 +141,23 @@ export function MarkdownViewer({ filePath }: MarkdownViewerProps) {
 
   useEffect(() => {
     hasTrackedEditRef.current = false;
+    setShowOriginals(true);
+    setRehydrationMap({});
+  }, [filePath]);
+
+  useEffect(() => {
+    let cancelled = false;
+    pii
+      .getRehydrationMap({ threadKey: noteRehydrationKey(filePath) })
+      .then((map) => {
+        if (!cancelled) setRehydrationMap(map);
+      })
+      .catch(() => {
+        // Session/vault unavailable — tokens stay opaque until a gesture re-fills the map.
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [filePath]);
 
   useEffect(() => {
@@ -1079,6 +1101,8 @@ export function MarkdownViewer({ filePath }: MarkdownViewerProps) {
   // Context menu handler for view mode switching
   const handleContextMenu = useCallback(async (e: React.MouseEvent) => {
     if (isWorkstationReadOnly()) return;
+    // TipTapViewer owns the menu when the click is inside the editor.
+    if (e.defaultPrevented) return;
     e.preventDefault();
 
     const items: ContextMenuItem[] = [
@@ -1091,6 +1115,13 @@ export function MarkdownViewer({ filePath }: MarkdownViewerProps) {
         label: showToolbar ? t('markdown.context.hideToolbar') : t('markdown.context.showToolbar'),
         action: 'toggle-toolbar',
       },
+      { label: '', action: '', separator: true },
+      {
+        label: showOriginals
+          ? t('basemind.pii.hideOriginals')
+          : t('basemind.pii.showOriginals'),
+        action: 'toggle-show-originals',
+      },
     ];
 
     const action = await showContextMenu(items, 'markdown_viewer');
@@ -1098,8 +1129,14 @@ export function MarkdownViewer({ filePath }: MarkdownViewerProps) {
       handleModeSwitch(action);
     } else if (action === 'toggle-toolbar') {
       setShowToolbar(prev => !prev);
+    } else if (action === 'toggle-show-originals') {
+      setShowOriginals(prev => !prev);
     }
-  }, [handleModeSwitch, showToolbar, t, viewMode]);
+  }, [handleModeSwitch, showToolbar, showOriginals, t, viewMode]);
+
+  const handleRehydrationChange = useCallback((map: Record<string, string>) => {
+    setRehydrationMap(prev => ({ ...prev, ...map }));
+  }, []);
 
   // Count remaining diffs
   const remainingDiffs = diffSegments.filter(s => s.type === 'diff').length;
@@ -1349,7 +1386,7 @@ export function MarkdownViewer({ filePath }: MarkdownViewerProps) {
                   className="text-xs"
                   onMouseDown={(e) => { e.preventDefault(); setIsMetadataOpen(true); }}
                 >
-                  Show Metadata
+                  {t('viewers.mdShowMetadata')}
                 </Button>
               </>
             ) : null}
@@ -1457,14 +1494,14 @@ export function MarkdownViewer({ filePath }: MarkdownViewerProps) {
                         }}
                       >
                         <div className="mb-3 flex items-center justify-between gap-3 text-[11px] uppercase tracking-[0.08em] text-muted-foreground">
-                          <span>Current</span>
+                          <span>{t('viewers.mdCurrent')}</span>
                           <Button
                             onClick={() => handleUndoHunk(segment.id)}
                             variant="ghost"
                             size="xs"
                             className="relative right-0 top-0"
                           >
-                            Undo
+                            {t('viewers.mdUndo')}
                           </Button>
                         </div>
                         <TipTapViewer
@@ -1486,14 +1523,14 @@ export function MarkdownViewer({ filePath }: MarkdownViewerProps) {
                         }}
                       >
                         <div className="mb-3 flex items-center justify-between gap-3 text-[11px] uppercase tracking-[0.08em] text-muted-foreground">
-                          <span>Proposed</span>
+                          <span>{t('viewers.mdProposed')}</span>
                           <Button
                             onClick={() => handleKeepHunk(segment.id)}
                             variant="ghost"
                             size="xs"
                             className="relative right-0 top-0"
                           >
-                            Keep
+                            {t('viewers.mdKeep')}
                           </Button>
                         </div>
                         <TipTapViewer
@@ -1590,6 +1627,10 @@ export function MarkdownViewer({ filePath }: MarkdownViewerProps) {
                 resolveImageSrc={resolveImageSrc}
                 mentionContainer={getMentionContainer}
                 pii={piiLabelsEnabled ? { mode: 'view', docId: filePath } : undefined}
+                showOriginals={showOriginals}
+                rehydrationMap={rehydrationMap}
+                onToggleShowOriginals={() => setShowOriginals(prev => !prev)}
+                onRehydrationChange={handleRehydrationChange}
               />
             ) : (
               <div className="flex items-center justify-center h-full text-muted-foreground">
@@ -1620,7 +1661,7 @@ export function MarkdownViewer({ filePath }: MarkdownViewerProps) {
               size="xs"
               data-testid="undo-all-button"
             >
-              Undo All
+              {t('viewers.mdUndoAll')}
             </Button>
             <Button
               onClick={handleKeepAll}
@@ -1628,7 +1669,7 @@ export function MarkdownViewer({ filePath }: MarkdownViewerProps) {
               size="xs"
               data-testid="keep-all-button"
             >
-              Keep All
+              {t('viewers.mdKeepAll')}
             </Button>
           </div>
         </div>

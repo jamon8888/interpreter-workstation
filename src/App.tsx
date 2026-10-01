@@ -12,6 +12,7 @@ import { windowingAPI } from "./api/windowingAPI";
 import { AuthCallback } from "./components/auth/AuthCallback";
 import { BrowserContextMenu } from "./components/BrowserContextMenu";
 import { BrowserSelect } from "./components/BrowserSelect";
+import { PromptDialog } from "./components/PromptDialog";
 import { ResizeHandle } from "./components/ui/resize-handle";
 import { LowerLeftNoticeViewport } from "./components/LowerLeftNoticeViewport";
 import { preloadOnboardingTourVideos, disposeOnboardingTourVideos } from "./components/onboarding/tourVideos";
@@ -906,7 +907,8 @@ function AppContent() {
           )}
 
           {/* Center: Editor - takes remaining space, marginRight set imperatively to avoid right sidebar */}
-          <div ref={centerRef} className="relative h-full min-w-0 flex-1">
+          <div ref={centerRef} className="relative h-full min-w-0 flex-1 flex flex-col">
+            <div className="relative min-h-0 flex-1">
             {shouldRenderMainSurfaces ? (
               <Suspense fallback={<LazyFallback />}>
                 <LazyEditorLayout onTopRightPaddingRef={handleTabBarRightPaddingRef} />
@@ -917,6 +919,7 @@ function AppContent() {
                 <LazyMentionPreviewOverlay />
               </Suspense>
             ) : null}
+            </div>
           </div>
 
           {/* Right resize handle - absolutely positioned at left edge of right sidebar */}
@@ -1006,6 +1009,7 @@ export default function App() {
                         <AppContent />
                         <BrowserContextMenu />
                         <BrowserSelect />
+                        <PromptDialog />
                       </CommandOverlayProvider>
                     </HelpProvider>
                   </LayoutProvider>

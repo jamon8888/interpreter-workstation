@@ -40,6 +40,12 @@ const CATEGORY_ALIASES: Record<string, string> = {
   ipv6: 'ipv6',
   creditcard: 'credit_card',
   credit_card: 'credit_card',
+  // GLiNER2's wording for a concept that already has a canonical category —
+  // the model emits whichever synonym it was asked for, the UI sees one.
+  street_address: 'address',
+  payment_card: 'credit_card',
+  card_number: 'credit_card',
+  access_token: 'bearer_token',
 };
 
 export function normalizePiiCategory(label: string): string {
@@ -162,9 +168,11 @@ export function mergeDetections(
 export function buildPiiLabelAttributes(
   match: { category: string; token: string },
   range: { from: number; to: number },
+  formatAriaLabel?: (categoryLabel: string) => string,
 ): Record<string, string> {
   const category = normalizePiiCategory(match.category);
   const color = PII_COLORS[category];
+  const categoryLabel = color?.label ?? category;
   return {
     class: 'oa-pii-label',
     style: `--pii-category-color:${color?.light ?? '#6b7280'};--pii-category-color-dark:${color?.dark ?? '#4b5563'}`,
@@ -175,6 +183,10 @@ export function buildPiiLabelAttributes(
     'data-to': String(range.to),
     tabindex: '0',
     role: 'button',
-    'aria-label': `Redacted ${color?.label ?? category}. Activate to reveal.`,
+    // Default-locale fallback for callers with no translator (tests); the
+    // viewer injects basemind.pii.tokenAriaLabel via the third argument.
+    'aria-label': formatAriaLabel
+      ? formatAriaLabel(categoryLabel)
+      : `Redacted ${categoryLabel}. Activate to reveal.`,
   };
 }

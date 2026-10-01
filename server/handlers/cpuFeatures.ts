@@ -1,4 +1,4 @@
-import { resolveBasemindBinary } from '../utils/basemindManager';
+import { isNoAvx2BasemindBinary, resolveBasemindBinary } from '../utils/basemindManager';
 import { spawn } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { arch } from 'node:os';
@@ -93,4 +93,10 @@ export async function cpuFeatures(): Promise<{ arch: string; avx2: boolean; avx:
     });
     child.on('error', () => settle(detectFromProcCpuinfo()));
   });
+}
+
+/** IPC payload: detected features plus whether the staged binary is the noavx2 build. */
+export async function cpuFeaturesWithBuild(): Promise<CpuFeatures & { noavx2Build: boolean }> {
+  const features = await cpuFeatures();
+  return { ...features, noavx2Build: isNoAvx2BasemindBinary(resolveBasemindBinary()) };
 }

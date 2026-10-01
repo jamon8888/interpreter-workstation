@@ -93,6 +93,7 @@ files:
   - "!resources/codex-skills/**"
   - "!resources/browser-extension-relay/**"
   - "!resources/browser-extension-relay.zip"
+  - "!resources/basemind/**"
   - "!resources/qwen-asr/**"
   - "!resources/*.qcow2"
   - build/**

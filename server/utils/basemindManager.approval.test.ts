@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, mock, test } from 'bun:test';
  * `resolveMcpToolApprovalMode` falls back to `prompt` for a tool with no
  * recorded mode, and PII redaction calls `redact_text` on every send. Without
  * the exemption the user gets an approval dialog per message, so these cover
- * that it is applied, scoped to that one tool, and non-destructive.
+ * that it is applied, scoped to those tools, and non-destructive.
  */
 type ToolConfig = { approvalMode?: string } & Record<string, unknown>;
 let stored: { tools?: Record<string, ToolConfig> } | undefined;
@@ -16,9 +16,18 @@ mock.module('../configStore', () => ({
     if (readFails) throw new Error('config unreadable');
     return stored;
   },
-  updateMcpServer: async (_id: string, patch: Record<string, unknown>) => {
-    updates.push(patch);
-  },
+}));
+
+mock.module('./workspace', () => ({
+  getCurrentWorkspace: () => null,
+}));
+
+mock.module('../tools/toolManagerAccessor', () => ({
+  getToolManager: () => ({
+    updateServer: async (_id: string, patch: Record<string, unknown>) => {
+      updates.push(patch);
+    },
+  }),
 }));
 
 beforeEach(() => {
@@ -28,33 +37,38 @@ beforeEach(() => {
 });
 
 async function ensure() {
-  const { ensureRedactTextAutoApproval } = await import('./basemindManager');
-  await ensureRedactTextAutoApproval('basemind');
+  const { ensureBasemindServerConfig } = await import('./basemindManager');
+  await ensureBasemindServerConfig('basemind');
 }
 
 function writtenTools(): Record<string, ToolConfig> {
   return updates[0].tools as Record<string, ToolConfig>;
 }
 
-describe('ensureRedactTextAutoApproval', () => {
+describe('ensureBasemindServerConfig', () => {
   test('auto-approves redact_text when nothing is on file', async () => {
     await ensure();
 
     expect(updates).toHaveLength(1);
     expect(writtenTools().redact_text.approvalMode).toBe('auto');
+    expect(writtenTools().vault.approvalMode).toBe('auto');
+    expect(writtenTools().admin.approvalMode).toBe('auto');
+    expect(writtenTools().code.approvalMode).toBe('auto');
   });
 
   test('leaves an explicit choice alone', async () => {
-    // Someone who set this to prompt on purpose keeps it.
+    // Someone who set this to prompt on purpose keeps it. The config is still
+    // normalized (args/env/timeout) so a write happens either way.
     stored = { tools: { redact_text: { approvalMode: 'prompt' } } };
 
     await ensure();
 
-    expect(updates).toHaveLength(0);
+    expect(writtenTools().redact_text.approvalMode).toBe('prompt');
+    expect(writtenTools().vault.approvalMode).toBe('auto');
   });
 
   test('keeps other tools despite the one-level merge', async () => {
-    // updateMcpServer spreads one level deep, so writing a bare
+    // updateServer spreads one level deep, so writing a bare
     // { redact_text } would drop every other tool's settings.
     stored = { tools: { vault: { approvalMode: 'prompt' }, code: { approvalMode: 'prompt' } } };
 

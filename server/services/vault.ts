@@ -3,8 +3,9 @@
  * and decrypts it through basemind's `vault` MCP tool.
  *
  * basemind stays stateless here: the encrypted blob lives at
- * `{userData}/vaults/{docId}.enc` and only the decrypted map for the
- * requested document is ever returned to the renderer.
+ * `{userData}/vaults/<workspace-segment>/{docId}.enc` (legacy root when no
+ * workspace is active) and only the decrypted map for the requested document
+ * is ever returned to the renderer.
  */
 
 import path from 'node:path';
@@ -18,6 +19,8 @@ import { runOrphanBlobGcOnce } from './vaultGc';
 import { broadcastEvent } from '../handlers/broadcast';
 import { listAllThreadIds } from '../handlers/agentThreads';
 import { getCodexService, THREAD_LIST_DEFAULTS } from '../../src/lib/codex/service';
+import { getCurrentWorkspace } from '../utils/workspace';
+import { workspaceVaultSegment } from '../../src/lib/pii/vaultScope';
 export { runOrphanBlobGcOnce, resetGcFlagForTests } from './vaultGc';
 
 let gcTriggered = false;
@@ -55,8 +58,20 @@ export function resolveUserDataDir(): string {
   return path.join(homedir(), '.interpreter');
 }
 
+/**
+ * Vault directory for the current workspace: `{userData}/vaults/<segment>/`
+ * when a workspace is active, the legacy `{userData}/vaults/` root otherwise.
+ * Key and blobs stay together, so switching workspaces never re-reads another
+ * workspace's secrets.
+ */
+export function resolveVaultDir(userDataDir = resolveUserDataDir()): string {
+  const workspace = getCurrentWorkspace();
+  if (!workspace) return path.join(userDataDir, 'vaults');
+  return path.join(userDataDir, 'vaults', workspaceVaultSegment(workspace));
+}
+
 export function resolveVaultBlobPath(docId: string, userDataDir = resolveUserDataDir()): string {
-  return path.join(userDataDir, 'vaults', `${sanitizeVaultDocId(docId)}.enc`);
+  return path.join(resolveVaultDir(userDataDir), `${sanitizeVaultDocId(docId)}.enc`);
 }
 
 export function deleteVaultBlob(docId: string, userDataDir?: string): void {
@@ -67,12 +82,35 @@ export function deleteVaultBlob(docId: string, userDataDir?: string): void {
   }
 }
 
+export function deleteVaultBlobPath(fullPath: string): void {
+  if (fs.existsSync(fullPath)) {
+    fs.rmSync(fullPath);
+  }
+}
+
+/** All `*.enc` blobs under the vaults root, one level into workspace segments. */
+export function listVaultBlobs(userDataDir?: string): Array<{ docId: string; fullPath: string }> {
+  const root = path.join(userDataDir ?? resolveUserDataDir(), 'vaults');
+  if (!fs.existsSync(root)) return [];
+  const blobs: Array<{ docId: string; fullPath: string }> = [];
+  const scan = (dir: string): void => {
+    for (const file of fs.readdirSync(dir)) {
+      if (!file.endsWith('.enc') || file === '.vault-key.enc') continue;
+      const fullPath = path.join(dir, file);
+      if (!fs.statSync(fullPath).isFile()) continue;
+      blobs.push({ docId: file.slice(0, -4), fullPath });
+    }
+  };
+  scan(root);
+  for (const entry of fs.readdirSync(root, { withFileTypes: true })) {
+    if (entry.isDirectory()) scan(path.join(root, entry.name));
+  }
+  return blobs;
+}
+
+/** Doc ids of every stored blob, workspace segments included. */
 export function listVaultBlobDocIds(userDataDir?: string): string[] {
-  const vaultsDir = path.join(userDataDir ?? resolveUserDataDir(), 'vaults');
-  if (!fs.existsSync(vaultsDir)) return [];
-  return fs.readdirSync(vaultsDir)
-    .filter((f) => f.endsWith('.enc') && f !== '.vault-key.enc')
-    .map((f) => f.slice(0, -4));
+  return listVaultBlobs(userDataDir).map((blob) => blob.docId);
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -218,7 +256,7 @@ async function encrypt(
   return blob;
 }
 
-/** Write an encrypted blob to `{userData}/vaults/{docId}.enc`; returns the path. */
+/** Write an encrypted blob to the current vault directory; returns the path. */
 export function persistEncryptedBlob(docId: string, blob: string, userDataDir = resolveUserDataDir()): string {
   if (!blob) throw new Error('[vault] Cannot persist an empty encrypted blob');
   // Fire-and-forget: GC is async but this method is sync.
